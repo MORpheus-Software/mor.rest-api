@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,8 @@ const models = [
   { id: 'llama-3.1-sonar-huge-128k-online', name: 'Llama-3.1-Sonar-Huge-405B' },
 ];
 
+const API_ENDPOINT = "https://token-auth-saas-1081887913409.us-west1.run.app";
+
 const ApiPlayground = () => {
   const [selectedModel, setSelectedModel] = useState('llama-3.1-sonar-small-128k-online');
   const [prompt, setPrompt] = useState('');
@@ -35,12 +36,10 @@ const ApiPlayground = () => {
   const [requestCode, setRequestCode] = useState('');
   const location = useLocation();
   
-  // API keys from localStorage
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [selectedApiKey, setSelectedApiKey] = useState<string>('');
 
   useEffect(() => {
-    // Load API keys from localStorage
     const storedApiKeys = localStorage.getItem('apiKeys');
     if (storedApiKeys) {
       const parsedTokens: Token[] = JSON.parse(storedApiKeys);
@@ -55,7 +54,6 @@ const ApiPlayground = () => {
       
       setApiKeys(formattedApiKeys);
       
-      // If there are keys, select the first one
       if (formattedApiKeys.length > 0) {
         setSelectedApiKey(formattedApiKeys[0].id);
         updateRequestCode(
@@ -67,7 +65,6 @@ const ApiPlayground = () => {
       }
     }
     
-    // Check for apiKey query parameter
     const params = new URLSearchParams(location.search);
     const apiKeyParam = params.get('apiKey');
     
@@ -121,7 +118,7 @@ const ApiPlayground = () => {
 
   const updateRequestCode = (model: string, promptText: string, streaming: boolean, apiKey: string) => {
     const modelName = models.find(m => m.id === model)?.name || model;
-    const code = `fetch('/api/v1/chat/completions', {
+    const code = `fetch('${API_ENDPOINT}/api/v1/chat/completions', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -151,25 +148,41 @@ const ApiPlayground = () => {
       return;
     }
     
+    const apiKey = apiKeys.find(k => k.id === selectedApiKey)?.value;
+    
+    if (!apiKey) {
+      toast.error('No API key selected');
+      return;
+    }
+    
     setIsLoading(true);
     setResponse(null);
     
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const modelName = models.find(m => m.id === selectedModel)?.name || selectedModel;
       
-      // Generate a mock response
-      const mockResponses = [
-        "Hello! I'm an AI assistant. How can I help you today?",
-        "Hi there! I'm happy to assist with any questions or tasks you may have.",
-        "Greetings! I'm here to help. What would you like to know?",
-        "Hello! Thank you for your message. I'm ready to assist you with your queries.",
-      ];
+      const response = await fetch(`${API_ENDPOINT}/api/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [{ role: 'user', content: prompt }],
+          stream: false
+        })
+      });
       
-      const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
-      setResponse(randomResponse);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error?.message || `API request failed with status ${response.status}`);
+      }
       
-      // Update last used time for the API key in localStorage
+      const data = await response.json();
+      const completionText = data.choices[0]?.message?.content || 'No response content';
+      setResponse(completionText);
+      
       const storedApiKeys = localStorage.getItem('apiKeys');
       if (storedApiKeys && selectedApiKey) {
         const parsedTokens: Token[] = JSON.parse(storedApiKeys);
@@ -180,10 +193,9 @@ const ApiPlayground = () => {
         );
         localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
       }
-      
     } catch (error) {
       console.error('Error making request:', error);
-      toast.error('Failed to get a response. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to get a response. Please try again.');
     } finally {
       setIsLoading(false);
     }
