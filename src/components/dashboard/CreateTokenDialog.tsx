@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -58,8 +59,9 @@ export function CreateTokenDialog({
       // Simulate API call to create a token
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Generate a new token
-      const tokenValue = `tk_${uuidv4().replace(/-/g, '')}`;
+      // Generate a new OpenAI-compatible API key
+      // Format: 'sk_' followed by a random string
+      const tokenValue = `sk_${uuidv4().replace(/-/g, '')}`;
       setNewToken(tokenValue);
 
       // Create the token object
@@ -97,14 +99,14 @@ export function CreateTokenDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {newToken ? 'Your New API Token' : 'Create API Token'}
+            {newToken ? 'Your New API Key' : 'Create API Key'}
           </DialogTitle>
         </DialogHeader>
 
         {newToken ? (
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              Your new API token has been created. Please save this token somewhere safe - you won't be able to see it again.
+              Your new API key has been created. Please save this key somewhere safe - you won't be able to see it again.
             </div>
             
             <div className="p-3 bg-muted rounded-md font-mono text-sm break-all">
@@ -134,7 +136,7 @@ export function CreateTokenDialog({
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Token Name</FormLabel>
+                    <FormLabel>Key Name</FormLabel>
                     <FormControl>
                       <Input 
                         placeholder="e.g. Production API, Development Environment" 
@@ -156,7 +158,7 @@ export function CreateTokenDialog({
                   {isCreating && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  {isCreating ? 'Creating...' : 'Create Token'}
+                  {isCreating ? 'Creating...' : 'Create Key'}
                 </Button>
               </DialogFooter>
             </form>

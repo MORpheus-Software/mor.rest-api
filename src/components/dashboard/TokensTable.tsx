@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -79,8 +79,8 @@ export function TokensTable({
   const handleCopy = (token: string) => {
     onCopy(token);
     toast({
-      title: "Token copied to clipboard",
-      description: "You can now use this token for API requests",
+      title: "API key copied to clipboard",
+      description: "You can now use this key for API requests",
     });
   };
 
@@ -91,7 +91,7 @@ export function TokensTable({
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Token</TableHead>
+              <TableHead>API Key</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Last Used</TableHead>
@@ -102,7 +102,7 @@ export function TokensTable({
             {tokens.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
-                  No tokens found. Create your first token to get started.
+                  No API keys found. Create your first key to get started.
                 </TableCell>
               </TableRow>
             ) : (
@@ -196,9 +196,9 @@ export function TokensTable({
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent className="glass-card">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete API Token</AlertDialogTitle>
+            <AlertDialogTitle>Delete API Key</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the API token and any applications using it will stop working.
+              This action cannot be undone. This will permanently delete the API key and any applications using it will stop working.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

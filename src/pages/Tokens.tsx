@@ -18,7 +18,7 @@ const TokensPage = () => {
     // Simulate fetching tokens from API
     setTimeout(() => {
       // Check if we have tokens in localStorage
-      const savedTokens = localStorage.getItem('tokens');
+      const savedTokens = localStorage.getItem('apiKeys');
       
       if (savedTokens) {
         setTokens(JSON.parse(savedTokens));
@@ -28,7 +28,7 @@ const TokensPage = () => {
           {
             id: uuidv4(),
             name: 'Production API',
-            token: `tk_${uuidv4().replace(/-/g, '')}`,
+            token: `sk_${uuidv4().replace(/-/g, '')}`,
             status: 'active',
             createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
             lastUsed: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
@@ -36,7 +36,7 @@ const TokensPage = () => {
           {
             id: uuidv4(),
             name: 'Development API',
-            token: `tk_${uuidv4().replace(/-/g, '')}`,
+            token: `sk_${uuidv4().replace(/-/g, '')}`,
             status: 'active',
             createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
             lastUsed: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
@@ -44,7 +44,7 @@ const TokensPage = () => {
           {
             id: uuidv4(),
             name: 'Testing Server',
-            token: `tk_${uuidv4().replace(/-/g, '')}`,
+            token: `sk_${uuidv4().replace(/-/g, '')}`,
             status: 'inactive',
             createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
             lastUsed: null
@@ -52,7 +52,7 @@ const TokensPage = () => {
         ];
         
         setTokens(sampleTokens);
-        localStorage.setItem('tokens', JSON.stringify(sampleTokens));
+        localStorage.setItem('apiKeys', JSON.stringify(sampleTokens));
       }
       
       setIsLoading(false);
@@ -62,7 +62,7 @@ const TokensPage = () => {
   const handleCreateToken = (token: Token) => {
     const updatedTokens = [...tokens, token];
     setTokens(updatedTokens);
-    localStorage.setItem('tokens', JSON.stringify(updatedTokens));
+    localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
     setIsCreateDialogOpen(false);
   };
   
@@ -72,11 +72,11 @@ const TokensPage = () => {
     );
     
     setTokens(updatedTokens);
-    localStorage.setItem('tokens', JSON.stringify(updatedTokens));
+    localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
     
     toast({
-      title: "Token activated",
-      description: "The API token is now active and can be used for authentication",
+      title: "API key activated",
+      description: "The API key is now active and can be used for authentication",
     });
   };
   
@@ -86,11 +86,11 @@ const TokensPage = () => {
     );
     
     setTokens(updatedTokens);
-    localStorage.setItem('tokens', JSON.stringify(updatedTokens));
+    localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
     
     toast({
-      title: "Token deactivated",
-      description: "The API token is now inactive and cannot be used for authentication",
+      title: "API key deactivated",
+      description: "The API key is now inactive and cannot be used for authentication",
     });
   };
   
@@ -98,11 +98,11 @@ const TokensPage = () => {
     const updatedTokens = tokens.filter(token => token.id !== id);
     
     setTokens(updatedTokens);
-    localStorage.setItem('tokens', JSON.stringify(updatedTokens));
+    localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
     
     toast({
-      title: "Token deleted",
-      description: "The API token has been permanently deleted",
+      title: "API key deleted",
+      description: "The API key has been permanently deleted",
     });
   };
   
@@ -115,15 +115,15 @@ const TokensPage = () => {
     
     if (token?.status === 'inactive') {
       toast({
-        title: "Cannot test inactive token",
-        description: "Please activate the token before testing",
+        title: "Cannot test inactive key",
+        description: "Please activate the key before testing",
         variant: "destructive",
       });
       return;
     }
     
     toast({
-      title: "Testing token",
+      title: "Testing API key",
       description: "Redirecting to API playground...",
     });
     
@@ -133,30 +133,28 @@ const TokensPage = () => {
     );
     
     setTokens(updatedTokens);
-    localStorage.setItem('tokens', JSON.stringify(updatedTokens));
+    localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
     
-    // In a real app, we would redirect to playground with this token
-    setTimeout(() => {
-      window.location.href = `/playground?token=${tokens.find(t => t.id === id)?.token}`;
-    }, 500);
+    // Redirect to playground with this token
+    window.location.href = `/playground?apiKey=${tokens.find(t => t.id === id)?.token}`;
   };
 
   return (
     <DashboardLayout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">API Tokens</h1>
-          <p className="text-muted-foreground">Manage the tokens used to authenticate with your API</p>
+          <h1 className="text-3xl font-bold tracking-tight">API Keys</h1>
+          <p className="text-muted-foreground">Manage the API keys used to authenticate with our API</p>
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Create Token
+          Create API Key
         </Button>
       </div>
       
       {isLoading ? (
         <div className="rounded-lg border h-[400px] flex items-center justify-center">
-          <div className="animate-pulse text-muted-foreground">Loading tokens...</div>
+          <div className="animate-pulse text-muted-foreground">Loading API keys...</div>
         </div>
       ) : (
         <TokensTable

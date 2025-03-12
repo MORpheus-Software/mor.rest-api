@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Code } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { Token } from '@/components/dashboard/TokensTable';
 
 interface ApiKey {
   id: string;
@@ -32,31 +33,90 @@ const ApiPlayground = () => {
   const [response, setResponse] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [requestCode, setRequestCode] = useState('');
+  const location = useLocation();
   
-  // Mock API keys
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([
-    { 
-      id: '1', 
-      value: 'sk-2c528daeee9d9806e284b9f15bd51809e01cca7f5f9bcfce', 
-      label: 'sk-2c52...cfce (OpenAI-compatible)',
-      isActive: true
+  // API keys from localStorage
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [selectedApiKey, setSelectedApiKey] = useState<string>('');
+
+  useEffect(() => {
+    // Load API keys from localStorage
+    const storedApiKeys = localStorage.getItem('apiKeys');
+    if (storedApiKeys) {
+      const parsedTokens: Token[] = JSON.parse(storedApiKeys);
+      const formattedApiKeys: ApiKey[] = parsedTokens
+        .filter(token => token.status === 'active')
+        .map(token => ({
+          id: token.id,
+          value: token.token,
+          label: `${token.token.substring(0, 8)}...${token.token.substring(token.token.length - 4)} (${token.name})`,
+          isActive: true
+        }));
+      
+      setApiKeys(formattedApiKeys);
+      
+      // If there are keys, select the first one
+      if (formattedApiKeys.length > 0) {
+        setSelectedApiKey(formattedApiKeys[0].id);
+        updateRequestCode(
+          selectedModel, 
+          prompt, 
+          isStreaming, 
+          formattedApiKeys[0].value
+        );
+      }
     }
-  ]);
-  const [selectedApiKey, setSelectedApiKey] = useState(apiKeys[0]?.id);
+    
+    // Check for apiKey query parameter
+    const params = new URLSearchParams(location.search);
+    const apiKeyParam = params.get('apiKey');
+    
+    if (apiKeyParam && storedApiKeys) {
+      const parsedTokens: Token[] = JSON.parse(storedApiKeys);
+      const matchingToken = parsedTokens.find(token => token.token === apiKeyParam && token.status === 'active');
+      
+      if (matchingToken) {
+        const matchingKey = {
+          id: matchingToken.id,
+          value: matchingToken.token,
+          label: `${matchingToken.token.substring(0, 8)}...${matchingToken.token.substring(matchingToken.token.length - 4)} (${matchingToken.name})`,
+          isActive: true
+        };
+        
+        setSelectedApiKey(matchingKey.id);
+        updateRequestCode(selectedModel, prompt, isStreaming, matchingKey.value);
+      }
+    }
+  }, [location.search]);
 
   const handleModelChange = (value: string) => {
     setSelectedModel(value);
-    updateRequestCode(value, prompt, isStreaming, apiKeys.find(k => k.id === selectedApiKey)?.value || '');
+    updateRequestCode(
+      value, 
+      prompt, 
+      isStreaming, 
+      apiKeys.find(k => k.id === selectedApiKey)?.value || ''
+    );
   };
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(e.target.value);
-    updateRequestCode(selectedModel, e.target.value, isStreaming, apiKeys.find(k => k.id === selectedApiKey)?.value || '');
+    updateRequestCode(
+      selectedModel, 
+      e.target.value, 
+      isStreaming, 
+      apiKeys.find(k => k.id === selectedApiKey)?.value || ''
+    );
   };
 
   const handleStreamingChange = (checked: boolean) => {
     setIsStreaming(checked);
-    updateRequestCode(selectedModel, prompt, checked, apiKeys.find(k => k.id === selectedApiKey)?.value || '');
+    updateRequestCode(
+      selectedModel, 
+      prompt, 
+      checked, 
+      apiKeys.find(k => k.id === selectedApiKey)?.value || ''
+    );
   };
 
   const updateRequestCode = (model: string, promptText: string, streaming: boolean, apiKey: string) => {
@@ -109,6 +169,18 @@ const ApiPlayground = () => {
       const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
       setResponse(randomResponse);
       
+      // Update last used time for the API key in localStorage
+      const storedApiKeys = localStorage.getItem('apiKeys');
+      if (storedApiKeys && selectedApiKey) {
+        const parsedTokens: Token[] = JSON.parse(storedApiKeys);
+        const updatedTokens = parsedTokens.map(token => 
+          token.id === selectedApiKey 
+            ? { ...token, lastUsed: new Date().toISOString() } 
+            : token
+        );
+        localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
+      }
+      
     } catch (error) {
       console.error('Error making request:', error);
       toast.error('Failed to get a response. Please try again.');
@@ -117,33 +189,21 @@ const ApiPlayground = () => {
     }
   };
 
-  const handleAddNewApiKey = () => {
-    toast.info('This would open a dialog to add a new API key in a real application.');
-  };
-
-  const deactivateApiKey = (keyId: string) => {
-    setApiKeys(apiKeys.map(key => 
-      key.id === keyId ? { ...key, isActive: false } : key
-    ));
-    toast.success('API key deactivated successfully');
-  };
-
-  const removeApiKey = (keyId: string) => {
-    setApiKeys(apiKeys.filter(key => key.id !== keyId));
-    toast.success('API key removed successfully');
+  const redirectToTokensPage = () => {
+    window.location.href = '/tokens';
   };
 
   return (
     <DashboardLayout>
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight">API Playground</h1>
-        <p className="text-muted-foreground">Test your API tokens and interact with AI models</p>
+        <p className="text-muted-foreground">Test your API keys and interact with AI models</p>
       </div>
       
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>API Rate Limiting</CardTitle>
+            <CardTitle>API Testing</CardTitle>
             <CardDescription>
               Click "Make Request" below to test the API. Look for the response in box below labeled "Response"
             </CardDescription>
@@ -210,67 +270,51 @@ const ApiPlayground = () => {
               
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <Label>Select API Key ({apiKeys.filter(k => k.isActive).length} active):</Label>
-                  <Select value={selectedApiKey} onValueChange={handleApiKeyChange}>
-                    <SelectTrigger className="w-[300px]">
-                      <SelectValue placeholder="Select API key" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {apiKeys.filter(k => k.isActive).map(key => (
-                        <SelectItem key={key.id} value={key.id}>
-                          {key.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Select API Key ({apiKeys.length} available):</Label>
+                  {apiKeys.length > 0 ? (
+                    <Select value={selectedApiKey} onValueChange={handleApiKeyChange}>
+                      <SelectTrigger className="w-[300px]">
+                        <SelectValue placeholder="Select API key" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {apiKeys.map(key => (
+                          <SelectItem key={key.id} value={key.id}>
+                            {key.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="text-muted-foreground">No API keys available</div>
+                  )}
                   
-                  <Button onClick={handleSubmit} disabled={isLoading} className="ml-4">
+                  <Button onClick={handleSubmit} disabled={isLoading || apiKeys.length === 0} className="ml-4">
                     Make request
                   </Button>
                 </div>
                 
-                {apiKeys.map(key => (
-                  <div key={key.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                    <div>
-                      <div className="font-mono text-sm">{key.value}</div>
-                      <div className="text-sm text-muted-foreground">OpenAI-compatible</div>
-                    </div>
-                    <div className="flex space-x-2">
-                      {key.isActive ? (
-                        <Button 
-                          variant="outline" 
-                          className="bg-blue-500 hover:bg-blue-600 text-white" 
-                          onClick={() => deactivateApiKey(key.id)}
-                        >
-                          Deactivate
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="outline"
-                          onClick={() => setApiKeys(apiKeys.map(k => 
-                            k.id === key.id ? { ...k, isActive: true } : k
-                          ))}
-                        >
-                          Activate
-                        </Button>
-                      )}
-                      <Button 
-                        variant="outline" 
-                        onClick={() => removeApiKey(key.id)}
-                      >
-                        Remove
+                {apiKeys.length === 0 ? (
+                  <div className="p-6 bg-slate-50 dark:bg-slate-900 rounded-lg text-center">
+                    <p className="mb-4">You don't have any active API keys.</p>
+                    <Button onClick={redirectToTokensPage}>
+                      Create API Key
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm font-medium">Using API Key</p>
+                        <p className="font-mono text-xs mt-1">
+                          {apiKeys.find(k => k.id === selectedApiKey)?.value.substring(0, 12)}...
+                        </p>
+                      </div>
+                      <Button variant="outline" onClick={redirectToTokensPage}>
+                        Manage API Keys
                       </Button>
                     </div>
                   </div>
-                ))}
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
-                  onClick={handleAddNewApiKey}
-                >
-                  Add new API Key
-                </Button>
+                )}
               </div>
             </div>
           </CardContent>
