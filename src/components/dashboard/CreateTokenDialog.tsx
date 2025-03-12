@@ -154,9 +154,3 @@ export function CreateTokenDialog({ open, onOpenChange, onCreateToken }: CreateT
     </Dialog>
   );
 }
-
-// Add uuid dependency
-<lov-add-dependency>uuid@latest</lov-add-dependency>
-
-// Add @types/uuid dependency for TypeScript
-<lov-add-dependency>@types/uuid@latest</lov-add-dependency>
