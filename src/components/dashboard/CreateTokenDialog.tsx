@@ -1,154 +1,166 @@
-
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Copy } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { v4 as uuidv4 } from 'uuid';
+import { Token } from './TokensTable';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
+
+const formSchema = z.object({
+  name: z.string().min(1, 'Token name is required'),
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 type CreateTokenDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateToken: (token: any) => void;
+  onCreateToken: (token: Token) => void;
 };
 
-export function CreateTokenDialog({ open, onOpenChange, onCreateToken }: CreateTokenDialogProps) {
-  const { toast } = useToast();
-  const [step, setStep] = useState<'form' | 'created'>('form');
-  const [loading, setLoading] = useState(false);
-  const [tokenName, setTokenName] = useState('');
-  const [generatedToken, setGeneratedToken] = useState('');
+export function CreateTokenDialog({
+  open,
+  onOpenChange,
+  onCreateToken,
+}: CreateTokenDialogProps) {
+  const [isCreating, setIsCreating] = useState(false);
+  const [newToken, setNewToken] = useState<string | null>(null);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tokenName.trim()) return;
-    
-    setLoading(true);
-    
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: '',
+    },
+  });
+
+  const onSubmit = async (values: FormValues) => {
+    setIsCreating(true);
+
     try {
-      // Generate a token
-      const newToken = `tk_${uuidv4().replace(/-/g, '')}`;
-      setGeneratedToken(newToken);
-      
-      // Create token object
-      const token = {
+      // Simulate API call to create a token
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Generate a new token
+      const tokenValue = `tk_${uuidv4().replace(/-/g, '')}`;
+      setNewToken(tokenValue);
+
+      // Create the token object
+      const token: Token = {
         id: uuidv4(),
-        name: tokenName,
-        token: newToken,
-        status: 'active',
+        name: values.name,
+        token: tokenValue,
+        status: 'active' as const,
         createdAt: new Date().toISOString(),
-        lastUsed: null
+        lastUsed: null,
       };
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
+
       onCreateToken(token);
-      setStep('created');
+      
+      // Reset the form but keep the dialog open to show the new token
+      form.reset();
     } catch (error) {
-      toast({
-        title: "Error creating token",
-        description: "Please try again",
-        variant: "destructive",
-      });
+      console.error('Error creating token:', error);
     } finally {
-      setLoading(false);
+      setIsCreating(false);
     }
   };
 
-  const handleCopyToken = () => {
-    navigator.clipboard.writeText(generatedToken);
-    toast({
-      title: "Token copied to clipboard",
-      description: "Make sure to store it securely, as it won't be shown again",
-    });
-  };
-
-  const handleClose = () => {
+  const handleCloseDialog = () => {
     onOpenChange(false);
-    // Reset the dialog state after it's closed
+    // Wait for dialog close animation before resetting state
     setTimeout(() => {
-      setStep('form');
-      setTokenName('');
-      setGeneratedToken('');
+      setNewToken(null);
+      form.reset();
     }, 300);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="glass-card sm:max-w-md">
-        {step === 'form' ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Create New API Token</DialogTitle>
-              <DialogDescription>
-                Generate a new token to access the API. This token will have full access to your account.
-              </DialogDescription>
-            </DialogHeader>
+    <Dialog open={open} onOpenChange={handleCloseDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {newToken ? 'Your New API Token' : 'Create API Token'}
+          </DialogTitle>
+        </DialogHeader>
+
+        {newToken ? (
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              Your new API token has been created. Please save this token somewhere safe - you won't be able to see it again.
+            </div>
             
-            <form onSubmit={handleCreate} className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Token Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g. Production Server"
-                  value={tokenName}
-                  onChange={(e) => setTokenName(e.target.value)}
-                  disabled={loading}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  Give your token a descriptive name to help you identify it later.
-                </p>
-              </div>
+            <div className="p-3 bg-muted rounded-md font-mono text-sm break-all">
+              {newToken}
+            </div>
+            
+            <div className="flex justify-between">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(newToken);
+                }}
+              >
+                Copy to clipboard
+              </Button>
               
-              <DialogFooter className="pt-4">
-                <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={!tokenName.trim() || loading}>
-                  {loading ? "Creating..." : "Generate Token"}
+              <Button onClick={handleCloseDialog}>
+                Done
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Token Name</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g. Production API, Development Environment" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter className="mt-6">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button type="submit" disabled={isCreating}>
+                  {isCreating && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {isCreating ? 'Creating...' : 'Create Token'}
                 </Button>
               </DialogFooter>
             </form>
-          </>
-        ) : (
-          <>
-            <DialogHeader>
-              <DialogTitle>Token Created</DialogTitle>
-              <DialogDescription>
-                This token will only be displayed once. Please copy it and store it securely.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4 py-4">
-              <div className="p-4 rounded-md bg-muted/50 border border-muted">
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-sm text-muted-foreground">Your API Token</Label>
-                  <Button size="sm" variant="ghost" onClick={handleCopyToken} className="h-8">
-                    <Copy className="h-3.5 w-3.5 mr-2" />
-                    Copy
-                  </Button>
-                </div>
-                <code className="block w-full p-2 rounded bg-background/80 text-sm break-all">
-                  {generatedToken}
-                </code>
-              </div>
-              
-              <div className="rounded-md bg-amber-50 p-3 text-amber-800 text-sm">
-                <p className="font-medium">Important Security Notice</p>
-                <p className="text-xs mt-1">
-                  You won't be able to see this token again. If you lose it, you'll need to generate a new one.
-                </p>
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button onClick={handleClose}>Done</Button>
-            </DialogFooter>
-          </>
+          </Form>
         )}
       </DialogContent>
     </Dialog>

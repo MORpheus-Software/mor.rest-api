@@ -68,7 +68,7 @@ const TokensPage = () => {
   
   const handleActivateToken = (id: string) => {
     const updatedTokens = tokens.map(token => 
-      token.id === id ? { ...token, status: 'active' } : token
+      token.id === id ? { ...token, status: 'active' as const } : token
     );
     
     setTokens(updatedTokens);
@@ -82,7 +82,7 @@ const TokensPage = () => {
   
   const handleDeactivateToken = (id: string) => {
     const updatedTokens = tokens.map(token => 
-      token.id === id ? { ...token, status: 'inactive' } : token
+      token.id === id ? { ...token, status: 'inactive' as const } : token
     );
     
     setTokens(updatedTokens);
