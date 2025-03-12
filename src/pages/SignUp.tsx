@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Github, Mail } from 'lucide-react';
+import { initiateGitHubAuth } from '@/utils/githubAuth';
 
 const SignUp = () => {
   const [email, setEmail] = useState('');
@@ -54,22 +54,14 @@ const SignUp = () => {
     }
   };
 
-  const handleSocialSignUp = async (provider: string) => {
+  const handleGitHubSignUp = async () => {
     try {
       setIsLoading(true);
-      // Mock social login - in a real app, this would redirect to the provider's OAuth flow
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Store the auth state in localStorage (for demo purposes only)
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('user', JSON.stringify({ email: `user@${provider}.com` }));
-      
-      toast.success(`Signed up with ${provider} successfully!`);
-      navigate('/dashboard');
+      initiateGitHubAuth();
+      // The page will redirect to GitHub, so we don't need to do anything else here
     } catch (error) {
-      toast.error(`Failed to sign up with ${provider}. Please try again.`);
+      toast.error(`Failed to sign up with GitHub. Please try again.`);
       console.error(error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -93,7 +85,7 @@ const SignUp = () => {
               variant="outline" 
               type="button" 
               disabled={isLoading}
-              onClick={() => handleSocialSignUp('github')}
+              onClick={handleGitHubSignUp}
               className="w-full"
             >
               <Github className="mr-2 h-4 w-4" />

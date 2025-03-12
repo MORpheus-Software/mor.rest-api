@@ -16,6 +16,7 @@ import Documentation from "./pages/Documentation";
 import Dashboard from "./pages/Dashboard";
 import Tokens from "./pages/Tokens";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import GitHubCallback from "./pages/GitHubCallback";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/auth/github/callback" element={<GitHubCallback />} />
           
           {/* Protected routes */}
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
