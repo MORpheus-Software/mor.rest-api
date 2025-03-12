@@ -1,69 +1,53 @@
-
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, ChevronRight, Key, LockKeyhole, Shield, Code, BookOpen, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [scrollY, setScrollY] = useState(0);
-  const features = [
-    {
-      title: 'Secure Token Management',
-      description: 'Create, activate, deactivate, and delete API tokens with ease. Full control over who has access to your API.',
-      icon: Key,
-    },
-    {
-      title: 'Fine-grained Permissions',
-      description: 'Set precise permissions for each token, controlling exactly what actions they can perform.',
-      icon: LockKeyhole,
-    },
-    {
-      title: 'Usage Analytics',
-      description: 'Track when and how your tokens are being used with detailed request logs and usage statistics.',
-      icon: Shield,
-    },
-    {
-      title: 'Interactive API Playground',
-      description: 'Test your API endpoints directly from the dashboard with our built-in API playground.',
-      icon: Code,
-    },
-    {
-      title: 'Comprehensive Documentation',
-      description: 'Access detailed guides, API references, and examples to help you get the most out of our platform.',
-      icon: BookOpen,
-    },
-    {
-      title: 'MOR Token Staking',
-      description: 'Stake MOR tokens to unlock premium features and higher rate limits for your API usage.',
-      icon: Wallet,
-    },
-  ];
-
+  const features = [{
+    title: 'Secure Token Management',
+    description: 'Create, activate, deactivate, and delete API tokens with ease. Full control over who has access to your API.',
+    icon: Key
+  }, {
+    title: 'Fine-grained Permissions',
+    description: 'Set precise permissions for each token, controlling exactly what actions they can perform.',
+    icon: LockKeyhole
+  }, {
+    title: 'Usage Analytics',
+    description: 'Track when and how your tokens are being used with detailed request logs and usage statistics.',
+    icon: Shield
+  }, {
+    title: 'Interactive API Playground',
+    description: 'Test your API endpoints directly from the dashboard with our built-in API playground.',
+    icon: Code
+  }, {
+    title: 'Comprehensive Documentation',
+    description: 'Access detailed guides, API references, and examples to help you get the most out of our platform.',
+    icon: BookOpen
+  }, {
+    title: 'MOR Token Staking',
+    description: 'Stake MOR tokens to unlock premium features and higher rate limits for your API usage.',
+    icon: Wallet
+  }];
   useEffect(() => {
     // Check if user is authenticated
     const auth = localStorage.getItem('isAuthenticated');
     setIsAuthenticated(!!auth);
-    
+
     // Add scroll listener
     const handleScroll = () => {
       setScrollY(window.scrollY);
     };
-    
     window.addEventListener('scroll', handleScroll);
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
-
-  return (
-    <div className="flex flex-col min-h-screen">
+  return <div className="flex flex-col min-h-screen">
       {/* Navbar */}
-      <header className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-apple-ease py-4 px-6",
-        scrollY > 10 ? "bg-white/80 backdrop-blur-lg shadow-sm" : "bg-transparent"
-      )}>
+      <header className={cn("fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-apple-ease py-4 px-6", scrollY > 10 ? "bg-white/80 backdrop-blur-lg shadow-sm" : "bg-transparent")}>
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 font-medium">
             <div className="rounded-lg bg-primary p-1.5 text-white">API</div>
@@ -83,23 +67,19 @@ const Index = () => {
           </nav>
           
           <div className="flex items-center gap-4">
-            {isAuthenticated ? (
-              <Button asChild>
+            {isAuthenticated ? <Button asChild>
                 <Link to="/dashboard">
                   Dashboard
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
-              </Button>
-            ) : (
-              <>
+              </Button> : <>
                 <Button variant="ghost" asChild>
                   <Link to="/signin">Sign In</Link>
                 </Button>
                 <Button asChild>
                   <Link to="/signup">Sign Up</Link>
                 </Button>
-              </>
-            )}
+              </>}
           </div>
         </div>
       </header>
@@ -132,11 +112,7 @@ const Index = () => {
         </div>
         
         <div className="w-full max-w-4xl mt-16 rounded-xl overflow-hidden shadow-xl animate-scale-in opacity-90 hover:opacity-100 transition-opacity">
-          <img 
-            src="https://via.placeholder.com/1200x600/f5f5f5/cccccc?text=API+Token+Dashboard" 
-            alt="API Token Dashboard Preview" 
-            className="w-full h-auto"
-          />
+          
         </div>
       </section>
 
@@ -153,18 +129,13 @@ const Index = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <div 
-                key={index} 
-                className="glass-card p-6 rounded-xl shadow-subtle hover-scale"
-              >
+            {features.map((feature, index) => <div key={index} className="glass-card p-6 rounded-xl shadow-subtle hover-scale">
                 <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
                   <feature.icon className="h-6 w-6 text-primary" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
                 <p className="text-muted-foreground">{feature.description}</p>
-              </div>
-            ))}
+              </div>)}
           </div>
           
           <div className="mt-16 text-center">
@@ -281,8 +252,6 @@ const Index = () => {
           </div>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
