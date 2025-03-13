@@ -1,7 +1,7 @@
 
 import { Request, Response, NextFunction } from 'express';
-import { get } from '../../lib/redis-adapter';
-import { API_KEY_PREFIX } from '../../lib/api/constants';
+import { get } from '../../lib/redis-adapter.js';
+import { API_KEY_PREFIX } from '../../lib/api/constants.js';
 
 export interface AuthenticatedRequest extends Request {
   // The user ID associated with the API key if authentication was successful

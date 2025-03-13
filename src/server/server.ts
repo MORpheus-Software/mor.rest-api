@@ -4,10 +4,10 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
-import chatCompletionsHandler from '../api/v1/chat/completions';
-import keyHandlers from '../api/v1/keys';
-import metricsHandlers from '../api/v1/metrics';
-import { checkRedisConnection } from './setupRedis';
+import chatCompletionsHandler from '../api/v1/chat/completions.js';
+import keyHandlers from '../api/v1/keys.js';
+import metricsHandlers from '../api/v1/metrics.js';
+import { checkRedisConnection } from './setupRedis.js';
 
 // Load environment variables
 dotenv.config();

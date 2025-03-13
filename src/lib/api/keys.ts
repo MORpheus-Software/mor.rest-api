@@ -1,7 +1,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
-import { set, get, del, exists, sadd, srem, smembers, keys } from '../../lib/redis-adapter';
-import { API_KEY_PREFIX, USER_KEYS_PREFIX } from '../../lib/api/constants';
+import { set, get, del, exists, sadd, srem, smembers, keys } from '../../lib/redis-adapter.js';
+import { API_KEY_PREFIX, USER_KEYS_PREFIX } from '../../lib/api/constants.js';
 
 export interface ApiKeyInfo {
   key: string;

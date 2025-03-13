@@ -1,7 +1,7 @@
 
 import { Request, Response } from 'express';
 import chalk from 'chalk';
-import { AuthenticatedRequest } from '../../lib/api/auth-middleware';
+import { AuthenticatedRequest } from '../../lib/api/auth-middleware.js';
 
 // Sample metrics data generator
 const generateSampleMetrics = (userId: string) => {

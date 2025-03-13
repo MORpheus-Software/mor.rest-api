@@ -1,7 +1,7 @@
 
 import { Request, Response } from 'express';
-import { authMiddleware, requireAuth, AuthenticatedRequest } from '../../lib/api/auth-middleware';
-import { createApiKey, getUserApiKeys, deleteApiKey, ApiKeyInfo, hasAnyApiKeys } from '../../lib/api/keys';
+import { authMiddleware, requireAuth, AuthenticatedRequest } from '../../lib/api/auth-middleware.js';
+import { createApiKey, getUserApiKeys, deleteApiKey, ApiKeyInfo, hasAnyApiKeys } from '../../lib/api/keys.js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Get all API keys for the current user
