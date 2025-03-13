@@ -10,8 +10,8 @@ const isBrowser = typeof process === 'undefined' ||
 
 // Base URL for the API, configure via environment variables
 export const API_BASE_URL = isBrowser 
-  ? (process.env?.VITE_API_BASE_URL || 'https://token-auth-saas-1081887913409.us-west1.run.app')
-  : (process.env?.VITE_API_BASE_URL || 'https://token-auth-saas-1081887913409.us-west1.run.app'); 
+  ? (process.env?.VITE_API_BASE_URL || 'https://nfa-proxy-1081887913409.us-west1.run.app')
+  : (process.env?.VITE_API_BASE_URL || 'https://nfa-proxy-1081887913409.us-west1.run.app'); 
 
 // API endpoint for frontend requests - uses absolute URL for proxied requests
 export const FRONTEND_API_ENDPOINT = '/api/v1';

@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       '/api': {
-        target: 'https://token-auth-saas-1081887913409.us-west1.run.app',
+        target: 'https://nfa-proxy-1081887913409.us-west1.run.app',
         changeOrigin: true,
         secure: true,
       }
