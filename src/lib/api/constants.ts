@@ -4,10 +4,9 @@ export const API_KEY_PREFIX = 'apikey:';
 export const USER_KEYS_PREFIX = 'user-keys:';
 
 // Check if we're in a browser environment using safer type checks
-const isBrowser = typeof globalThis !== 'undefined' && 
-  typeof globalThis === 'object' && 
-  'window' in globalThis && 
-  globalThis.window === globalThis;
+const isBrowser = typeof window !== 'undefined' && 
+  typeof document !== 'undefined' && 
+  typeof window.document === 'object';
 
 // Base URL for the API, configure via environment variables
 export const API_BASE_URL = isBrowser 

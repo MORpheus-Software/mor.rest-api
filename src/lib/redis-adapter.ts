@@ -1,13 +1,13 @@
+
 import { createClient, RedisClientType } from 'redis';
 
 // Redis connection configuration
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 // Flag to determine if we're in a browser environment with proper type checking
-const isBrowser = typeof globalThis !== 'undefined' && 
-  typeof globalThis === 'object' && 
-  'window' in globalThis && 
-  globalThis.window === globalThis;
+const isBrowser = typeof window !== 'undefined' && 
+  typeof document !== 'undefined' && 
+  typeof window.document === 'object';
 
 // Mock Redis client for browser environments
 const mockRedisClient = {

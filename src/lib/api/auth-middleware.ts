@@ -4,10 +4,9 @@ import { get } from '../redis-adapter.js';
 import { API_KEY_PREFIX } from './constants.js';
 
 // Check if we're in a browser environment using safer type checks
-const isBrowser = typeof globalThis !== 'undefined' && 
-  typeof globalThis === 'object' && 
-  'window' in globalThis && 
-  globalThis.window === globalThis;
+const isBrowser = typeof window !== 'undefined' && 
+  typeof document !== 'undefined' && 
+  typeof window.document === 'object';
 
 export interface AuthenticatedRequest extends Request {
   // The user ID associated with the API key if authentication was successful
