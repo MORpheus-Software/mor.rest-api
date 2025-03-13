@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Code, Play, FileJson, Copy } from 'lucide-react';
+import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants';
 
 export function ApiPlayground() {
   const { toast } = useToast();
@@ -20,7 +20,7 @@ export function ApiPlayground() {
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [requestBody, setRequestBody] = useState('{\n  "name": "John Doe"\n}');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
       toast({
@@ -37,94 +37,67 @@ export function ApiPlayground() {
     
     const startTime = performance.now();
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      console.log(`Making real API request to ${endpoint}`);
+      
+      const options: RequestInit = {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      if (method === 'POST' || method === 'PUT') {
+        try {
+          const parsedBody = JSON.parse(requestBody);
+          options.body = JSON.stringify(parsedBody);
+        } catch (error) {
+          toast({
+            title: "Invalid JSON",
+            description: "Please check your request body format",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      const response = await fetch(`${endpoint}`, options);
       const endTime = performance.now();
       setResponseTime(Math.round(endTime - startTime));
       
-      let mockResponse;
+      let data;
+      const contentType = response.headers.get('content-type');
       
-      if (endpoint === '/api/v1/user') {
-        switch (method) {
-          case 'GET':
-            mockResponse = {
-              status: 200,
-              data: {
-                id: '123',
-                name: 'Demo User',
-                email: 'demo@tokenhub.com',
-                createdAt: new Date().toISOString(),
-              }
-            };
-            break;
-          case 'POST':
-            mockResponse = {
-              status: 201,
-              data: {
-                message: 'User created successfully',
-                user: {
-                  id: '456',
-                  ...JSON.parse(requestBody),
-                  createdAt: new Date().toISOString(),
-                }
-              }
-            };
-            break;
-          case 'PUT':
-            mockResponse = {
-              status: 200,
-              data: {
-                message: 'User updated successfully',
-                user: {
-                  id: '123',
-                  ...JSON.parse(requestBody),
-                  updatedAt: new Date().toISOString(),
-                }
-              }
-            };
-            break;
-          case 'DELETE':
-            mockResponse = {
-              status: 204,
-              data: null
-            };
-            break;
-          default:
-            mockResponse = {
-              status: 400,
-              error: 'Invalid method'
-            };
-        }
-      } else if (endpoint === '/api/v1/tokens') {
-        mockResponse = {
-          status: 200,
-          data: {
-            tokens: [
-              {
-                id: '1',
-                name: 'Production API',
-                createdAt: new Date().toISOString(),
-                lastUsed: new Date().toISOString(),
-              },
-              {
-                id: '2',
-                name: 'Development API',
-                createdAt: new Date().toISOString(),
-                lastUsed: null,
-              }
-            ]
-          }
-        };
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
       } else {
-        mockResponse = {
-          status: 404,
-          error: 'Endpoint not found'
-        };
+        data = await response.text();
       }
       
-      setResponse(mockResponse);
+      setResponse({
+        status: response.status,
+        data
+      });
+    } catch (error) {
+      console.error('API request error:', error);
+      toast({
+        title: "Request failed",
+        description: (error as Error).message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+      
+      const endTime = performance.now();
+      setResponseTime(Math.round(endTime - startTime));
+      
+      setResponse({
+        status: 'Error',
+        error: (error as Error).message || "An unexpected error occurred"
+      });
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   const copyResponse = () => {

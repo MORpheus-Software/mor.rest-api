@@ -178,47 +178,92 @@ const ApiPlayground = () => {
     abortControllerRef.current = new AbortController();
     
     try {
+      console.log(`Making real API request to ${FRONTEND_API_ENDPOINT}/chat/completions`);
+      
       const modelName = models.find(m => m.id === selectedModel)?.name || selectedModel;
       
-      // For the playground, let's mock the API call instead of making a real one
-      // This ensures the playground works even if the backend isn't ready
-      setTimeout(() => {
-        if (isStreaming) {
-          let mockResponse = '';
-          const sentences = [
-            "Hello! I'm an AI assistant. ",
-            "I'm here to help answer your questions. ",
-            "How can I assist you today? ",
-            "Feel free to ask me anything. ",
-            "I'm designed to provide helpful and accurate information. "
-          ];
-          
-          const streamIntervals = sentences.map((sentence, index) => {
-            return setTimeout(() => {
-              mockResponse += sentence;
-              setStreamingOutput(mockResponse);
-            }, index * 300);
-          });
-          
-          // Final update
-          setTimeout(() => {
-            setResponse(mockResponse);
-            setIsLoading(false);
-            abortControllerRef.current = null;
-          }, sentences.length * 300);
-          
-          // Cleanup function to clear intervals if aborted
-          abortControllerRef.current.signal.addEventListener('abort', () => {
-            streamIntervals.forEach(interval => clearTimeout(interval));
-          });
-        } else {
-          // Non-streaming response
-          const mockResponse = "Hello! I'm an AI assistant. I'm here to help answer your questions. How can I assist you today?";
-          setResponse(mockResponse);
-          setIsLoading(false);
-          abortControllerRef.current = null;
+      if (isStreaming) {
+        // Handle streaming response
+        const response = await fetch(`${FRONTEND_API_ENDPOINT}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [{ role: 'user', content: prompt }],
+            stream: true
+          }),
+          signal: abortControllerRef.current.signal
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.text();
+          throw new Error(`API request failed: ${response.status} ${errorData}`);
         }
-      }, 500);
+        
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let streamText = '';
+        
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            
+            // Handle SSE format for streaming responses
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                
+                if (data === '[DONE]') continue;
+                
+                try {
+                  const json = JSON.parse(data);
+                  const content = json.choices[0]?.delta?.content || '';
+                  if (content) {
+                    streamText += content;
+                    setStreamingOutput(streamText);
+                  }
+                } catch (e) {
+                  console.error('Error parsing SSE chunk:', e);
+                }
+              }
+            }
+          }
+          
+          setResponse(streamText);
+        }
+      } else {
+        // Handle non-streaming response
+        const response = await fetch(`${FRONTEND_API_ENDPOINT}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [{ role: 'user', content: prompt }],
+            stream: false
+          }),
+          signal: abortControllerRef.current.signal
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.text();
+          throw new Error(`API request failed: ${response.status} ${errorData}`);
+        }
+        
+        const data = await response.json();
+        const content = data.choices[0]?.message?.content || '';
+        setResponse(content);
+      }
       
       // Update last used time for the token
       const storedApiKeys = localStorage.getItem('apiKeys');
@@ -240,6 +285,7 @@ const ApiPlayground = () => {
           variant: "destructive"
         });
       }
+    } finally {
       setIsLoading(false);
       abortControllerRef.current = null;
     }
