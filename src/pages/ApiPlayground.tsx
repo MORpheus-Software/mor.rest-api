@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'react-router-dom';
 import { Token } from '@/components/dashboard/TokensTable';
-import { API_BASE_URL } from '@/lib/api/constants';
+import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants';
 
 interface ApiKey {
   id: string;
@@ -25,11 +25,6 @@ const models = [
   { id: 'llama-3.1-sonar-large-128k-online', name: 'Llama-3.1-Sonar-Large-70B' },
   { id: 'llama-3.1-sonar-huge-128k-online', name: 'Llama-3.1-Sonar-Huge-405B' },
 ];
-
-// Use environment-aware API endpoint
-const API_ENDPOINT = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:3001/api/v1'
-  : `${API_BASE_URL}/api/v1`;
 
 const ApiPlayground = () => {
   const [selectedModel, setSelectedModel] = useState('llama-3.1-sonar-small-128k-online');
@@ -126,7 +121,7 @@ const ApiPlayground = () => {
 
   const updateRequestCode = (model: string, promptText: string, streaming: boolean, apiKey: string) => {
     const modelName = models.find(m => m.id === model)?.name || model;
-    const code = `fetch('${API_ENDPOINT}/chat/completions', {
+    const code = `fetch('${FRONTEND_API_ENDPOINT}/chat/completions', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -185,7 +180,7 @@ const ApiPlayground = () => {
       const modelName = models.find(m => m.id === selectedModel)?.name || selectedModel;
       
       if (isStreaming) {
-        const response = await fetch(`${API_ENDPOINT}/chat/completions`, {
+        const response = await fetch(`${FRONTEND_API_ENDPOINT}/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -237,7 +232,7 @@ const ApiPlayground = () => {
           setResponse(accumulatedResponse);
         }
       } else {
-        const response = await fetch(`${API_ENDPOINT}/chat/completions`, {
+        const response = await fetch(`${FRONTEND_API_ENDPOINT}/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

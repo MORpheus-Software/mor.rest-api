@@ -6,12 +6,7 @@ import { CreateTokenDialog } from '@/components/dashboard/CreateTokenDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Plus } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { API_BASE_URL } from '@/lib/api/constants';
-
-// Use environment-aware API endpoint
-const API_ENDPOINT = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:3001/api/v1'
-  : `${API_BASE_URL}/api/v1`;
+import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants';
 
 // Define the API response types
 interface ApiKeyResponse {
@@ -36,8 +31,8 @@ interface ApiKeyDeleteResponse {
 // Function to fetch API keys from the server
 const fetchApiKeys = async (): Promise<Token[]> => {
   try {
-    // First try to fetch from the server API
-    const response = await fetch(`${API_ENDPOINT}/keys`, {
+    // Fetch from the local API
+    const response = await fetch(`${FRONTEND_API_ENDPOINT}/keys`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -100,8 +95,8 @@ const fetchApiKeys = async (): Promise<Token[]> => {
 // Function to create a new API key on the server
 const createApiKey = async (name: string): Promise<Token> => {
   try {
-    // Try to create using the server API
-    const response = await fetch(`${API_ENDPOINT}/keys`, {
+    // Try to create using the local API
+    const response = await fetch(`${FRONTEND_API_ENDPOINT}/keys`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -142,7 +137,7 @@ const createApiKey = async (name: string): Promise<Token> => {
   }
 };
 
-// Function to update API key status on the server (activate/deactivate)
+// Function to update API key status on the server
 const updateApiKeyStatus = async (id: string, status: 'active' | 'inactive'): Promise<boolean> => {
   try {
     // The real API would need an endpoint for this
@@ -157,8 +152,8 @@ const updateApiKeyStatus = async (id: string, status: 'active' | 'inactive'): Pr
 // Function to delete an API key on the server
 const deleteApiKey = async (id: string): Promise<boolean> => {
   try {
-    // Try to delete using the server API
-    const response = await fetch(`${API_ENDPOINT}/keys/${id}`, {
+    // Try to delete using the local API
+    const response = await fetch(`${FRONTEND_API_ENDPOINT}/keys/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

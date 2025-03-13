@@ -1,3 +1,4 @@
+
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
@@ -5,6 +6,7 @@ import dotenv from 'dotenv';
 import chalk from 'chalk';
 import chatCompletionsHandler from '../api/v1/chat/completions';
 import keyHandlers from '../api/v1/keys';
+import metricsHandlers from '../api/v1/metrics';
 import { checkRedisConnection } from './setupRedis';
 
 // Load environment variables
@@ -76,6 +78,11 @@ apiRouter.post('/chat/completions', (req, res) => {
   chatCompletionsHandler(req, res);
 });
 
+// Metrics endpoint
+apiRouter.get('/metrics', (req, res) => {
+  metricsHandlers.getMetrics(req, res);
+});
+
 // Mount API routes
 app.use('/api/v1', apiRouter);
 
@@ -122,4 +129,4 @@ startServer().catch(err => {
   process.exit(1);
 });
 
-export default app; 
+export default app;

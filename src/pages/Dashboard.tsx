@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { ArrowRight, BarChart3, Activity, KeyRound, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants';
 
 const API_ENDPOINT = "https://token-auth-saas-1081887913409.us-west1.run.app";
 
@@ -48,8 +48,8 @@ const Dashboard = () => {
           return;
         }
         
-        // Fetch metrics from the API
-        const response = await fetch(`${API_ENDPOINT}/api/v1/metrics`, {
+        // Fetch metrics from the local API
+        const response = await fetch(`${FRONTEND_API_ENDPOINT}/metrics`, {
           headers: {
             'Authorization': `Bearer ${apiKey}`
           }
