@@ -1,69 +1,122 @@
-# Welcome to your Lovable project
+# MorSaaS Application
 
-## Project info
+A SaaS application with API key management, authentication, and chat completions functionality.
 
-**URL**: https://lovable.dev/projects/662a7c37-9ec1-4adf-9c87-f0f2a47eb296
+## Features
 
-## How can I edit this code?
+- API Key Management (create, list, delete)
+- Chat completions API endpoint
+- Redis-backed data persistence with localStorage fallback
+- React frontend with modern UI components
 
-There are several ways of editing your application.
+## Getting Started
 
-**Use Lovable**
+### Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/662a7c37-9ec1-4adf-9c87-f0f2a47eb296) and start prompting.
+- Node.js 18+ and npm
+- Redis (optional, for data persistence)
 
-Changes made via Lovable will be committed automatically to this repo.
+### Installation
 
-**Use your preferred IDE**
+1. Clone the repository
+2. Install dependencies:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```bash
+npm install
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+3. Create a `.env` file based on the provided example:
 
-Follow these steps:
+```
+# Server Configuration
+PORT=3001
+NODE_ENV=development
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# API Configuration
+API_BASE_URL=https://token-auth-saas-1081887913409.us-west1.run.app
 
-# Step 3: Install the necessary dependencies.
-npm i
+# JWT Secret for user authentication
+JWT_SECRET=your-jwt-secret-change-this-in-production
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Proxy configuration
+BASEIMAGE_PROXY_URL=https://token-auth-saas-1081887913409.us-west1.run.app
+```
+
+### Running the Application
+
+#### Development Mode
+
+To run the frontend in development mode:
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+To run the server in development mode:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm run server:dev
+```
 
-**Use GitHub Codespaces**
+#### Production Mode
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+To build for production:
 
-## What technologies are used for this project?
+```bash
+npm run build
+```
 
-This project is built with .
+To run the server in production mode:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+npm run server
+```
 
-## How can I deploy this project?
+## API Endpoints
 
-Simply open [Lovable](https://lovable.dev/projects/662a7c37-9ec1-4adf-9c87-f0f2a47eb296) and click on Share -> Publish.
+### Authentication
 
-## I want to use a custom domain - is that possible?
+All API endpoints require authentication via API keys. Include the API key in the Authorization header:
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+```
+Authorization: Bearer your-api-key
+```
+
+### API Key Management
+
+- `GET /api/v1/keys`: List all API keys
+- `POST /api/v1/keys`: Create a new API key with `{ "name": "Key Name" }`
+- `DELETE /api/v1/keys/:id`: Delete an API key
+
+### Chat Completions
+
+- `POST /api/v1/chat/completions`: Send chat completion requests
+
+## Redis Configuration
+
+The application will automatically use Redis if available, or fall back to localStorage.
+
+To install and run Redis:
+
+### macOS
+
+```bash
+brew install redis
+redis-server
+```
+
+### Linux
+
+```bash
+sudo apt install redis-server
+sudo systemctl start redis
+```
+
+### Docker
+
+```bash
+docker run -d -p 6379:6379 --name redis redis:alpine
+```

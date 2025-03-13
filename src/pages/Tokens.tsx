@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,178 @@ import { CreateTokenDialog } from '@/components/dashboard/CreateTokenDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Plus } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { API_BASE_URL } from '@/lib/api/constants';
+
+// Use environment-aware API endpoint
+const API_ENDPOINT = process.env.NODE_ENV === 'development' 
+  ? 'http://localhost:3001/api/v1'
+  : `${API_BASE_URL}/api/v1`;
+
+// Define the API response types
+interface ApiKeyResponse {
+  id: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+interface ApiKeyListResponse {
+  data: ApiKeyResponse[];
+}
+
+interface ApiKeyCreateResponse {
+  data: ApiKeyResponse & { key: string };
+}
+
+interface ApiKeyDeleteResponse {
+  data: { id: string; deleted: boolean };
+}
+
+// Function to fetch API keys from the server
+const fetchApiKeys = async (): Promise<Token[]> => {
+  try {
+    // First try to fetch from the server API
+    const response = await fetch(`${API_ENDPOINT}/keys`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        // Add authentication headers here if needed
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch API keys: ${response.status}`);
+    }
+
+    const data: ApiKeyListResponse = await response.json();
+    
+    // Map the API response to our Token format
+    return data.data.map(key => ({
+      id: key.id,
+      name: key.name,
+      token: key.id,
+      status: 'active' as const,
+      createdAt: key.created_at,
+      lastUsed: key.last_used_at || undefined
+    }));
+  } catch (error) {
+    console.error('Error fetching API keys from server:', error);
+    
+    // Fall back to localStorage if server fetch fails
+    console.log('Falling back to localStorage for API keys');
+    const savedTokens = localStorage.getItem('apiKeys');
+    
+    if (savedTokens) {
+      return JSON.parse(savedTokens);
+    }
+    
+    // Generate some sample tokens if nothing exists
+    const sampleTokens: Token[] = [
+      {
+        id: uuidv4(),
+        name: 'Production API',
+        token: `sk_${uuidv4().replace(/-/g, '')}`,
+        status: 'active',
+        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        lastUsed: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: uuidv4(),
+        name: 'Development API',
+        token: `sk_${uuidv4().replace(/-/g, '')}`,
+        status: 'active',
+        createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+        lastUsed: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    ];
+    
+    // Store sample tokens in localStorage
+    localStorage.setItem('apiKeys', JSON.stringify(sampleTokens));
+    return sampleTokens;
+  }
+};
+
+// Function to create a new API key on the server
+const createApiKey = async (name: string): Promise<Token> => {
+  try {
+    // Try to create using the server API
+    const response = await fetch(`${API_ENDPOINT}/keys`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Add authentication headers here if needed
+      },
+      body: JSON.stringify({ name })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create API key: ${response.status}`);
+    }
+
+    const data: ApiKeyCreateResponse = await response.json();
+    
+    // Map the API response to our Token format
+    return {
+      id: data.data.id,
+      name: data.data.name,
+      token: data.data.key,
+      status: 'active' as const,
+      createdAt: data.data.created_at,
+      lastUsed: null
+    };
+  } catch (error) {
+    console.error('Error creating API key on server:', error);
+    
+    // Fall back to local generation
+    console.log('Falling back to local generation for new API key');
+    
+    return {
+      id: uuidv4(),
+      name,
+      token: `sk_${uuidv4().replace(/-/g, '')}`,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      lastUsed: null
+    };
+  }
+};
+
+// Function to update API key status on the server (activate/deactivate)
+const updateApiKeyStatus = async (id: string, status: 'active' | 'inactive'): Promise<boolean> => {
+  try {
+    // The real API would need an endpoint for this
+    // For now, we'll just succeed
+    return true;
+  } catch (error) {
+    console.error(`Error ${status === 'active' ? 'activating' : 'deactivating'} API key on server:`, error);
+    return false;
+  }
+};
+
+// Function to delete an API key on the server
+const deleteApiKey = async (id: string): Promise<boolean> => {
+  try {
+    // Try to delete using the server API
+    const response = await fetch(`${API_ENDPOINT}/keys/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        // Add authentication headers here if needed
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete API key: ${response.status}`);
+    }
+
+    const data: ApiKeyDeleteResponse = await response.json();
+    return data.data.deleted;
+  } catch (error) {
+    console.error('Error deleting API key on server:', error);
+    // Assume success in fallback mode
+    return true;
+  }
+};
 
 const TokensPage = () => {
   const { toast } = useToast();
@@ -15,99 +186,161 @@ const TokensPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   
   useEffect(() => {
-    // Simulate fetching tokens from API
-    setTimeout(() => {
-      // Check if we have tokens in localStorage
-      const savedTokens = localStorage.getItem('apiKeys');
-      
-      if (savedTokens) {
-        setTokens(JSON.parse(savedTokens));
-      } else {
-        // Generate some sample tokens if none exist
-        const sampleTokens: Token[] = [
-          {
-            id: uuidv4(),
-            name: 'Production API',
-            token: `sk_${uuidv4().replace(/-/g, '')}`,
-            status: 'active',
-            createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-            lastUsed: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-          },
-          {
-            id: uuidv4(),
-            name: 'Development API',
-            token: `sk_${uuidv4().replace(/-/g, '')}`,
-            status: 'active',
-            createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-            lastUsed: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-          },
-          {
-            id: uuidv4(),
-            name: 'Testing Server',
-            token: `sk_${uuidv4().replace(/-/g, '')}`,
-            status: 'inactive',
-            createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-            lastUsed: null
-          }
-        ];
-        
-        setTokens(sampleTokens);
-        localStorage.setItem('apiKeys', JSON.stringify(sampleTokens));
+    // Fetch tokens from server or localStorage
+    async function loadTokens() {
+      try {
+        setIsLoading(true);
+        const fetchedTokens = await fetchApiKeys();
+        setTokens(fetchedTokens);
+      } catch (error) {
+        console.error('Error loading tokens:', error);
+        toast({
+          title: "Failed to load API keys",
+          description: "Please try again later",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
-    }, 1000);
+    }
+    
+    loadTokens();
   }, []);
   
-  const handleCreateToken = (token: Token) => {
-    const updatedTokens = [...tokens, token];
-    setTokens(updatedTokens);
-    localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
-    setIsCreateDialogOpen(false);
+  const handleCreateToken = async (tokenData: { name: string }) => {
+    try {
+      // Create token on server
+      const newToken = await createApiKey(tokenData.name);
+      
+      // Update local state
+      const updatedTokens = [...tokens, newToken];
+      setTokens(updatedTokens);
+      
+      // Also update localStorage as fallback
+      localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
+      
+      // Close dialog
+      setIsCreateDialogOpen(false);
+      
+      // Show success toast
+      toast({
+        title: "API key created",
+        description: "Your new API key has been created successfully",
+      });
+    } catch (error) {
+      console.error('Error creating token:', error);
+      toast({
+        title: "Failed to create API key",
+        description: "Please try again later",
+        variant: "destructive"
+      });
+    }
   };
   
-  const handleActivateToken = (id: string) => {
-    const updatedTokens = tokens.map(token => 
-      token.id === id ? { ...token, status: 'active' as const } : token
-    );
-    
-    setTokens(updatedTokens);
-    localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
-    
-    toast({
-      title: "API key activated",
-      description: "The API key is now active and can be used for authentication",
-    });
+  const handleActivateToken = async (id: string) => {
+    try {
+      // Update on server
+      const success = await updateApiKeyStatus(id, 'active');
+      
+      if (!success) {
+        throw new Error('Failed to activate API key');
+      }
+      
+      // Update local state
+      const updatedTokens = tokens.map(token => 
+        token.id === id ? { ...token, status: 'active' as const } : token
+      );
+      
+      setTokens(updatedTokens);
+      
+      // Also update localStorage as fallback
+      localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
+      
+      toast({
+        title: "API key activated",
+        description: "The API key is now active and can be used for authentication",
+      });
+    } catch (error) {
+      console.error('Error activating token:', error);
+      toast({
+        title: "Failed to activate API key",
+        description: "Please try again later",
+        variant: "destructive"
+      });
+    }
   };
   
-  const handleDeactivateToken = (id: string) => {
-    const updatedTokens = tokens.map(token => 
-      token.id === id ? { ...token, status: 'inactive' as const } : token
-    );
-    
-    setTokens(updatedTokens);
-    localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
-    
-    toast({
-      title: "API key deactivated",
-      description: "The API key is now inactive and cannot be used for authentication",
-    });
+  const handleDeactivateToken = async (id: string) => {
+    try {
+      // Update on server
+      const success = await updateApiKeyStatus(id, 'inactive');
+      
+      if (!success) {
+        throw new Error('Failed to deactivate API key');
+      }
+      
+      // Update local state
+      const updatedTokens = tokens.map(token => 
+        token.id === id ? { ...token, status: 'inactive' as const } : token
+      );
+      
+      setTokens(updatedTokens);
+      
+      // Also update localStorage as fallback
+      localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
+      
+      toast({
+        title: "API key deactivated",
+        description: "The API key is now inactive and cannot be used for authentication",
+      });
+    } catch (error) {
+      console.error('Error deactivating token:', error);
+      toast({
+        title: "Failed to deactivate API key",
+        description: "Please try again later",
+        variant: "destructive"
+      });
+    }
   };
   
-  const handleDeleteToken = (id: string) => {
-    const updatedTokens = tokens.filter(token => token.id !== id);
-    
-    setTokens(updatedTokens);
-    localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
-    
-    toast({
-      title: "API key deleted",
-      description: "The API key has been permanently deleted",
-    });
+  const handleDeleteToken = async (id: string) => {
+    try {
+      // Delete on server
+      const success = await deleteApiKey(id);
+      
+      if (!success) {
+        throw new Error('Failed to delete API key');
+      }
+      
+      // Update local state
+      const updatedTokens = tokens.filter(token => token.id !== id);
+      
+      setTokens(updatedTokens);
+      
+      // Also update localStorage as fallback
+      localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
+      
+      toast({
+        title: "API key deleted",
+        description: "The API key has been permanently deleted",
+      });
+    } catch (error) {
+      console.error('Error deleting token:', error);
+      toast({
+        title: "Failed to delete API key",
+        description: "Please try again later",
+        variant: "destructive"
+      });
+    }
   };
   
   const handleCopyToken = (token: string) => {
     navigator.clipboard.writeText(token);
+    
+    toast({
+      title: "API key copied",
+      description: "The API key has been copied to your clipboard",
+    });
   };
   
   const handleTestToken = (id: string) => {

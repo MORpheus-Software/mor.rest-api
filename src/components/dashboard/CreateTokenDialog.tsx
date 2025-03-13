@@ -1,169 +1,92 @@
-
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { v4 as uuidv4 } from 'uuid';
 import { Token } from './TokensTable';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
 
-const formSchema = z.object({
-  name: z.string().min(1, 'Token name is required'),
-});
-
-type FormValues = z.infer<typeof formSchema>;
-
-type CreateTokenDialogProps = {
+interface CreateTokenDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateToken: (token: Token) => void;
-};
+  onCreateToken: (token: { name: string }) => void;
+}
 
-export function CreateTokenDialog({
-  open,
-  onOpenChange,
-  onCreateToken,
-}: CreateTokenDialogProps) {
+export function CreateTokenDialog({ open, onOpenChange, onCreateToken }: CreateTokenDialogProps) {
+  const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [newToken, setNewToken] = useState<string | null>(null);
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: '',
-    },
-  });
-
-  const onSubmit = async (values: FormValues) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!name.trim()) {
+      return;
+    }
+    
     setIsCreating(true);
-
+    
     try {
-      // Simulate API call to create a token
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Generate a new OpenAI-compatible API key
-      // Format: 'sk_' followed by a random string
-      const tokenValue = `sk_${uuidv4().replace(/-/g, '')}`;
-      setNewToken(tokenValue);
-
-      // Create the token object
-      const token: Token = {
-        id: uuidv4(),
-        name: values.name,
-        token: tokenValue,
-        status: 'active' as const,
-        createdAt: new Date().toISOString(),
-        lastUsed: null,
-      };
-
-      onCreateToken(token);
+      // Pass only the name to the parent component
+      // The API key generation now happens server-side
+      onCreateToken({ name: name.trim() });
       
-      // Reset the form but keep the dialog open to show the new token
-      form.reset();
-    } catch (error) {
-      console.error('Error creating token:', error);
+      // Reset form
+      setName('');
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleCloseDialog = () => {
-    onOpenChange(false);
-    // Wait for dialog close animation before resetting state
-    setTimeout(() => {
-      setNewToken(null);
-      form.reset();
-    }, 300);
+  const handleOpenChange = (open: boolean) => {
+    // Reset form when dialog is closed
+    if (!open) {
+      setName('');
+    }
+    onOpenChange(open);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleCloseDialog}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {newToken ? 'Your New API Key' : 'Create API Key'}
-          </DialogTitle>
+          <DialogTitle>Create API Key</DialogTitle>
+          <DialogDescription>
+            Generate a new API key for authentication with our API
+          </DialogDescription>
         </DialogHeader>
-
-        {newToken ? (
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              Your new API key has been created. Please save this key somewhere safe - you won't be able to see it again.
-            </div>
-            
-            <div className="p-3 bg-muted rounded-md font-mono text-sm break-all">
-              {newToken}
-            </div>
-            
-            <div className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  navigator.clipboard.writeText(newToken);
-                }}
-              >
-                Copy to clipboard
-              </Button>
-              
-              <Button onClick={handleCloseDialog}>
-                Done
-              </Button>
-            </div>
+        
+        <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Key Name</Label>
+            <Input
+              id="name"
+              placeholder="e.g. Production API"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <p className="text-sm text-muted-foreground">
+              Give your API key a descriptive name to identify its purpose
+            </p>
           </div>
-        ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Key Name</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="e.g. Production API, Development Environment" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <DialogFooter className="mt-6">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">
-                    Cancel
-                  </Button>
-                </DialogClose>
-                <Button type="submit" disabled={isCreating}>
-                  {isCreating && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  {isCreating ? 'Creating...' : 'Create Key'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        )}
+          
+          <DialogFooter>
+            <Button 
+              type="button" 
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              onClick={() => onOpenChange(false)}
+              disabled={isCreating}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={!name.trim() || isCreating}
+            >
+              {isCreating ? 'Creating...' : 'Create Key'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
