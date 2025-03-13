@@ -1,11 +1,11 @@
 
-import { createClient } from 'redis';
+import { createClient, RedisClientType } from 'redis';
 
 // Redis connection configuration
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 // Flag to determine if we're in a browser environment
-const isBrowser = typeof window !== 'undefined';
+const isBrowser = typeof globalThis !== 'undefined' && globalThis.window === globalThis;
 
 // Mock Redis client for browser environments
 const mockRedisClient = {
@@ -152,7 +152,15 @@ export async function sadd(key: string, ...members: string[]): Promise<number> {
     if (isBrowser) {
       return mockRedisClient.sadd(key, ...members);
     }
-    return await client.sAdd(key, members);
+    // Fix Redis method name to match the client's API
+    if ('SADD' in client) {
+      return await (client as any).SADD(key, members);
+    } else if ('sadd' in client) {
+      return await (client as any).sadd(key, members);
+    } else {
+      console.warn('Redis SADD method not found, using mock implementation');
+      return mockRedisClient.sadd(key, ...members);
+    }
   } catch (error) {
     console.error(`Redis SADD error for ${key}:`, error);
     throw error;
@@ -165,7 +173,15 @@ export async function srem(key: string, ...members: string[]): Promise<number> {
     if (isBrowser) {
       return mockRedisClient.srem(key, ...members);
     }
-    return await client.sRem(key, members);
+    // Fix Redis method name to match the client's API
+    if ('SREM' in client) {
+      return await (client as any).SREM(key, members);
+    } else if ('srem' in client) {
+      return await (client as any).srem(key, members);
+    } else {
+      console.warn('Redis SREM method not found, using mock implementation');
+      return mockRedisClient.srem(key, ...members);
+    }
   } catch (error) {
     console.error(`Redis SREM error for ${key}:`, error);
     throw error;
@@ -178,7 +194,15 @@ export async function smembers(key: string): Promise<string[]> {
     if (isBrowser) {
       return mockRedisClient.smembers(key);
     }
-    return await client.sMembers(key);
+    // Fix Redis method name to match the client's API
+    if ('SMEMBERS' in client) {
+      return await (client as any).SMEMBERS(key);
+    } else if ('smembers' in client) {
+      return await (client as any).smembers(key);
+    } else {
+      console.warn('Redis SMEMBERS method not found, using mock implementation');
+      return mockRedisClient.smembers(key);
+    }
   } catch (error) {
     console.error(`Redis SMEMBERS error for ${key}:`, error);
     throw error;

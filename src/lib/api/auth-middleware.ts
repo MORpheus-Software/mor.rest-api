@@ -1,7 +1,10 @@
 
 import { Request, Response, NextFunction } from 'express';
-import { get } from '../../lib/redis-adapter.js';
-import { API_KEY_PREFIX } from '../../lib/api/constants.js';
+import { get } from '../redis-adapter.js';
+import { API_KEY_PREFIX } from './constants.js';
+
+// Check if we're in a browser environment
+const isBrowser = typeof globalThis !== 'undefined' && globalThis.window === globalThis;
 
 export interface AuthenticatedRequest extends Request {
   // The user ID associated with the API key if authentication was successful
@@ -47,7 +50,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       console.log('[AUTH] Processing simple API key');
       try {
         // Mock auth for browser testing
-        if (typeof window !== 'undefined') {
+        if (isBrowser) {
           console.log('[AUTH] Browser environment detected, using mock auth');
           authReq.isAuthenticated = true;
           authReq.userId = 'browser-user';

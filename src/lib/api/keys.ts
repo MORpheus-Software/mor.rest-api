@@ -1,7 +1,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
-import { set, get, del, exists, sadd, srem, smembers, keys } from '../../lib/redis-adapter.js';
-import { API_KEY_PREFIX, USER_KEYS_PREFIX } from '../../lib/api/constants.js';
+import { set, get, del, exists, sadd, srem, smembers, keys as redisKeys } from '../redis-adapter.js';
+import { API_KEY_PREFIX, USER_KEYS_PREFIX } from './constants.js';
 
 export interface ApiKeyInfo {
   key: string;
@@ -17,7 +17,7 @@ export interface ApiKeyInfo {
 export async function hasAnyApiKeys(): Promise<boolean> {
   try {
     // Check if there are any keys with the API_KEY_PREFIX
-    const apiKeys = await keys(`${API_KEY_PREFIX}*`).catch(() => []);
+    const apiKeys = await redisKeys(`${API_KEY_PREFIX}*`).catch(() => []);
     
     // Filter out key metadata (entries with :info suffix)
     const actualKeys = apiKeys.filter(key => !key.endsWith(':info'));

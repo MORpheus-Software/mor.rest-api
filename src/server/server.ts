@@ -41,7 +41,7 @@ app.use((req, res, next) => {
 });
 
 // Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err, req, res, next) => {
   console.error(chalk.red('[SERVER] Error:'), err);
   res.status(500).json({
     error: {
@@ -61,7 +61,8 @@ const apiRouter = express.Router();
 
 // API Key endpoints with wrapper functions
 apiRouter.get('/keys', (req, res) => {
-  keyHandlers.getApiKeys(req, res);
+  // Change getApiKeys to getKeys to match the actual method name in keyHandlers
+  keyHandlers.getKeys(req, res);
 });
 
 apiRouter.post('/keys', (req, res) => {
@@ -75,6 +76,7 @@ apiRouter.delete('/keys/:id', (req, res) => {
 
 // Chat completions endpoint with wrapper function
 apiRouter.post('/chat/completions', (req, res) => {
+  // Fix to call the handler directly rather than accessing a property
   chatCompletionsHandler(req, res);
 });
 
