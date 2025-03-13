@@ -29,21 +29,21 @@ const mockRedisClient = {
   },
   exists: async (key: string) => {
     console.log(`[MOCK-REDIS] EXISTS ${key}`);
-    if (isBrowser) {
+    if (typeof localStorage !== 'undefined') {
       return localStorage.getItem(key) ? 1 : 0;
     }
     return 0;
   },
   del: async (key: string) => {
     console.log(`[MOCK-REDIS] DEL ${key}`);
-    if (isBrowser) {
+    if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(key);
     }
     return 1;
   },
   sadd: async (key: string, ...members: string[]) => {
     console.log(`[MOCK-REDIS] SADD ${key} ${members.join(' ')}`);
-    if (isBrowser) {
+    if (typeof localStorage !== 'undefined') {
       const existingSet = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key) || '[]') : [];
       const newSet = [...new Set([...existingSet, ...members])];
       localStorage.setItem(key, JSON.stringify(newSet));
@@ -52,7 +52,7 @@ const mockRedisClient = {
   },
   srem: async (key: string, ...members: string[]) => {
     console.log(`[MOCK-REDIS] SREM ${key} ${members.join(' ')}`);
-    if (isBrowser) {
+    if (typeof localStorage !== 'undefined') {
       const existingSet = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key) || '[]') : [];
       const newSet = existingSet.filter((item: string) => !members.includes(item));
       localStorage.setItem(key, JSON.stringify(newSet));
@@ -61,14 +61,14 @@ const mockRedisClient = {
   },
   smembers: async (key: string) => {
     console.log(`[MOCK-REDIS] SMEMBERS ${key}`);
-    if (isBrowser) {
+    if (typeof localStorage !== 'undefined') {
       return localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key) || '[]') : [];
     }
     return [];
   },
   keys: async (pattern: string) => {
     console.log(`[MOCK-REDIS] KEYS ${pattern}`);
-    if (isBrowser) {
+    if (typeof localStorage !== 'undefined') {
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
