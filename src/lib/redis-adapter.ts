@@ -2,12 +2,12 @@
 import { createClient, RedisClientType } from 'redis';
 
 // Redis connection configuration
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = process.env?.REDIS_URL || 'redis://localhost:6379';
 
-// Flag to determine if we're in a browser environment with proper type checking
-const isBrowser = typeof window !== 'undefined' && 
-  typeof document !== 'undefined' && 
-  typeof window.document === 'object';
+// Safer environment detection that works in both Node.js and browser environments
+const isBrowser = typeof process === 'undefined' || 
+  !process.versions ||
+  !process.versions.node;
 
 // Mock Redis client for browser environments
 const mockRedisClient = {
@@ -15,14 +15,14 @@ const mockRedisClient = {
   disconnect: async () => console.log('Mock Redis client disconnected'),
   set: async (key: string, value: string) => {
     console.log(`[MOCK-REDIS] SET ${key} ${value}`);
-    if (isBrowser) {
+    if (typeof localStorage !== 'undefined') {
       localStorage.setItem(key, value);
     }
     return 'OK';
   },
   get: async (key: string) => {
     console.log(`[MOCK-REDIS] GET ${key}`);
-    if (isBrowser) {
+    if (typeof localStorage !== 'undefined') {
       return localStorage.getItem(key);
     }
     return null;

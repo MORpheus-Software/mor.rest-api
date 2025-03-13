@@ -3,10 +3,10 @@ import { Request, Response, NextFunction } from 'express';
 import { get } from '../redis-adapter.js';
 import { API_KEY_PREFIX } from './constants.js';
 
-// Check if we're in a browser environment using safer type checks
-const isBrowser = typeof window !== 'undefined' && 
-  typeof document !== 'undefined' && 
-  typeof window.document === 'object';
+// Safer environment detection that works in both Node.js and browser environments
+const isBrowser = typeof process === 'undefined' || 
+  !process.versions ||
+  !process.versions.node;
 
 export interface AuthenticatedRequest extends Request {
   // The user ID associated with the API key if authentication was successful
