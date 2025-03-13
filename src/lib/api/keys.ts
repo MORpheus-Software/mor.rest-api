@@ -1,6 +1,7 @@
+
 import { v4 as uuidv4 } from 'uuid';
-import { set, get, del, exists, sadd, srem, smembers, keys } from '@/lib/redis-adapter';
-import { API_KEY_PREFIX, USER_KEYS_PREFIX } from '@/lib/api/constants';
+import { set, get, del, exists, sadd, srem, smembers, keys } from '../../lib/redis-adapter';
+import { API_KEY_PREFIX, USER_KEYS_PREFIX } from '../../lib/api/constants';
 
 export interface ApiKeyInfo {
   key: string;
@@ -66,12 +67,12 @@ export async function createApiKey(userId: string, name: string): Promise<ApiKey
  */
 export async function getUserApiKeys(userId: string): Promise<ApiKeyInfo[]> {
   // Get the set of API keys for the user
-  const keys = await smembers(`${USER_KEYS_PREFIX}${userId}`);
+  const userKeys = await smembers(`${USER_KEYS_PREFIX}${userId}`);
   
   // Get the info for each key
   const keyInfos: ApiKeyInfo[] = [];
   
-  for (const key of keys) {
+  for (const key of userKeys) {
     const infoJson = await get(`${API_KEY_PREFIX}${key}:info`);
     
     if (infoJson) {
@@ -158,4 +159,4 @@ export async function validateApiKey(key: string): Promise<string | null> {
   console.log(`[API-KEYS] Validated key: ${key.substring(0, 8)}... for user: ${userId}`);
   
   return userId;
-} 
+}

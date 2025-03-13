@@ -1,6 +1,7 @@
 
 import { Request, Response } from 'express';
 import chalk from 'chalk';
+import { AuthenticatedRequest } from '../../lib/api/auth-middleware';
 
 // Sample metrics data generator
 const generateSampleMetrics = (userId: string) => {
@@ -33,7 +34,8 @@ const getMetrics = async (req: Request, res: Response) => {
     
     // In a real implementation, we would fetch real metrics from a database
     // For now, we'll generate random sample data
-    const userId = req.userId || 'anonymous';
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.userId || 'anonymous';
     
     const metrics = generateSampleMetrics(userId);
     

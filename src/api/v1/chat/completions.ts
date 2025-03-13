@@ -1,7 +1,8 @@
+
 import { Request, Response } from 'express';
-import { authMiddleware, requireAuth, AuthenticatedRequest } from '@/lib/api/auth-middleware';
-import { API_BASE_URL } from '@/lib/api/constants';
-import { validateApiKey } from '@/lib/api/keys';
+import { authMiddleware, requireAuth, AuthenticatedRequest } from '../../lib/api/auth-middleware';
+import { API_BASE_URL } from '../../lib/api/constants';
+import { validateApiKey } from '../../lib/api/keys';
 
 export const formatStreamingResponse = (originalData: string): string => {
   // If empty or whitespace, ignore
@@ -145,12 +146,12 @@ export default async function chatCompletionsHandler(req: Request, res: Response
         console.log(`[PROXY] Success: received chat completion response`);
         
         // Transform the response if needed (e.g., to match OpenAI format)
-        const transformedData = {
-          ...data,
+        const transformedData: Record<string, any> = {
+          ...data as Record<string, any>,
           // Ensure there's at least a choices array
-          choices: data.choices || [{ 
+          choices: (data as any).choices || [{ 
             message: { 
-              content: data.response || data.text || data.content || JSON.stringify(data) 
+              content: (data as any).response || (data as any).text || (data as any).content || JSON.stringify(data) 
             }
           }]
         };
@@ -258,4 +259,4 @@ export default async function chatCompletionsHandler(req: Request, res: Response
       }
     });
   }
-} 
+}

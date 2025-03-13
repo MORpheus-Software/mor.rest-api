@@ -1,14 +1,18 @@
+
 import { createClient } from 'redis';
 
 // Create Redis client based on environment
 let redisClient: any = null;
 let isConnecting = false;
 
+// Check if code is running in browser
+const isBrowser = typeof window !== 'undefined';
+
 // First, check if a Docker Redis container is available
-const hasRedisUrl = typeof window === 'undefined' && process.env.REDIS_URL;
+const hasRedisUrl = !isBrowser && process.env.REDIS_URL;
 
 // Second, check for Upstash credentials
-const hasUpstashCreds = typeof window === 'undefined' && 
+const hasUpstashCreds = !isBrowser && 
                         process.env.UPSTASH_REST_API_DOMAIN && 
                         process.env.UPSTASH_REST_API_TOKEN;
 
@@ -71,7 +75,7 @@ async function getRedisInstance() {
  */
 export async function set(key: string, value: string, expirySeconds?: number): Promise<void> {
   try {
-    if (typeof window !== 'undefined') {
+    if (isBrowser) {
       console.warn('[REDIS] Attempted to use Redis on client side');
       return;
     }
@@ -96,7 +100,7 @@ export async function set(key: string, value: string, expirySeconds?: number): P
  */
 export async function get(key: string): Promise<string | null> {
   try {
-    if (typeof window !== 'undefined') {
+    if (isBrowser) {
       console.warn('[REDIS] Attempted to use Redis on client side');
       return null;
     }
@@ -118,7 +122,7 @@ export async function get(key: string): Promise<string | null> {
  */
 export async function del(key: string): Promise<void> {
   try {
-    if (typeof window !== 'undefined') {
+    if (isBrowser) {
       console.warn('[REDIS] Attempted to use Redis on client side');
       return;
     }
@@ -138,7 +142,7 @@ export async function del(key: string): Promise<void> {
  */
 export async function exists(key: string): Promise<boolean> {
   try {
-    if (typeof window !== 'undefined') {
+    if (isBrowser) {
       console.warn('[REDIS] Attempted to use Redis on client side');
       return false;
     }
@@ -160,7 +164,7 @@ export async function exists(key: string): Promise<boolean> {
  */
 export async function keys(pattern: string): Promise<string[]> {
   try {
-    if (typeof window !== 'undefined') {
+    if (isBrowser) {
       console.warn('[REDIS] Attempted to use Redis on client side');
       return [];
     }
@@ -182,7 +186,7 @@ export async function keys(pattern: string): Promise<string[]> {
  */
 export async function sadd(key: string, ...members: string[]): Promise<number> {
   try {
-    if (typeof window !== 'undefined') {
+    if (isBrowser) {
       console.warn('[REDIS] Attempted to use Redis on client side');
       return 0;
     }
@@ -204,7 +208,7 @@ export async function sadd(key: string, ...members: string[]): Promise<number> {
  */
 export async function srem(key: string, ...members: string[]): Promise<number> {
   try {
-    if (typeof window !== 'undefined') {
+    if (isBrowser) {
       console.warn('[REDIS] Attempted to use Redis on client side');
       return 0;
     }
@@ -226,7 +230,7 @@ export async function srem(key: string, ...members: string[]): Promise<number> {
  */
 export async function smembers(key: string): Promise<string[]> {
   try {
-    if (typeof window !== 'undefined') {
+    if (isBrowser) {
       console.warn('[REDIS] Attempted to use Redis on client side');
       return [];
     }
@@ -241,4 +245,4 @@ export async function smembers(key: string): Promise<string[]> {
     console.error('[REDIS] Error getting set members:', error);
     throw error;
   }
-} 
+}

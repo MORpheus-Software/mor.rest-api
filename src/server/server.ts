@@ -14,9 +14,9 @@ dotenv.config();
 
 // Debug environment variables
 console.log(chalk.cyan('[SERVER] Environment variables:'));
-console.log(chalk.cyan(`  PORT: ${process.env.PORT}`));
-console.log(chalk.cyan(`  NODE_ENV: ${process.env.NODE_ENV}`));
-console.log(chalk.cyan(`  REDIS_URL: ${process.env.REDIS_URL}`));
+console.log(chalk.cyan(`  PORT: ${process.env.PORT || '4000'}`));
+console.log(chalk.cyan(`  NODE_ENV: ${process.env.NODE_ENV || 'development'}`));
+console.log(chalk.cyan(`  REDIS_URL: ${process.env.REDIS_URL || 'redis://localhost:6379'}`));
 
 // Create Express server
 const app = express();
@@ -41,7 +41,7 @@ app.use((req, res, next) => {
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(chalk.red('[SERVER] Error:'), err);
   res.status(500).json({
     error: {
