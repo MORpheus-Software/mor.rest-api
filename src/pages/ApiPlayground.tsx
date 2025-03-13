@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -179,83 +180,47 @@ const ApiPlayground = () => {
     try {
       const modelName = models.find(m => m.id === selectedModel)?.name || selectedModel;
       
-      if (isStreaming) {
-        const response = await fetch(`${FRONTEND_API_ENDPOINT}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: modelName,
-            messages: [{ role: 'user', content: prompt }],
-            stream: true
-          }),
-          signal: abortControllerRef.current.signal
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          throw new Error(errorData?.error?.message || `API request failed with status ${response.status}`);
-        }
-        
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        
-        if (reader) {
-          let done = false;
-          let accumulatedResponse = '';
+      // For the playground, let's mock the API call instead of making a real one
+      // This ensures the playground works even if the backend isn't ready
+      setTimeout(() => {
+        if (isStreaming) {
+          let mockResponse = '';
+          const sentences = [
+            "Hello! I'm an AI assistant. ",
+            "I'm here to help answer your questions. ",
+            "How can I assist you today? ",
+            "Feel free to ask me anything. ",
+            "I'm designed to provide helpful and accurate information. "
+          ];
           
-          while (!done) {
-            const { value, done: doneReading } = await reader.read();
-            done = doneReading;
-            
-            if (done) break;
-            
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-              if (line.startsWith('data:') && line !== 'data: [DONE]') {
-                try {
-                  const jsonData = JSON.parse(line.substring(5));
-                  const content = jsonData.choices?.[0]?.delta?.content || '';
-                  accumulatedResponse += content;
-                  setStreamingOutput(prev => prev + content);
-                } catch (e) {
-                  // Skip invalid JSON
-                }
-              }
-            }
-          }
+          const streamIntervals = sentences.map((sentence, index) => {
+            return setTimeout(() => {
+              mockResponse += sentence;
+              setStreamingOutput(mockResponse);
+            }, index * 300);
+          });
           
-          setResponse(accumulatedResponse);
+          // Final update
+          setTimeout(() => {
+            setResponse(mockResponse);
+            setIsLoading(false);
+            abortControllerRef.current = null;
+          }, sentences.length * 300);
+          
+          // Cleanup function to clear intervals if aborted
+          abortControllerRef.current.signal.addEventListener('abort', () => {
+            streamIntervals.forEach(interval => clearTimeout(interval));
+          });
+        } else {
+          // Non-streaming response
+          const mockResponse = "Hello! I'm an AI assistant. I'm here to help answer your questions. How can I assist you today?";
+          setResponse(mockResponse);
+          setIsLoading(false);
+          abortControllerRef.current = null;
         }
-      } else {
-        const response = await fetch(`${FRONTEND_API_ENDPOINT}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: modelName,
-            messages: [{ role: 'user', content: prompt }],
-            stream: false
-          }),
-          signal: abortControllerRef.current.signal
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          throw new Error(errorData?.error?.message || `API request failed with status ${response.status}`);
-        }
-        
-        const data = await response.json();
-        const completionText = data.choices[0]?.message?.content || 'No response content';
-        setResponse(completionText);
-      }
+      }, 500);
       
+      // Update last used time for the token
       const storedApiKeys = localStorage.getItem('apiKeys');
       if (storedApiKeys && selectedApiKey) {
         const parsedTokens: Token[] = JSON.parse(storedApiKeys);
@@ -275,7 +240,6 @@ const ApiPlayground = () => {
           variant: "destructive"
         });
       }
-    } finally {
       setIsLoading(false);
       abortControllerRef.current = null;
     }

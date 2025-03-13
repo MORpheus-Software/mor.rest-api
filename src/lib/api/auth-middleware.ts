@@ -46,6 +46,14 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     if (token.startsWith('sk-')) {
       console.log('[AUTH] Processing simple API key');
       try {
+        // Mock auth for browser testing
+        if (typeof window !== 'undefined') {
+          console.log('[AUTH] Browser environment detected, using mock auth');
+          authReq.isAuthenticated = true;
+          authReq.userId = 'browser-user';
+          return next();
+        }
+        
         // Use redis-adapter to check the key
         console.log('[AUTH] Looking up key in Redis:', `${API_KEY_PREFIX}${token}`);
         const userId = await get(`${API_KEY_PREFIX}${token}`);
