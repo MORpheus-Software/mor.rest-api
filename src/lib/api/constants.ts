@@ -1,4 +1,3 @@
-
 // API key prefixes for Redis storage
 export const API_KEY_PREFIX = 'apikey:';
 export const USER_KEYS_PREFIX = 'user-keys:';
@@ -8,10 +7,12 @@ const isBrowser = typeof process === 'undefined' ||
   !process.versions ||
   !process.versions.node;
 
-// Base URL for the API, configure via environment variables
+// Base URL for the remote API, configure via environment variables
+// This should NOT include "/api" as it's used for server-to-server communication
+// The remote service expects requests at /v1/chat/completions
 export const API_BASE_URL = isBrowser 
   ? (process.env?.VITE_API_BASE_URL || 'https://nfa-proxy-1081887913409.us-west1.run.app')
   : (process.env?.VITE_API_BASE_URL || 'https://nfa-proxy-1081887913409.us-west1.run.app'); 
 
-// API endpoint for frontend requests - uses absolute URL for proxied requests
+// API endpoint for frontend requests to our local API - always starts with /api
 export const FRONTEND_API_ENDPOINT = '/api/v1';
