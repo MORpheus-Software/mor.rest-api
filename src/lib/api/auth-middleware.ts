@@ -3,8 +3,11 @@ import { Request, Response, NextFunction } from 'express';
 import { get } from '../redis-adapter.js';
 import { API_KEY_PREFIX } from './constants.js';
 
-// Check if we're in a browser environment
-const isBrowser = typeof globalThis !== 'undefined' && globalThis.window === globalThis;
+// Check if we're in a browser environment using safer type checks
+const isBrowser = typeof globalThis !== 'undefined' && 
+  typeof globalThis === 'object' && 
+  'window' in globalThis && 
+  globalThis.window === globalThis;
 
 export interface AuthenticatedRequest extends Request {
   // The user ID associated with the API key if authentication was successful

@@ -1,5 +1,4 @@
-
-import express from 'express';
+import express, { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
@@ -40,8 +39,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
+// Error handling middleware with proper type annotations
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(chalk.red('[SERVER] Error:'), err);
   res.status(500).json({
     error: {
@@ -59,9 +58,8 @@ app.get('/api/health', (req, res) => {
 // API routes
 const apiRouter = express.Router();
 
-// API Key endpoints with wrapper functions
+// API Key endpoints
 apiRouter.get('/keys', (req, res) => {
-  // Change getApiKeys to getKeys to match the actual method name in keyHandlers
   keyHandlers.getKeys(req, res);
 });
 
@@ -74,9 +72,8 @@ apiRouter.delete('/keys/:id', (req, res) => {
   keyHandlers.deleteKey(req, res);
 });
 
-// Chat completions endpoint with wrapper function
+// Chat completions endpoint
 apiRouter.post('/chat/completions', (req, res) => {
-  // Fix to call the handler directly rather than accessing a property
   chatCompletionsHandler(req, res);
 });
 
