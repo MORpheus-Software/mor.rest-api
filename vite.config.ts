@@ -11,8 +11,9 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        target: 'https://token-auth-saas-1081887913409.us-west1.run.app',
         changeOrigin: true,
+        secure: true,
       }
     }
   },
