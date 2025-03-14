@@ -1,3 +1,4 @@
+
 /**
  * User interface representing the authenticated user data
  */
@@ -105,7 +106,9 @@ export function logout(): void {
   localStorage.removeItem('isAuthenticated');
   
   // Redirect to home page
-  window.location.href = '/';
+  if (isBrowser) {
+    window.location.href = '/';
+  }
 }
 
 /**
@@ -189,12 +192,12 @@ export function notifyAuthChange(): void {
   console.log('[AUTH] Broadcasting auth state change');
   
   // Method 1: Use the storage event (works across tabs)
-  if (typeof window !== 'undefined') {
+  if (isBrowser) {
     window.dispatchEvent(new Event('storage'));
   }
   
   // Method 2: Use a custom event (works better within the same tab)
-  if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+  if (isBrowser && typeof CustomEvent !== 'undefined') {
     const authEvent = new CustomEvent('auth-state-changed', { 
       detail: { 
         isAuthenticated: localStorage.getItem('isAuthenticated'),

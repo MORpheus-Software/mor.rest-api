@@ -1,463 +1,211 @@
-
-import { createClient } from 'redis';
 import Redis from 'ioredis';
 import chalk from 'chalk';
 
-// -----------------
-// Redis configuration
-// -----------------
+// Redis connection options
+const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
+const REDIS_PORT = process.env.REDIS_PORT || 6379;
+const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
 
-// Detect if we're in a browser environment
-const isBrowser = typeof process === 'undefined' || 
-  !process.versions ||
-  !process.versions.node;
-
-// Get Redis URL from environment variable or use default local URL
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-
-// Check if Upstash credentials are provided
-const UPSTASH_REST_API_DOMAIN = process.env.UPSTASH_REST_API_DOMAIN;
-const UPSTASH_REST_API_TOKEN = process.env.UPSTASH_REST_API_TOKEN;
-const useUpstash = UPSTASH_REST_API_DOMAIN && UPSTASH_REST_API_TOKEN;
-
-// -----------------
-// Redis client state
-// -----------------
-
-// Redis client instance
-let redisClient: any = null;
-let isConnecting = false;
-let lastConnectionAttempt = 0;
-
-// -----------------
-// In-memory fallback storage for both server and browser
-// -----------------
-
-// Browser storage using localStorage
-const browserStorage = {
-  connect: async () => console.log('[REDIS] Browser storage connected'),
-  disconnect: async () => console.log('[REDIS] Browser storage disconnected'),
-  get: async (key: string) => {
-    console.log(`[REDIS] Browser GET ${key}`);
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem(key);
-    }
-    return null;
-  },
-  set: async (key: string, value: string) => {
-    console.log(`[REDIS] Browser SET ${key}`);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, value);
-    }
-    return 'OK';
-  },
-  exists: async (key: string) => {
-    console.log(`[REDIS] Browser EXISTS ${key}`);
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem(key) ? 1 : 0;
-    }
-    return 0;
-  },
-  del: async (key: string) => {
-    console.log(`[REDIS] Browser DEL ${key}`);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(key);
-    }
-    return 1;
-  },
-  sadd: async (key: string, ...members: string[]) => {
-    console.log(`[REDIS] Browser SADD ${key} ${members.join(' ')}`);
-    if (typeof localStorage !== 'undefined') {
-      const existingSet = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key) || '[]') : [];
-      const newSet = [...new Set([...existingSet, ...members])];
-      localStorage.setItem(key, JSON.stringify(newSet));
-    }
-    return members.length;
-  },
-  srem: async (key: string, ...members: string[]) => {
-    console.log(`[REDIS] Browser SREM ${key} ${members.join(' ')}`);
-    if (typeof localStorage !== 'undefined') {
-      const existingSet = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key) || '[]') : [];
-      const newSet = existingSet.filter((item: string) => !members.includes(item));
-      localStorage.setItem(key, JSON.stringify(newSet));
-    }
-    return members.length;
-  },
-  smembers: async (key: string) => {
-    console.log(`[REDIS] Browser SMEMBERS ${key}`);
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key) || '[]') : [];
-    }
-    return [];
-  },
-  keys: async (pattern: string) => {
-    console.log(`[REDIS] Browser KEYS ${pattern}`);
-    if (typeof localStorage !== 'undefined') {
-      const keys = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(pattern.replace('*', ''))) {
-          keys.push(key);
-        }
-      }
-      return keys;
-    }
-    return [];
-  }
-};
-
-// Server memory storage using Maps
-const serverStorageMap = new Map<string, string>();
-const serverSetMap = new Map<string, Set<string>>();
-
-const serverStorage = {
-  connect: async () => console.log('[REDIS] Server memory storage connected'),
-  disconnect: async () => console.log('[REDIS] Server memory storage disconnected'),
-  get: async (key: string) => {
-    console.log(`[REDIS] Server GET ${key}`);
-    return serverStorageMap.get(key) || null;
-  },
-  set: async (key: string, value: string) => {
-    console.log(`[REDIS] Server SET ${key}`);
-    serverStorageMap.set(key, value);
-    return 'OK';
-  },
-  exists: async (key: string) => {
-    console.log(`[REDIS] Server EXISTS ${key}`);
-    return serverStorageMap.has(key) ? 1 : 0;
-  },
-  del: async (key: string) => {
-    console.log(`[REDIS] Server DEL ${key}`);
-    serverStorageMap.delete(key);
-    return 1;
-  },
-  sadd: async (key: string, ...members: string[]) => {
-    console.log(`[REDIS] Server SADD ${key} ${members.join(' ')}`);
-    if (!serverSetMap.has(key)) {
-      serverSetMap.set(key, new Set());
-    }
-    const set = serverSetMap.get(key)!;
-    members.forEach(member => set.add(member));
-    return members.length;
-  },
-  srem: async (key: string, ...members: string[]) => {
-    console.log(`[REDIS] Server SREM ${key} ${members.join(' ')}`);
-    if (!serverSetMap.has(key)) {
-      return 0;
-    }
-    const set = serverSetMap.get(key)!;
-    let count = 0;
-    members.forEach(member => {
-      if (set.delete(member)) {
-        count++;
-      }
-    });
-    return count;
-  },
-  smembers: async (key: string) => {
-    console.log(`[REDIS] Server SMEMBERS ${key}`);
-    if (!serverSetMap.has(key)) {
-      return [];
-    } 
-    return Array.from(serverSetMap.get(key)!);
-  },
-  keys: async (pattern: string) => {
-    console.log(`[REDIS] Server KEYS ${pattern}`);
-    const prefix = pattern.replace('*', '');
-    return Array.from(serverStorageMap.keys()).filter(key => key.startsWith(prefix));
-  },
-};
-
-// -----------------
-// Redis client management
-// -----------------
-
-/**
- * Get or create a Redis client - handles both local Redis and Upstash
- */
-async function getRedisInstance() {
-  // Return existing client if connected and ready
-  if (redisClient && redisClient.isReady) {
-    return redisClient;
-  }
-  
-  // Don't attempt reconnection too frequently
-  const now = Date.now();
-  if (isConnecting || (now - lastConnectionAttempt < 5000)) {
-    console.log('[REDIS] Connection already in progress or attempted recently');
-    return null;
-  }
-  
-  isConnecting = true;
-  lastConnectionAttempt = now;
-  
+// Function to create a Redis client
+async function createRedisClient() {
   try {
-    // Check if we should use Upstash
-    if (useUpstash) {
-      console.log(`[REDIS] Connecting to Upstash Redis at ${UPSTASH_REST_API_DOMAIN}`);
-      
-      // Create Upstash Redis client using IoRedis
-      const upstashUrl = `rediss://default:${UPSTASH_REST_API_TOKEN}@${UPSTASH_REST_API_DOMAIN}:6379`;
-      redisClient = new Redis(upstashUrl);
-      
-      // Handle errors without crashing
-      redisClient.on('error', (err: Error) => {
-        console.error('[REDIS] Upstash connection error:', err.message);
-      });
-      
-      console.log('[REDIS] Successfully connected to Upstash Redis');
-      isConnecting = false;
-      return redisClient;
-    } else {
-      // Use local Redis
-      console.log(`[REDIS] Connecting to local Redis at ${REDIS_URL}`);
-      
-      // Create Redis client
-      redisClient = createClient({
-        url: REDIS_URL,
-        socket: {
-          connectTimeout: 5000, // 5 seconds timeout
-          reconnectStrategy: (retries: number) => {
-            if (retries > 2) {
-              console.log('[REDIS] Max reconnection attempts reached');
-              return false;
-            }
-            return Math.min(retries * 1000, 3000); // 1s, 2s, 3s
-          }
-        }
-      });
-      
-      // Handle errors without crashing
-      redisClient.on('error', (err: Error) => {
-        console.error('[REDIS] Connection error:', err.message);
-      });
-      
-      // Connect to Redis
-      await redisClient.connect();
-      console.log('[REDIS] Successfully connected to local Redis server');
-      isConnecting = false;
-      return redisClient;
-    }
-  } catch (error) {
-    console.error('[REDIS] Failed to create or connect to Redis:', error instanceof Error ? error.message : String(error));
-    isConnecting = false;
-    redisClient = null; // Reset client on error
-    return null;
-  }
-}
-
-/**
- * Verify Redis connection and store a test value
- */
-export async function verifyRedisConnection(): Promise<boolean> {
-  try {
-    const testKey = `redis-test-${Date.now()}`;
-    const testValue = `test-value-${Date.now()}`;
+    console.log(chalk.blue('[REDIS] Creating Redis client'));
     
-    console.log(`[REDIS] Testing connection with key: ${testKey}`);
+    // Redis connection URL
+    const redisUrl = process.env.REDIS_URL || `redis://${REDIS_HOST}:${REDIS_PORT}`;
     
-    // Try to set a test value
-    await set(testKey, testValue);
-    
-    // Try to get the test value
-    const retrievedValue = await get(testKey);
-    
-    // Clean up test key
-    await del(testKey);
-    
-    if (retrievedValue === testValue) {
-      console.log('[REDIS] Connection test successful');
-      return true;
-    } else {
-      console.error('[REDIS] Connection test failed: Value mismatch');
-      return false;
-    }
-  } catch (error) {
-    console.error('[REDIS] Connection test failed with error:', error);
-    return false;
-  }
-}
-
-/**
- * Choose the appropriate storage backend
- */
-async function getStorage() {
-  if (isBrowser) {
-    return browserStorage;
-  }
-  
-  // Try to get Redis client
-  const client = await getRedisInstance();
-  if (client && client.isReady) {
-    // Return a wrapper that ensures Redis commands are called correctly
-    return {
-      connect: async () => {},
-      disconnect: async () => client.disconnect ? client.disconnect() : client.quit(),
-      get: async (key: string) => client.get(key),
-      set: async (key: string, value: string) => useUpstash ? client.set(key, value) : client.set(key, value),
-      exists: async (key: string) => client.exists(key),
-      del: async (key: string) => client.del(key),
-      sadd: async (key: string, ...members: string[]) => {
-        // IoRedis and node-redis have different APIs for sadd
-        if (useUpstash) {
-          return client.sadd(key, ...members);
-        } else {
-          return client.sAdd(key, members);
-        }
+    // Redis connection options
+    const redisOptions: Redis.RedisOptions = {
+      lazyConnect: true,
+      reconnectOnError: (err) => {
+        console.error(chalk.red('[REDIS] Reconnect error:', err));
+        return 2; // Reconnect after 2 seconds
       },
-      srem: async (key: string, ...members: string[]) => {
-        // IoRedis and node-redis have different APIs for srem
-        if (useUpstash) {
-          return client.srem(key, ...members);
-        } else {
-          return client.sRem(key, members);
-        }
-      },
-      smembers: async (key: string) => {
-        // IoRedis and node-redis have different APIs for smembers
-        if (useUpstash) {
-          return client.smembers(key);
-        } else {
-          return client.sMembers(key);
-        }
-      },
-      keys: async (pattern: string) => client.keys(pattern)
+      maxRetriesPerRequest: 3,
     };
-  }
-  
-  // Fall back to server-side memory storage
-  console.log('[REDIS] Falling back to server memory storage');
-  return serverStorage;
-}
-
-// -----------------
-// Redis operations with fallback
-// -----------------
-
-/**
- * Set a value in Redis
- */
-export async function set(key: string, value: string): Promise<string> {
-  try {
-    const storage = await getStorage();
-    return await storage.set(key, value);
+    
+    // Add password if available
+    if (REDIS_PASSWORD) {
+      redisOptions.password = REDIS_PASSWORD;
+    }
+    
+    // Create Redis client using IoRedis
+    const client = new Redis(redisUrl, redisOptions);
+    
+    // Handle errors without crashing
+    client.on('error', (err: Error) => {
+      console.error(chalk.red(`[REDIS] Redis error: ${err.message}`));
+    });
+    
+    // Test the connection
+    await client.ping();
+    console.log(chalk.green('[REDIS] Connected to Redis'));
+    
+    return client;
   } catch (error) {
-    console.error('[REDIS] SET error:', error instanceof Error ? error.message : String(error));
-    // Use appropriate fallback based on environment
-    return isBrowser 
-      ? await browserStorage.set(key, value)
-      : await serverStorage.set(key, value);
+    console.error(chalk.red('[REDIS] Failed to connect to Redis:'), error);
+    throw error;
   }
 }
 
-/**
- * Get a value from Redis
- */
-export async function get(key: string): Promise<string | null> {
+// Upstash Redis client creation
+async function createUpstashRedisClient() {
   try {
-    const storage = await getStorage();
-    return await storage.get(key);
+    console.log(chalk.blue('[REDIS] Creating Upstash Redis client'));
+    
+    // Get Upstash credentials from environment variables
+    const UPSTASH_REST_API_TOKEN = process.env.UPSTASH_REST_API_TOKEN;
+    const UPSTASH_REST_API_DOMAIN = process.env.UPSTASH_REST_API_DOMAIN;
+    
+    if (!UPSTASH_REST_API_TOKEN || !UPSTASH_REST_API_DOMAIN) {
+      console.error(chalk.red('[REDIS] Missing Upstash credentials in environment variables'));
+      throw new Error('Missing Upstash credentials');
+    }
+    
+    // Create Upstash Redis client using IoRedis
+    const upstashUrl = `rediss://default:${UPSTASH_REST_API_TOKEN}@${UPSTASH_REST_API_DOMAIN}:6379`;
+    // Create IoRedis client correctly (need to properly import Redis)
+    const client = new Redis(upstashUrl);
+    
+    // Handle errors without crashing
+    client.on('error', (err: Error) => {
+      console.error(chalk.red(`[REDIS] Upstash Redis error: ${err.message}`));
+    });
+    
+    // Test the connection
+    await client.ping();
+    console.log(chalk.green('[REDIS] Connected to Upstash Redis'));
+    
+    return client;
   } catch (error) {
-    console.error('[REDIS] GET error:', error instanceof Error ? error.message : String(error));
-    // Use appropriate fallback based on environment
-    return isBrowser 
-      ? await browserStorage.get(key)
-      : await serverStorage.get(key);
+    console.error(chalk.red('[REDIS] Failed to connect to Upstash Redis:'), error);
+    throw error;
   }
 }
 
-/**
- * Check if a key exists in Redis
- */
-export async function exists(key: string): Promise<number> {
+// Method to set a key-value pair with expiration
+async function setex(client: Redis, key: string, seconds: number, value: string): Promise<void> {
   try {
-    const storage = await getStorage();
-    return await storage.exists(key);
+    await client.setex(key, seconds, value);
+    console.log(chalk.green(`[REDIS] Set key ${key} with expiration ${seconds}s`));
   } catch (error) {
-    console.error('[REDIS] EXISTS error:', error instanceof Error ? error.message : String(error));
-    // Use appropriate fallback based on environment
-    return isBrowser 
-      ? await browserStorage.exists(key)
-      : await serverStorage.exists(key);
+    console.error(chalk.red(`[REDIS] Failed to set key ${key}:`), error);
+    throw error;
   }
 }
 
-/**
- * Delete a key from Redis
- */
-export async function del(key: string): Promise<number> {
+// Method to get the value of a key
+async function get(client: Redis, key: string): Promise<string | null> {
   try {
-    const storage = await getStorage();
-    return await storage.del(key);
+    const value = await client.get(key);
+    if (value) {
+      console.log(chalk.green(`[REDIS] Get key ${key}: ${value.substring(0, 20)}...`));
+    } else {
+      console.log(chalk.yellow(`[REDIS] Key ${key} not found`));
+    }
+    return value;
   } catch (error) {
-    console.error('[REDIS] DEL error:', error instanceof Error ? error.message : String(error));
-    // Use appropriate fallback based on environment
-    return isBrowser 
-      ? await browserStorage.del(key)
-      : await serverStorage.del(key);
+    console.error(chalk.red(`[REDIS] Failed to get key ${key}:`), error);
+    throw error;
   }
 }
 
-/**
- * Add members to a Redis set
- */
-export async function sadd(key: string, ...members: string[]): Promise<number> {
+// Method to delete a key
+async function del(client: Redis, key: string): Promise<void> {
   try {
-    const storage = await getStorage();
-    return await storage.sadd(key, ...members);
+    await client.del(key);
+    console.log(chalk.green(`[REDIS] Deleted key ${key}`));
   } catch (error) {
-    console.error('[REDIS] SADD error:', error instanceof Error ? error.message : String(error));
-    // Use appropriate fallback based on environment
-    return isBrowser 
-      ? await browserStorage.sadd(key, ...members)
-      : await serverStorage.sadd(key, ...members);
+    console.error(chalk.red(`[REDIS] Failed to delete key ${key}:`), error);
+    throw error;
   }
 }
 
-/**
- * Remove members from a Redis set
- */
-export async function srem(key: string, ...members: string[]): Promise<number> {
+// Method to check if a key exists
+async function exists(client: Redis, key: string): Promise<boolean> {
   try {
-    const storage = await getStorage();
-    return await storage.srem(key, ...members);
+    const result = await client.exists(key);
+    const exists = result === 1;
+    if (exists) {
+      console.log(chalk.green(`[REDIS] Key ${key} exists`));
+    } else {
+      console.log(chalk.yellow(`[REDIS] Key ${key} does not exist`));
+    }
+    return exists;
   } catch (error) {
-    console.error('[REDIS] SREM error:', error instanceof Error ? error.message : String(error));
-    // Use appropriate fallback based on environment
-    return isBrowser 
-      ? await browserStorage.srem(key, ...members)
-      : await serverStorage.srem(key, ...members);
+    console.error(chalk.red(`[REDIS] Failed to check if key ${key} exists:`), error);
+    throw error;
   }
 }
 
-/**
- * Get all members of a Redis set
- */
-export async function smembers(key: string): Promise<string[]> {
+// Method to add a value to a set
+async function sadd(client: Redis, key: string, value: string): Promise<void> {
   try {
-    const storage = await getStorage();
-    return await storage.smembers(key);
+    await client.sadd(key, value);
+    console.log(chalk.green(`[REDIS] Added value ${value} to set ${key}`));
   } catch (error) {
-    console.error('[REDIS] SMEMBERS error:', error instanceof Error ? error.message : String(error));
-    // Use appropriate fallback based on environment
-    return isBrowser 
-      ? await browserStorage.smembers(key)
-      : await serverStorage.smembers(key);
+    console.error(chalk.red(`[REDIS] Failed to add value ${value} to set ${key}:`), error);
+    throw error;
   }
 }
 
-/**
- * Get all keys matching a pattern
- */
-export async function keys(pattern: string): Promise<string[]> {
+// Method to get all values from a set
+async function smembers(client: Redis, key: string): Promise<string[]> {
   try {
-    const storage = await getStorage();
-    return await storage.keys(pattern);
+    const members = await client.smembers(key);
+    console.log(chalk.green(`[REDIS] Retrieved members from set ${key}`));
+    return members;
   } catch (error) {
-    console.error('[REDIS] KEYS error:', error instanceof Error ? error.message : String(error));
-    // Use appropriate fallback based on environment
-    return isBrowser 
-      ? await browserStorage.keys(pattern)
-      : await serverStorage.keys(pattern);
+    console.error(chalk.red(`[REDIS] Failed to retrieve members from set ${key}:`), error);
+    throw error;
   }
 }
+
+// Method to remove a value from a set
+async function srem(client: Redis, key: string, value: string): Promise<void> {
+  try {
+    await client.srem(key, value);
+    console.log(chalk.green(`[REDIS] Removed value ${value} from set ${key}`));
+  } catch (error) {
+    console.error(chalk.red(`[REDIS] Failed to remove value ${value} from set ${key}:`), error);
+    throw error;
+  }
+}
+
+// Method to increment a value
+async function incr(client: Redis, key: string): Promise<number> {
+    try {
+        const result = await client.incr(key);
+        console.log(chalk.green(`[REDIS] Incremented key ${key} to ${result}`));
+        return result;
+    } catch (error) {
+        console.error(chalk.red(`[REDIS] Failed to increment key ${key}:`), error);
+        throw error;
+    }
+}
+
+// Method to decrement a value
+async function decr(client: Redis, key: string): Promise<number> {
+    try {
+        const result = await client.decr(key);
+        console.log(chalk.green(`[REDIS] Decremented key ${key} to ${result}`));
+        return result;
+    } catch (error) {
+        console.error(chalk.red(`[REDIS] Failed to decrement key ${key}:`), error);
+        throw error;
+    }
+}
+
+export {
+    createRedisClient,
+    createUpstashRedisClient,
+    setex,
+    get,
+    del,
+    exists,
+    sadd,
+    smembers,
+    srem,
+    incr,
+    decr,
+};
