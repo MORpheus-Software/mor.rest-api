@@ -24,16 +24,17 @@ export function Sidebar() {
       href: '/playground',
       icon: Play,
     },
-    {
-      title: 'MOR Staking',
-      href: '/staking',
-      icon: Coins,
-    },
-    {
-      title: 'Documentation',
-      href: '/docs',
-      icon: BookOpen,
-    },
+    // Hidden for development
+    // {
+    //   title: 'MOR Staking',
+    //   href: '/staking',
+    //   icon: Coins,
+    // },
+    // {
+    //   title: 'Documentation',
+    //   href: '/docs',
+    //   icon: BookOpen,
+    // },
     {
       title: 'Profile',
       href: '/profile',

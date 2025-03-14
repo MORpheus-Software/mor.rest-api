@@ -1,7 +1,7 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import SignUp from "./pages/SignUp";
@@ -17,8 +17,14 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AuthCheck from "./components/auth/AuthCheck";
 import GitHubCallback from "./pages/GitHubCallback";
 import DebugPage from "./pages/Debug";
+import { isAuthenticated } from "./lib/auth";
 
 const queryClient = new QueryClient();
+
+// Component to handle root path redirection based on authentication
+const RootRedirect = () => {
+  return isAuthenticated() ? <Navigate to="/playground" replace /> : <Index />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -34,7 +40,7 @@ const App = () => (
         <AuthCheck>
           <Routes>
             {/* Public routes */}
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<RootRedirect />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
