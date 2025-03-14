@@ -63,13 +63,14 @@ ENV NODE_ENV=production
 EXPOSE 8080
 
 # Set a healthcheck to verify the app is running
-HEALTHCHECK --interval=5s --timeout=5s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
 # Create a startup script that prints diagnostic info before starting
 RUN echo '#!/bin/sh\n\
 echo "Starting server..."\n\
 echo "Node environment: $NODE_ENV"\n\
+echo "Port: $PORT"\n\
 echo "Available files in public directory:"\n\
 ls -la public || echo "No public files found"\n\
 echo "Available files in dist/server:"\n\

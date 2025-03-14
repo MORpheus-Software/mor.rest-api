@@ -55,14 +55,21 @@ jobs:
           --memory 2Gi \
           --cpu 1 \
           --concurrency 80 \
-          --min-instances 0 \
+          --min-instances 1 \
           --max-instances 10 \
           --timeout 600s \
           --cpu-boost \
           --execution-environment gen2 \
           --no-cpu-throttling \
           --set-env-vars "NODE_ENV=production,REDIS_URL=${{ secrets.REDIS_URL }}" \
-          --allow-unauthenticated
+          --allow-unauthenticated \
+          --port 8080 \
+          --startup-cpu-allocation 1 \
+          --startup-memory-allocation 2Gi \
+          --max-instance-request-concurrency 10 \
+          --min-instance-request-concurrency 1 \
+          --health-checks readiness \
+          --initial-delay 120s
           
         SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.url)')
         echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT

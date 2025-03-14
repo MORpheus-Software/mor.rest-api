@@ -19,9 +19,10 @@ SERVICE_NAME="morsaas"
 MEMORY="2Gi"
 CPU="1"
 CONCURRENCY="80"
-MIN_INSTANCES="0"
+MIN_INSTANCES="1"  # Changed from 0 to 1 to ensure an instance is always ready
 MAX_INSTANCES="10"
 TIMEOUT="600s"
+INITIAL_DELAY="120s"  # Added initial delay for health checks
 UPSTASH_PRODUCTION_URL="redis://global:UPSTASH_SECRET@us1-engaged-cattle-39555.upstash.io:39555"
 
 # Function to display a section header
@@ -188,9 +189,16 @@ deploy_to_cloud_run() {
     --min-instances="$MIN_INSTANCES" \
     --max-instances="$MAX_INSTANCES" \
     --timeout="$TIMEOUT" \
+    --initial-delay="$INITIAL_DELAY" \
     --cpu-boost \
     --execution-environment=gen2 \
     --no-cpu-throttling \
+    --port=8080 \
+    --startup-cpu-allocation=1 \
+    --startup-memory-allocation=2Gi \
+    --max-instance-request-concurrency=10 \
+    --min-instance-request-concurrency=1 \
+    --health-checks=readiness \
     --set-env-vars="REDIS_URL=${redis_url},NODE_ENV=production" \
     --allow-unauthenticated
   
