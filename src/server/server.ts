@@ -4,7 +4,7 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
-import chatCompletionsHandler from '../api/v1/chat/completions.js';
+import * as chatCompletionsHandler from '../api/v1/chat/completions.js';
 import keyHandlers from '../api/v1/keys.js';
 import metricsHandlers from '../api/v1/metrics.js';
 import authHandlers from '../api/v1/auth.js';
@@ -179,7 +179,7 @@ async function startServer() {
     });
     
     // Handle server errors
-    server.on('error', (err) => {
+    server.on('error', (err: Error) => {
       console.error(chalk.red('[SERVER] Server error:'), err);
     });
   });
