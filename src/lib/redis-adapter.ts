@@ -1,19 +1,24 @@
+
 import { createClient } from 'redis';
+import Redis from 'ioredis';
+import chalk from 'chalk';
 
 // -----------------
 // Redis configuration
 // -----------------
 
-interface RedisAdapterOptions {
-  clusterMode?: boolean;
-}
+// Detect if we're in a browser environment
+const isBrowser = typeof process === 'undefined' || 
+  !process.versions ||
+  !process.versions.node;
 
-export class RedisAdapter {
-  private url: string;
-  private clusterMode: boolean;
-  private redisClient: RedisClient | null = null;
+// Get Redis URL from environment variable or use default local URL
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
-const isDevelopment = process.env.NODE_ENV === 'development';
+// Check if Upstash credentials are provided
+const UPSTASH_REST_API_DOMAIN = process.env.UPSTASH_REST_API_DOMAIN;
+const UPSTASH_REST_API_TOKEN = process.env.UPSTASH_REST_API_TOKEN;
+const useUpstash = UPSTASH_REST_API_DOMAIN && UPSTASH_REST_API_TOKEN;
 
 // -----------------
 // Redis client state
@@ -95,10 +100,11 @@ const browserStorage = {
           keys.push(key);
         }
       }
-    } finally {
-      redis.quit();
+      return keys;
     }
+    return [];
   }
+};
 
 // Server memory storage using Maps
 const serverStorageMap = new Map<string, string>();
@@ -167,7 +173,7 @@ const serverStorage = {
 // -----------------
 
 /**
- * Get or create a Redis client
+ * Get or create a Redis client - handles both local Redis and Upstash
  */
 async function getRedisInstance() {
   // Return existing client if connected and ready
@@ -186,33 +192,52 @@ async function getRedisInstance() {
   lastConnectionAttempt = now;
   
   try {
-    console.log(`[REDIS] Connecting to Redis at ${REDIS_URL}`);
-    
-    // Create Redis client
-    redisClient = createClient({
-      url: REDIS_URL,
-      socket: {
-        connectTimeout: 5000, // 5 seconds timeout
-        reconnectStrategy: (retries) => {
-          if (retries > 2) {
-            console.log('[REDIS] Max reconnection attempts reached');
-            return false;
+    // Check if we should use Upstash
+    if (useUpstash) {
+      console.log(`[REDIS] Connecting to Upstash Redis at ${UPSTASH_REST_API_DOMAIN}`);
+      
+      // Create Upstash Redis client using IoRedis
+      const upstashUrl = `rediss://default:${UPSTASH_REST_API_TOKEN}@${UPSTASH_REST_API_DOMAIN}:6379`;
+      redisClient = new Redis(upstashUrl);
+      
+      // Handle errors without crashing
+      redisClient.on('error', (err: Error) => {
+        console.error('[REDIS] Upstash connection error:', err.message);
+      });
+      
+      console.log('[REDIS] Successfully connected to Upstash Redis');
+      isConnecting = false;
+      return redisClient;
+    } else {
+      // Use local Redis
+      console.log(`[REDIS] Connecting to local Redis at ${REDIS_URL}`);
+      
+      // Create Redis client
+      redisClient = createClient({
+        url: REDIS_URL,
+        socket: {
+          connectTimeout: 5000, // 5 seconds timeout
+          reconnectStrategy: (retries: number) => {
+            if (retries > 2) {
+              console.log('[REDIS] Max reconnection attempts reached');
+              return false;
+            }
+            return Math.min(retries * 1000, 3000); // 1s, 2s, 3s
           }
-          return Math.min(retries * 1000, 3000); // 1s, 2s, 3s
         }
-      }
-    });
-    
-    // Handle errors without crashing
-    redisClient.on('error', (err: Error) => {
-      console.error('[REDIS] Connection error:', err.message);
-    });
-    
-    // Connect to Redis
-    await redisClient.connect();
-    console.log('[REDIS] Successfully connected to Redis server');
-    isConnecting = false;
-    return redisClient;
+      });
+      
+      // Handle errors without crashing
+      redisClient.on('error', (err: Error) => {
+        console.error('[REDIS] Connection error:', err.message);
+      });
+      
+      // Connect to Redis
+      await redisClient.connect();
+      console.log('[REDIS] Successfully connected to local Redis server');
+      isConnecting = false;
+      return redisClient;
+    }
   } catch (error) {
     console.error('[REDIS] Failed to create or connect to Redis:', error instanceof Error ? error.message : String(error));
     isConnecting = false;
@@ -264,17 +289,38 @@ async function getStorage() {
   // Try to get Redis client
   const client = await getRedisInstance();
   if (client && client.isReady) {
-    // Return a wrapper that ensures Redis commands are called as methods on the client
+    // Return a wrapper that ensures Redis commands are called correctly
     return {
-      connect: async () => client.connect(),
-      disconnect: async () => client.disconnect(),
+      connect: async () => {},
+      disconnect: async () => client.disconnect ? client.disconnect() : client.quit(),
       get: async (key: string) => client.get(key),
-      set: async (key: string, value: string) => client.set(key, value),
+      set: async (key: string, value: string) => useUpstash ? client.set(key, value) : client.set(key, value),
       exists: async (key: string) => client.exists(key),
       del: async (key: string) => client.del(key),
-      sadd: async (key: string, ...members: string[]) => client.sAdd(key, members),
-      srem: async (key: string, ...members: string[]) => client.sRem(key, members),
-      smembers: async (key: string) => client.sMembers(key),
+      sadd: async (key: string, ...members: string[]) => {
+        // IoRedis and node-redis have different APIs for sadd
+        if (useUpstash) {
+          return client.sadd(key, ...members);
+        } else {
+          return client.sAdd(key, members);
+        }
+      },
+      srem: async (key: string, ...members: string[]) => {
+        // IoRedis and node-redis have different APIs for srem
+        if (useUpstash) {
+          return client.srem(key, ...members);
+        } else {
+          return client.sRem(key, members);
+        }
+      },
+      smembers: async (key: string) => {
+        // IoRedis and node-redis have different APIs for smembers
+        if (useUpstash) {
+          return client.smembers(key);
+        } else {
+          return client.sMembers(key);
+        }
+      },
       keys: async (pattern: string) => client.keys(pattern)
     };
   }

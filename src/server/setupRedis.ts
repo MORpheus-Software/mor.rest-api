@@ -1,61 +1,102 @@
+
 import { createClient } from 'redis';
+import Redis from 'ioredis';
 import chalk from 'chalk';
 
 export async function checkRedisConnection(): Promise<boolean> {
   try {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    console.log(chalk.blue(`[REDIS] Checking connection to Redis at ${redisUrl}`));
+    // Check if Upstash credentials are provided
+    const upstashDomain = process.env.UPSTASH_REST_API_DOMAIN;
+    const upstashToken = process.env.UPSTASH_REST_API_TOKEN;
+    const useUpstash = upstashDomain && upstashToken;
     
-    // Try to connect with a timeout
-    const connectWithTimeout = async () => {
+    if (useUpstash) {
+      console.log(chalk.blue(`[REDIS] Checking connection to Upstash Redis at ${upstashDomain}`));
+      
       try {
-        // Create a temporary client just for testing connectivity
-        const client = createClient({ 
-          url: redisUrl,
-          socket: {
-            connectTimeout: 3000, // 3 seconds timeout
-            reconnectStrategy: false // Don't reconnect automatically
-          }
-        });
-        
-        // Add error handler
-        client.on('error', (err) => {
-          console.error(chalk.red(`[REDIS] Connection error: ${err.message}`));
-        });
-        
-        // Attempt to connect with timeout
-        await Promise.race([
-          client.connect(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 3000))
-        ]);
+        // Connect to Upstash Redis
+        const upstashUrl = `rediss://default:${upstashToken}@${upstashDomain}:6379`;
+        const client = new Redis(upstashUrl);
         
         // Test connection by setting and getting a key
         await client.set('test-connection', 'success');
         const testResult = await client.get('test-connection');
         
         if (testResult === 'success') {
-          console.log(chalk.green('[REDIS] ✓ Successfully connected to Redis'));
+          console.log(chalk.green('[REDIS] ✓ Successfully connected to Upstash Redis'));
           
           // Cleanup test key
           await client.del('test-connection');
           
           // Disconnect from test client
-          await client.disconnect();
+          await client.quit();
           
           return true;
         } else {
-          console.error(chalk.red('[REDIS] × Test operation failed'));
-          await client.disconnect();
+          console.error(chalk.red('[REDIS] × Upstash test operation failed'));
+          await client.quit();
           return false;
         }
       } catch (error) {
-        console.error(chalk.red(`[REDIS] Connection test failed: ${error instanceof Error ? error.message : String(error)}`));
+        console.error(chalk.red(`[REDIS] Upstash connection test failed: ${error instanceof Error ? error.message : String(error)}`));
         return false;
       }
-    };
-    
-    // Test the connection
-    return await connectWithTimeout();
+    } else {
+      // Try local Redis
+      const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+      console.log(chalk.blue(`[REDIS] Checking connection to local Redis at ${redisUrl}`));
+      
+      // Try to connect with a timeout
+      const connectWithTimeout = async () => {
+        try {
+          // Create a temporary client just for testing connectivity
+          const client = createClient({ 
+            url: redisUrl,
+            socket: {
+              connectTimeout: 3000, // 3 seconds timeout
+              reconnectStrategy: false // Don't reconnect automatically
+            }
+          });
+          
+          // Add error handler
+          client.on('error', (err) => {
+            console.error(chalk.red(`[REDIS] Connection error: ${err.message}`));
+          });
+          
+          // Attempt to connect with timeout
+          await Promise.race([
+            client.connect(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 3000))
+          ]);
+          
+          // Test connection by setting and getting a key
+          await client.set('test-connection', 'success');
+          const testResult = await client.get('test-connection');
+          
+          if (testResult === 'success') {
+            console.log(chalk.green('[REDIS] ✓ Successfully connected to Redis'));
+            
+            // Cleanup test key
+            await client.del('test-connection');
+            
+            // Disconnect from test client
+            await client.disconnect();
+            
+            return true;
+          } else {
+            console.error(chalk.red('[REDIS] × Test operation failed'));
+            await client.disconnect();
+            return false;
+          }
+        } catch (error) {
+          console.error(chalk.red(`[REDIS] Connection test failed: ${error instanceof Error ? error.message : String(error)}`));
+          return false;
+        }
+      };
+      
+      // Test the connection
+      return await connectWithTimeout();
+    }
   } catch (error) {
     console.error(chalk.red(`[REDIS] Connection setup failed: ${error instanceof Error ? error.message : String(error)}`));
     
@@ -80,4 +121,4 @@ export async function checkRedisConnection(): Promise<boolean> {
     
     return false;
   }
-} 
+}
