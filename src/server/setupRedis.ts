@@ -1,6 +1,6 @@
 
 import { createClient } from 'redis';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
 import chalk from 'chalk';
 
 export async function checkRedisConnection(): Promise<boolean> {
@@ -48,7 +48,7 @@ export async function checkRedisConnection(): Promise<boolean> {
     const client = createClient({
       url: process.env.REDIS_URL || 'redis://localhost:6379',
       socket: {
-        reconnectStrategy: (retries) => {
+        reconnectStrategy: (retries: number) => {
           console.log(chalk.yellow(`[REDIS] Retry connecting (${retries})`));
           return Math.min(retries * 50, 1000);
         }
