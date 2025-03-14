@@ -44,24 +44,14 @@ export async function checkRedisConnection(): Promise<boolean> {
   try {
     console.log(chalk.blue('[REDIS] Checking local Redis connection...'));
     
-    // Connect to local Redis
-    const client = createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379',
-      socket: {
-        reconnectStrategy: (retries: number) => {
-          console.log(chalk.yellow(`[REDIS] Retry connecting (${retries})`));
-          return Math.min(retries * 50, 1000);
-        }
-      }
-    });
+    // Connect to local Redis using the correct IoRedis constructor
+    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    const client = new Redis(redisUrl);
     
     // Add error handler
     client.on('error', (err: Error) => {
       console.error(chalk.red(`[REDIS] Connection error: ${err.message}`));
     });
-    
-    // Connect to Redis
-    await client.connect();
     
     // Test connection by setting and getting a key
     await client.set('test-connection', 'success');
@@ -70,11 +60,11 @@ export async function checkRedisConnection(): Promise<boolean> {
     // Verify connection worked
     if (value === 'success') {
       console.log(chalk.green('[REDIS] Successfully connected to local Redis!'));
-      await client.disconnect();
+      await client.quit();
       return true;
     }
     
-    await client.disconnect();
+    await client.quit();
     return false;
   } catch (error) {
     console.error(chalk.red('[REDIS] Failed to connect to Redis:'), error);

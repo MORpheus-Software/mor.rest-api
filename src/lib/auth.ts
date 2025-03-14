@@ -4,6 +4,15 @@ import { v4 as uuidv4 } from 'uuid';
 // Helper to check if we're in a browser environment
 const isBrowser = typeof window !== 'undefined';
 
+// Define global browser types for TypeScript
+declare global {
+  interface Window {
+    addEventListener: (event: string, callback: EventListenerOrEventListenerObject) => void;
+    dispatchEvent: (event: Event) => boolean;
+    localStorage: Storage;
+  }
+}
+
 /**
  * Check if a user is authenticated
  */
