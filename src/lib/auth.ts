@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 
 // Helper to check if we're in a browser environment
@@ -6,10 +5,9 @@ const isBrowser = typeof window !== 'undefined';
 
 // Define global browser types for TypeScript
 declare global {
+  // No need to redefine Window since it's already in lib.dom.d.ts
   interface Window {
-    addEventListener: (event: string, callback: EventListenerOrEventListenerObject) => void;
-    dispatchEvent: (event: Event) => boolean;
-    localStorage: Storage;
+    // Don't redefine properties here to avoid collisions
   }
 }
 
@@ -179,13 +177,15 @@ export function setupAuthListeners(): void {
   }
   
   // Listen for localStorage changes from other tabs/windows
-  window.addEventListener('storage', (event: StorageEvent) => {
-    if (event.key === 'isAuthenticated') {
-      const newValue = event.newValue === 'true';
-      console.log('[AUTH] Auth changed in another tab:', newValue);
-      emitAuthChangeEvent(newValue);
-    }
-  });
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (event: StorageEvent) => {
+      if (event.key === 'isAuthenticated') {
+        const newValue = event.newValue === 'true';
+        console.log('[AUTH] Auth changed in another tab:', newValue);
+        emitAuthChangeEvent(newValue);
+      }
+    });
+  }
   
   console.log('[AUTH] Auth listeners set up');
 }
@@ -198,12 +198,14 @@ function emitAuthChangeEvent(isAuthenticated: boolean): void {
     return;
   }
   
-  const event = new CustomEvent('authChanged', { 
-    detail: { isAuthenticated } 
-  });
-  
-  window.dispatchEvent(event);
-  console.log('[AUTH] Auth change event emitted:', isAuthenticated);
+  if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+    const event = new CustomEvent('authChanged', { 
+      detail: { isAuthenticated } 
+    });
+    
+    window.dispatchEvent(event);
+    console.log('[AUTH] Auth change event emitted:', isAuthenticated);
+  }
 }
 
 /**
