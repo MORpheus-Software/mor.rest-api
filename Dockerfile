@@ -3,7 +3,7 @@ FROM node:18-alpine as frontend-builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
@@ -12,16 +12,32 @@ FROM node:18-alpine as server-builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
-COPY tsconfig.json ./
+RUN npm ci --no-audit --no-fund
+
+# Copy all TypeScript configuration files
+COPY tsconfig*.json ./
+
+# Copy source files that will be compiled
 COPY src/server ./src/server
 COPY src/api ./src/api
 COPY src/lib ./src/lib
 COPY src/utils ./src/utils
+COPY vite.config.ts ./
 
-# Compile TypeScript to JavaScript
+# Install TypeScript
 RUN npm install -g typescript
-RUN tsc --project tsconfig.json
+
+# Validate TypeScript config files
+RUN echo "Checking TypeScript config files:" && \
+    ls -la tsconfig*.json && \
+    echo "Contents of tsconfig.node.json:" && \
+    cat tsconfig.node.json
+
+# Compile TypeScript to JavaScript with better error reporting
+RUN tsc --project tsconfig.node.json || (echo "TypeScript compilation failed. Check configurations and source files." && exit 1)
+
+# Verify the compiled output
+RUN ls -la dist || (echo "Compilation did not produce expected output directory" && exit 1)
 
 # Stage 3: Build the final image with compiled code
 FROM node:18-alpine
@@ -30,7 +46,7 @@ WORKDIR /app
 
 # Install production dependencies only
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --only=production --no-audit --no-fund
 
 # Copy compiled server files from server-builder
 COPY --from=server-builder /app/dist ./dist
@@ -38,8 +54,8 @@ COPY --from=server-builder /app/dist ./dist
 # Copy static frontend files from frontend-builder
 COPY --from=frontend-builder /app/dist ./public
 
-# Install necessary runtime dependencies without dev dependencies
-RUN npm install --production --save express dotenv cors ioredis
+# Install necessary runtime dependencies
+RUN npm install --production --no-audit --no-fund --save express dotenv cors ioredis
 
 # Set environment variables
 ENV PORT=8080

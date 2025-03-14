@@ -22,6 +22,7 @@ CONCURRENCY="80"
 MIN_INSTANCES="0"
 MAX_INSTANCES="10"
 TIMEOUT="600s"
+CONTAINER_STARTUP_TIMEOUT="300s"  # Added specific container startup timeout
 UPSTASH_PRODUCTION_URL="redis://global:UPSTASH_SECRET@us1-engaged-cattle-39555.upstash.io:39555"
 
 # Function to display a section header
@@ -188,6 +189,7 @@ deploy_to_cloud_run() {
     --min-instances="$MIN_INSTANCES" \
     --max-instances="$MAX_INSTANCES" \
     --timeout="$TIMEOUT" \
+    --container-startup-timeout="$CONTAINER_STARTUP_TIMEOUT" \
     --startup-cpu-boost \
     --execution-environment=gen2 \
     --no-cpu-throttling \

@@ -58,6 +58,7 @@ jobs:
           --min-instances 0 \
           --max-instances 10 \
           --timeout 600s \
+          --container-startup-timeout 300s \
           --startup-cpu-boost \
           --execution-environment gen2 \
           --no-cpu-throttling \
