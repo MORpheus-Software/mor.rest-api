@@ -5,7 +5,8 @@ import chalk from 'chalk';
 
 // Helper function to create a Redis instance
 const createRedisInstance = (url: string) => {
-  return new Redis(url);
+  const redis = new Redis(url);
+  return redis;
 };
 
 export async function checkRedisConnection(): Promise<boolean> {

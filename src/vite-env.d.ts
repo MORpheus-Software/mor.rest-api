@@ -44,6 +44,16 @@ interface EventListenerOrEventListenerObject {
   (evt: Event): void;
 }
 
+interface AddEventListenerOptions extends EventListenerOptions {
+  once?: boolean;
+  passive?: boolean;
+  signal?: AbortSignal;
+}
+
+interface EventListenerOptions {
+  capture?: boolean;
+}
+
 // Add additional DOM types needed for auth.ts
 interface StorageEvent extends Event {
   readonly key: string | null;
