@@ -16,7 +16,7 @@ export async function checkRedisConnection(): Promise<boolean> {
     try {
       // Connect to Upstash Redis
       const upstashUrl = `rediss://default:${upstashToken}@${upstashDomain}:6379`;
-      // Use Redis constructor correctly
+      // Create Redis client properly
       const client = new Redis(upstashUrl);
       
       // Test connection by setting and getting a key

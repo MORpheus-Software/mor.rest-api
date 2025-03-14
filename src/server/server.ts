@@ -1,4 +1,3 @@
-
 import express, { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
@@ -113,11 +112,7 @@ nfaServiceRouter.use(apiKeyAuthMiddleware);
 
 // NFA service proxy endpoints - require API key authentication
 nfaServiceRouter.post('/chat/completions', requireAuth, (req, res) => {
-  if (chatCompletionsHandler && typeof chatCompletionsHandler.postChatCompletion === 'function') {
-    chatCompletionsHandler.postChatCompletion(req, res);
-  } else {
-    res.status(501).json({ error: { message: 'Not implemented', type: 'not_implemented' } });
-  }
+  chatCompletionsHandler.postChatCompletion(req, res);
 });
 
 // Auth verification endpoint
