@@ -1,3 +1,4 @@
+
 /**
  * User interface representing the authenticated user data
  */
@@ -10,12 +11,17 @@ export interface User {
   avatar?: string | null;
 }
 
+// Helper to check if code is running in browser environment
+const isBrowser = typeof window !== 'undefined';
+
 /**
  * Check if the user is authenticated with valid data
  * @param verbose Enable verbose logging
  * @returns Boolean indicating authentication status
  */
 export function isAuthenticated(verbose: boolean = false): boolean {
+  if (!isBrowser) return false;
+  
   // Try to get authentication flag from localStorage
   const auth = localStorage.getItem('isAuthenticated');
   if (verbose) console.log(`[AUTH] isAuthenticated flag: ${auth}`);
@@ -74,7 +80,7 @@ export function isAuthenticated(verbose: boolean = false): boolean {
  * @returns User object or null if not authenticated
  */
 export function getCurrentUser(): User | null {
-  if (!isAuthenticated()) {
+  if (!isBrowser || !isAuthenticated()) {
     return null;
   }
   
@@ -94,6 +100,8 @@ export function getCurrentUser(): User | null {
  * Logout the current user
  */
 export function logout(): void {
+  if (!isBrowser) return;
+  
   localStorage.removeItem('user');
   localStorage.removeItem('isAuthenticated');
   
@@ -122,6 +130,10 @@ export function createAuthToken(): string | null {
  * @returns The created test user
  */
 export function createTestUser(overrideExisting: boolean = false): User {
+  if (!isBrowser) {
+    throw new Error('createTestUser can only be used in browser environment');
+  }
+  
   // Check if user is already authenticated
   if (!overrideExisting && isAuthenticated()) {
     console.log('[AUTH] Test user not created: User already authenticated');
@@ -143,10 +155,12 @@ export function createTestUser(overrideExisting: boolean = false): User {
   console.log('[AUTH] Test user created:', testUser);
   
   // Force a storage event to notify other components
-  window.dispatchEvent(new StorageEvent('storage', {
-    key: 'isAuthenticated',
-    newValue: 'true'
-  }));
+  if (isBrowser) {
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'isAuthenticated',
+      newValue: 'true'
+    }));
+  }
   
   return testUser;
 }
@@ -155,6 +169,8 @@ export function createTestUser(overrideExisting: boolean = false): User {
  * For debugging: Log authentication status and user data
  */
 export function debugAuth(): void {
+  if (!isBrowser) return;
+  
   console.group('[AUTH] Debug Info');
   
   console.log('localStorage items:', {
@@ -172,6 +188,8 @@ export function debugAuth(): void {
  * Notify all components of authentication state changes
  */
 export function notifyAuthChange(): void {
+  if (!isBrowser) return;
+  
   console.log('[AUTH] Broadcasting auth state change');
   
   // Method 1: Use the storage event (works across tabs)

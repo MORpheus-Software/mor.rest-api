@@ -1,3 +1,4 @@
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -19,7 +20,7 @@ export default defineConfig(({ mode }) => {
   return {
     server: {
       host: "::",
-      port: 5173, // This should be the default
+      port: 8080, // Changed from 5173 to 8080 as required
       proxy: {
         '/api': {
           target: proxyTarget,

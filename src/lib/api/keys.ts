@@ -1,7 +1,6 @@
-
 import { v4 as uuidv4 } from 'uuid';
-import { set, get, del, exists, sadd, srem, smembers, keys as redisKeys } from '../redis-adapter.ts';
-import { API_KEY_PREFIX, USER_KEYS_PREFIX } from './constants.js';
+import { set, get, del, exists, sadd, srem, smembers, keys as redisKeys } from '../redis-adapter';
+import { API_KEY_PREFIX, USER_KEYS_PREFIX } from './constants';
 
 export interface ApiKeyInfo {
   key: string;

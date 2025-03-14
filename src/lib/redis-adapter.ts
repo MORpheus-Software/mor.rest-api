@@ -1,6 +1,6 @@
 
 import { createClient } from 'redis';
-import Redis from 'ioredis';
+import * as Redis from 'ioredis';
 import chalk from 'chalk';
 
 // -----------------
@@ -198,7 +198,7 @@ async function getRedisInstance() {
       
       // Create Upstash Redis client using IoRedis
       const upstashUrl = `rediss://default:${UPSTASH_REST_API_TOKEN}@${UPSTASH_REST_API_DOMAIN}:6379`;
-      redisClient = new Redis(upstashUrl);
+      redisClient = new Redis.default(upstashUrl);
       
       // Handle errors without crashing
       redisClient.on('error', (err: Error) => {
