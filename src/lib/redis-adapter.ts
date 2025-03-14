@@ -1,236 +1,156 @@
+import { Redis, Cluster } from 'ioredis';
 
-import { createClient, RedisClientType } from 'redis';
+type RedisClient = Redis | Cluster;
 
-// Redis connection configuration
-const REDIS_URL = process.env?.REDIS_URL || 'redis://localhost:6379';
+interface RedisAdapterOptions {
+  clusterMode?: boolean;
+}
 
-// Safer environment detection that works in both Node.js and browser environments
-const isBrowser = typeof process === 'undefined' || 
-  !process.versions ||
-  !process.versions.node;
+export class RedisAdapter {
+  private url: string;
+  private clusterMode: boolean;
+  private redisClient: RedisClient | null = null;
 
-// Mock Redis client for browser environments
-const mockRedisClient = {
-  connect: async () => console.log('Mock Redis client connected'),
-  disconnect: async () => console.log('Mock Redis client disconnected'),
-  set: async (key: string, value: string) => {
-    console.log(`[MOCK-REDIS] SET ${key} ${value}`);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, value);
+  constructor(url: string, clusterMode = false) {
+    this.url = url;
+    this.clusterMode = clusterMode;
+  }
+
+  private async createClient(): Promise<RedisClient> {
+    if (this.clusterMode) {
+      const nodes = this.url.split(',').map(url => ({ url }));
+      return new Cluster(nodes.map(node => node.url));
+    } else {
+      return new Redis(this.url);
     }
-    return 'OK';
-  },
-  get: async (key: string) => {
-    console.log(`[MOCK-REDIS] GET ${key}`);
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem(key);
+  }
+
+  private async getClient(): Promise<RedisClient> {
+    if (!this.redisClient) {
+      this.redisClient = await this.createClient();
+
+      this.redisClient.on('error', (err) => {
+        console.error('Redis error:', err);
+        this.redisClient = null;
+      });
     }
-    return null;
-  },
-  exists: async (key: string) => {
-    console.log(`[MOCK-REDIS] EXISTS ${key}`);
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem(key) ? 1 : 0;
-    }
-    return 0;
-  },
-  del: async (key: string) => {
-    console.log(`[MOCK-REDIS] DEL ${key}`);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(key);
-    }
-    return 1;
-  },
-  sadd: async (key: string, ...members: string[]) => {
-    console.log(`[MOCK-REDIS] SADD ${key} ${members.join(' ')}`);
-    if (typeof localStorage !== 'undefined') {
-      const existingSet = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key) || '[]') : [];
-      const newSet = [...new Set([...existingSet, ...members])];
-      localStorage.setItem(key, JSON.stringify(newSet));
-    }
-    return members.length;
-  },
-  srem: async (key: string, ...members: string[]) => {
-    console.log(`[MOCK-REDIS] SREM ${key} ${members.join(' ')}`);
-    if (typeof localStorage !== 'undefined') {
-      const existingSet = localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key) || '[]') : [];
-      const newSet = existingSet.filter((item: string) => !members.includes(item));
-      localStorage.setItem(key, JSON.stringify(newSet));
-    }
-    return members.length;
-  },
-  smembers: async (key: string) => {
-    console.log(`[MOCK-REDIS] SMEMBERS ${key}`);
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key) || '[]') : [];
-    }
-    return [];
-  },
-  keys: async (pattern: string) => {
-    console.log(`[MOCK-REDIS] KEYS ${pattern}`);
-    if (typeof localStorage !== 'undefined') {
-      const keys = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(pattern.replace('*', ''))) {
-          keys.push(key);
-        }
+    return this.redisClient;
+  }
+
+  /**
+   * Set a value in Redis with an optional expiration time.
+   * @param key The key to set
+   * @param value The value to set
+   * @param expirationTimeSeconds Optional expiration time in seconds
+   */
+  async set(key: string, value: string, expirationTimeSeconds?: number): Promise<void> {
+    const redis = await this.getClient();
+    try {
+      if (expirationTimeSeconds) {
+        await redis.set(key, value, 'EX', expirationTimeSeconds);
+      } else {
+        await redis.set(key, value);
       }
-      return keys;
+    } finally {
+      redis.quit();
     }
-    return [];
-  },
-};
-
-// Choose the appropriate Redis client based on the environment
-let client = isBrowser ? mockRedisClient : createClient({ url: REDIS_URL });
-
-// Connect to Redis if not in browser
-if (!isBrowser) {
-  try {
-    client.connect();
-    console.log('Redis connected');
-  } catch (error) {
-    console.error('Redis connection error:', error);
   }
-}
 
-// Set a value in Redis
-export async function set(key: string, value: string): Promise<string> {
-  try {
-    if (isBrowser) {
-      return mockRedisClient.set(key, value);
+  /**
+   * Get a value from Redis
+   * @param key The key to get
+   * @returns The value, or null if not found
+   */
+  async get(key: string): Promise<string | null> {
+    const redis = await this.getClient();
+    try {
+      return await redis.get(key);
+    } finally {
+      redis.quit();
     }
-    return await client.set(key, value);
-  } catch (error) {
-    console.error(`Redis SET error for ${key}:`, error);
-    throw error;
   }
-}
 
-// Get a value from Redis
-export async function get(key: string): Promise<string | null> {
-  try {
-    if (isBrowser) {
-      return mockRedisClient.get(key);
+  /**
+   * Delete a key from Redis
+   * @param key The key to delete
+   */
+  async del(key: string): Promise<void> {
+    const redis = await this.getClient();
+    try {
+      await redis.del(key);
+    } finally {
+      redis.quit();
     }
-    return await client.get(key);
-  } catch (error) {
-    console.error(`Redis GET error for ${key}:`, error);
-    throw error;
   }
-}
 
-// Check if a key exists in Redis
-export async function exists(key: string): Promise<number> {
-  try {
-    if (isBrowser) {
-      return mockRedisClient.exists(key);
+  /**
+   * Check if a key exists in Redis
+   * @param key The key to check
+   * @returns True if the key exists, false otherwise
+   */
+  async exists(key: string): Promise<boolean> {
+    const redis = await this.getClient();
+    try {
+      const result = await redis.exists(key);
+      return result === 1;
+    } finally {
+      redis.quit();
     }
-    return await client.exists(key);
-  } catch (error) {
-    console.error(`Redis EXISTS error for ${key}:`, error);
-    throw error;
   }
-}
 
-// Delete a key from Redis
-export async function del(key: string): Promise<number> {
-  try {
-    if (isBrowser) {
-      return mockRedisClient.del(key);
+  /**
+   * Increment a key in Redis
+   * @param key The key to increment
+   * @returns The new value of the key
+   */
+  async incr(key: string): Promise<number> {
+    const redis = await this.getClient();
+    try {
+      return await redis.incr(key);
+    } finally {
+      redis.quit();
     }
-    return await client.del(key);
-  } catch (error) {
-    console.error(`Redis DEL error for ${key}:`, error);
-    throw error;
   }
-}
 
-// Add values to a set in Redis
-export async function sadd(key: string, ...members: string[]): Promise<number> {
-  try {
-    if (isBrowser) {
-      return mockRedisClient.sadd(key, ...members);
+  /**
+   * Expire a key in Redis
+   * @param key The key to expire
+   * @param expirationTimeSeconds The expiration time in seconds
+   */
+  async expire(key: string, expirationTimeSeconds: number): Promise<void> {
+    const redis = await this.getClient();
+    try {
+      await redis.expire(key, expirationTimeSeconds);
+    } finally {
+      redis.quit();
     }
-    
-    // Use type casting and method checking for Redis client methods
-    const redisClient = client as any;
-    if (typeof redisClient.sAdd === 'function') {
-      return await redisClient.sAdd(key, members);
-    } else if (typeof redisClient.SADD === 'function') {
-      return await redisClient.SADD(key, members);
-    } else if (typeof redisClient.sadd === 'function') {
-      return await redisClient.sadd(key, members);
-    } else {
-      console.warn('Redis SADD method not found, using mock implementation');
-      return mockRedisClient.sadd(key, ...members);
-    }
-  } catch (error) {
-    console.error(`Redis SADD error for ${key}:`, error);
-    throw error;
   }
-}
 
-// Remove values from a set in Redis
-export async function srem(key: string, ...members: string[]): Promise<number> {
-  try {
-    if (isBrowser) {
-      return mockRedisClient.srem(key, ...members);
+  /**
+   * Get the time to live of a key in Redis
+   * @param key The key to check
+   * @returns The time to live in seconds, or -1 if the key does not exist or does not have an expiration time
+   */
+  async ttl(key: string): Promise<number> {
+    const redis = await this.getClient();
+    try {
+      return await redis.ttl(key);
+    } finally {
+      redis.quit();
     }
-    
-    // Use type casting and method checking for Redis client methods
-    const redisClient = client as any;
-    if (typeof redisClient.sRem === 'function') {
-      return await redisClient.sRem(key, members);
-    } else if (typeof redisClient.SREM === 'function') {
-      return await redisClient.SREM(key, members);
-    } else if (typeof redisClient.srem === 'function') {
-      return await redisClient.srem(key, members);
-    } else {
-      console.warn('Redis SREM method not found, using mock implementation');
-      return mockRedisClient.srem(key, ...members);
-    }
-  } catch (error) {
-    console.error(`Redis SREM error for ${key}:`, error);
-    throw error;
   }
-}
 
-// Get all members of a set in Redis
-export async function smembers(key: string): Promise<string[]> {
-  try {
-    if (isBrowser) {
-      return mockRedisClient.smembers(key);
+  /**
+   * List keys matching a pattern
+   * @param pattern The pattern to match
+   * @returns An array of keys matching the pattern
+   */
+  async keys(pattern: string): Promise<string[]> {
+    const redis = await this.getClient();
+    try {
+      return await redis.keys(pattern);
+    } finally {
+      redis.quit();
     }
-    
-    // Use type casting and method checking for Redis client methods
-    const redisClient = client as any;
-    if (typeof redisClient.sMembers === 'function') {
-      return await redisClient.sMembers(key);
-    } else if (typeof redisClient.SMEMBERS === 'function') {
-      return await redisClient.SMEMBERS(key);
-    } else if (typeof redisClient.smembers === 'function') {
-      return await redisClient.smembers(key);
-    } else {
-      console.warn('Redis SMEMBERS method not found, using mock implementation');
-      return mockRedisClient.smembers(key);
-    }
-  } catch (error) {
-    console.error(`Redis SMEMBERS error for ${key}:`, error);
-    throw error;
-  }
-}
-
-// Get keys matching a pattern in Redis
-export async function keys(pattern: string): Promise<string[]> {
-  try {
-    if (isBrowser) {
-      return mockRedisClient.keys(pattern);
-    }
-    return await client.keys(pattern);
-  } catch (error) {
-    console.error(`Redis KEYS error for ${pattern}:`, error);
-    throw error;
   }
 }

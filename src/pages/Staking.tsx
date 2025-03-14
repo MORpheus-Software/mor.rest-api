@@ -7,14 +7,29 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Wallet, Coins, ArrowUp } from 'lucide-react';
+import { Wallet, Coins, ArrowUp, ArrowDown, Link } from 'lucide-react';
+import WalletConnect from '@/components/wallet/WalletConnect';
+import { stakeTokens, unstakeTokens, getBlockchainBalance } from '@/services/ethService';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const Staking = () => {
   const [balance, setBalance] = useState(1000); // Mock MOR token balance
   const [stakedAmount, setStakedAmount] = useState(250); // Mock staked amount
   const [amountToStake, setAmountToStake] = useState('');
+  const [amountToUnstake, setAmountToUnstake] = useState('');
   const [isStaking, setIsStaking] = useState(false);
+  const [isUnstaking, setIsUnstaking] = useState(false);
   const [tier, setTier] = useState('Basic');
+  const [connectedAccount, setConnectedAccount] = useState<string | null>(null);
+  const [showUnstakeDialog, setShowUnstakeDialog] = useState(false);
   
   // Calculate tier based on staked amount
   useEffect(() => {
@@ -29,6 +44,23 @@ const Staking = () => {
     }
   }, [stakedAmount]);
 
+  // Update balance from blockchain when wallet is connected
+  useEffect(() => {
+    const updateBalance = async () => {
+      if (connectedAccount) {
+        const blockchainBalance = await getBlockchainBalance(connectedAccount);
+        setBalance(blockchainBalance);
+      }
+    };
+    
+    updateBalance();
+  }, [connectedAccount]);
+
+  const handleWalletConnect = (account: string) => {
+    setConnectedAccount(account);
+    toast.success(`Wallet connected: ${account.substring(0, 6)}...${account.substring(account.length - 4)}`);
+  };
+
   const handleStake = async () => {
     const amount = parseInt(amountToStake);
     
@@ -41,24 +73,74 @@ const Staking = () => {
       toast.error('Insufficient balance');
       return;
     }
+
+    if (!connectedAccount) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
     
     setIsStaking(true);
     
     try {
-      // Mock staking process
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const success = await stakeTokens(amount);
       
-      // Update balances
-      setBalance(prev => prev - amount);
-      setStakedAmount(prev => prev + amount);
-      setAmountToStake('');
-      
-      toast.success(`Successfully staked ${amount} MOR tokens`);
+      if (success) {
+        // Update balances
+        setBalance(prev => prev - amount);
+        setStakedAmount(prev => prev + amount);
+        setAmountToStake('');
+        
+        toast.success(`Successfully staked ${amount} MOR tokens`);
+      } else {
+        toast.error('Transaction failed');
+      }
     } catch (error) {
       toast.error('Failed to stake tokens. Please try again.');
       console.error(error);
     } finally {
       setIsStaking(false);
+    }
+  };
+
+  const handleUnstake = async () => {
+    const amount = parseInt(amountToUnstake);
+    
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    
+    if (amount > stakedAmount) {
+      toast.error('Amount exceeds staked balance');
+      return;
+    }
+
+    if (!connectedAccount) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
+    
+    setIsUnstaking(true);
+    
+    try {
+      const success = await unstakeTokens(amount);
+      
+      if (success) {
+        // Update balances
+        setBalance(prev => prev + amount);
+        setStakedAmount(prev => prev - amount);
+        setAmountToUnstake('');
+        setShowUnstakeDialog(false);
+        
+        toast.success(`Successfully unstaked ${amount} MOR tokens`);
+      } else {
+        toast.error('Transaction failed');
+      }
+    } catch (error) {
+      toast.error('Failed to unstake tokens. Please try again.');
+      console.error(error);
+    } finally {
+      setIsUnstaking(false);
     }
   };
 
@@ -74,9 +156,12 @@ const Staking = () => {
 
   return (
     <DashboardLayout>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">MOR Token Staking</h1>
-        <p className="text-muted-foreground">Stake your MOR tokens to unlock premium features</p>
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">MOR Token Staking</h1>
+          <p className="text-muted-foreground">Stake your MOR tokens to unlock premium features</p>
+        </div>
+        <WalletConnect onConnect={handleWalletConnect} />
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -105,6 +190,12 @@ const Staking = () => {
                 <p className="text-sm text-muted-foreground">Total staked</p>
               </div>
             </div>
+            
+            {connectedAccount && (
+              <div className="pt-2 text-xs text-muted-foreground">
+                Connected: {`${connectedAccount.substring(0, 6)}...${connectedAccount.substring(connectedAccount.length - 4)}`}
+              </div>
+            )}
           </CardContent>
         </Card>
         
@@ -123,12 +214,68 @@ const Staking = () => {
                   placeholder="Enter amount"
                   value={amountToStake}
                   onChange={(e) => setAmountToStake(e.target.value)}
+                  disabled={!connectedAccount || isStaking}
                 />
-                <Button onClick={handleStake} disabled={isStaking}>
+                <Button 
+                  onClick={handleStake} 
+                  disabled={isStaking || !connectedAccount}
+                >
                   {isStaking ? 'Staking...' : 'Stake'}
                   <ArrowUp className="ml-2 h-4 w-4" />
                 </Button>
               </div>
+            </div>
+            
+            <div className="pt-2">
+              <Dialog open={showUnstakeDialog} onOpenChange={setShowUnstakeDialog}>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    disabled={!connectedAccount || stakedAmount <= 0}
+                  >
+                    Unstake Tokens
+                    <ArrowDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Unstake Tokens</DialogTitle>
+                    <DialogDescription>
+                      Withdraw your staked MOR tokens. Note that this may affect your tier level and benefits.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="unstakeAmount">Amount to Unstake</Label>
+                      <Input
+                        id="unstakeAmount"
+                        type="number"
+                        placeholder="Enter amount"
+                        value={amountToUnstake}
+                        onChange={(e) => setAmountToUnstake(e.target.value)}
+                      />
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Available: {stakedAmount} MOR
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowUnstakeDialog(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleUnstake}
+                      disabled={isUnstaking}
+                    >
+                      {isUnstaking ? 'Processing...' : 'Confirm Unstake'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </Card>
