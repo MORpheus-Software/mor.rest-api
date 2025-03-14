@@ -1,14 +1,17 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Wallet, AlertCircle } from 'lucide-react';
+import { Wallet, AlertCircle, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}
+import { checkIfWalletIsConnected, connectWallet, switchNetwork } from '@/services/ethService';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type WalletConnectProps = {
   onConnect: (account: string) => void;
@@ -18,10 +21,20 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
   const [account, setAccount] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState(true);
+  const [currentNetwork, setCurrentNetwork] = useState<string | null>(null);
 
   useEffect(() => {
     const checkMetaMaskInstalled = async () => {
       setIsMetaMaskInstalled(!!window.ethereum);
+      
+      if (window.ethereum) {
+        try {
+          const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+          updateNetworkInfo(chainId);
+        } catch (error) {
+          console.error("Failed to get chain ID:", error);
+        }
+      }
     };
     
     checkMetaMaskInstalled();
@@ -29,27 +42,46 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
 
   useEffect(() => {
     // Check if already connected
+    const checkConnection = async () => {
+      const connectedAccount = await checkIfWalletIsConnected();
+      if (connectedAccount) {
+        handleAccountsChanged([connectedAccount]);
+      }
+    };
+    
+    checkConnection();
+    
     if (window.ethereum) {
-      window.ethereum.request({ method: 'eth_accounts' })
-        .then((accounts: string[]) => {
-          if (accounts.length > 0) {
-            handleAccountsChanged(accounts);
-          }
-        })
-        .catch((err: Error) => {
-          console.error("Failed to get accounts:", err);
-        });
-
       // Listen for account changes
       window.ethereum.on('accountsChanged', handleAccountsChanged);
+      
+      // Listen for chain changes
+      window.ethereum.on('chainChanged', updateNetworkInfo);
     }
 
     return () => {
       if (window.ethereum) {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', updateNetworkInfo);
       }
     };
   }, []);
+
+  const updateNetworkInfo = (chainId: string) => {
+    // Map chainId to network name
+    const networks: Record<string, string> = {
+      '0x1': 'Mainnet',
+      '0x3': 'Ropsten',
+      '0x4': 'Rinkeby',
+      '0x5': 'Goerli',
+      '0xaa36a7': 'Sepolia',
+      '0x89': 'Polygon',
+      '0xa': 'Optimism',
+      '0xa4b1': 'Arbitrum'
+    };
+    
+    setCurrentNetwork(networks[chainId] || `Chain ID: ${chainId}`);
+  };
 
   const handleAccountsChanged = (accounts: string[]) => {
     if (accounts.length === 0) {
@@ -63,7 +95,7 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
     }
   };
 
-  const connectWallet = async () => {
+  const handleConnectWallet = async () => {
     if (!window.ethereum) {
       toast.error("MetaMask is not installed");
       return;
@@ -72,15 +104,28 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
     setIsConnecting(true);
     
     try {
-      const accounts = await window.ethereum.request({ 
-        method: 'eth_requestAccounts' 
-      });
-      handleAccountsChanged(accounts);
-    } catch (error) {
+      const account = await connectWallet();
+      if (account) {
+        handleAccountsChanged([account]);
+      }
+    } catch (error: any) {
       console.error("Failed to connect:", error);
-      toast.error("Failed to connect to MetaMask");
+      toast.error(error.message || "Failed to connect to MetaMask");
     } finally {
       setIsConnecting(false);
+    }
+  };
+
+  const handleSwitchNetwork = async (network: 'mainnet' | 'sepolia') => {
+    try {
+      const success = await switchNetwork(network);
+      if (success) {
+        toast.success(`Switched to ${network}`);
+      } else {
+        toast.error(`Failed to switch to ${network}`);
+      }
+    } catch (error: any) {
+      toast.error(error.message || `Failed to switch to ${network}`);
     }
   };
 
@@ -105,16 +150,61 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
 
   if (account) {
     return (
-      <Button variant="outline" className="flex gap-2">
-        <Wallet className="h-4 w-4" />
-        {`${account.substring(0, 6)}...${account.substring(account.length - 4)}`}
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" className="flex gap-2">
+            <Wallet className="h-4 w-4" />
+            {`${account.substring(0, 6)}...${account.substring(account.length - 4)}`}
+            {currentNetwork && (
+              <>
+                <span className="hidden md:inline mx-1">|</span>
+                <span className="hidden md:inline text-xs bg-primary/10 px-2 py-0.5 rounded-full">
+                  {currentNetwork}
+                </span>
+              </>
+            )}
+            <ChevronDown className="h-4 w-4 ml-1" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>Wallet Connected</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => handleSwitchNetwork('mainnet')}
+          >
+            Switch to Mainnet
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => handleSwitchNetwork('sepolia')}
+          >
+            Switch to Sepolia Testnet
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => {
+              navigator.clipboard.writeText(account);
+              toast.success("Address copied to clipboard");
+            }}
+          >
+            Copy Address
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => window.open(`https://etherscan.io/address/${account}`, '_blank')}
+          >
+            View on Etherscan
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
   return (
     <Button 
-      onClick={connectWallet} 
+      onClick={handleConnectWallet} 
       disabled={isConnecting}
       className="flex gap-2"
     >

@@ -7,9 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Wallet, Coins, ArrowUp, ArrowDown, Link } from 'lucide-react';
+import { Wallet, Coins, ArrowUp, ArrowDown, ExternalLink, AlertTriangle } from 'lucide-react';
 import WalletConnect from '@/components/wallet/WalletConnect';
-import { stakeTokens, unstakeTokens, getBlockchainBalance } from '@/services/ethService';
+import { 
+  stakeTokens, 
+  unstakeTokens, 
+  getTokenBalance, 
+  getStakedBalance,
+  switchNetwork 
+} from '@/services/ethService';
 import {
   Dialog,
   DialogContent,
@@ -19,10 +25,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Mock contract data similar to MOR Dashboard
+const CONTRACT_ADDRESS = "0x7396F26DdEE748D3cE166852Ef56E24cdA25CBD4";
+const TOKEN_ADDRESS = "0x1C9491865a1DE77C5b6e19d2E6a5F1D7a6F2b25F";
 
 const Staking = () => {
-  const [balance, setBalance] = useState(1000); // Mock MOR token balance
-  const [stakedAmount, setStakedAmount] = useState(250); // Mock staked amount
+  const [balance, setBalance] = useState<number>(0);
+  const [stakedAmount, setStakedAmount] = useState<number>(0);
   const [amountToStake, setAmountToStake] = useState('');
   const [amountToUnstake, setAmountToUnstake] = useState('');
   const [isStaking, setIsStaking] = useState(false);
@@ -30,6 +41,8 @@ const Staking = () => {
   const [tier, setTier] = useState('Basic');
   const [connectedAccount, setConnectedAccount] = useState<string | null>(null);
   const [showUnstakeDialog, setShowUnstakeDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("stake");
   
   // Calculate tier based on staked amount
   useEffect(() => {
@@ -46,19 +59,38 @@ const Staking = () => {
 
   // Update balance from blockchain when wallet is connected
   useEffect(() => {
-    const updateBalance = async () => {
+    const updateBalances = async () => {
       if (connectedAccount) {
-        const blockchainBalance = await getBlockchainBalance(connectedAccount);
-        setBalance(blockchainBalance);
+        setIsLoading(true);
+        try {
+          // Try to switch to mainnet
+          await switchNetwork('mainnet');
+          
+          // Get token balance
+          const tokenBalance = await getTokenBalance(connectedAccount);
+          setBalance(tokenBalance);
+          
+          // Get staked balance
+          const staked = await getStakedBalance(connectedAccount);
+          setStakedAmount(staked);
+        } catch (error) {
+          console.error("Error fetching balances:", error);
+          toast.error("Failed to fetch blockchain data");
+        } finally {
+          setIsLoading(false);
+        }
       }
     };
     
-    updateBalance();
+    if (connectedAccount) {
+      updateBalances();
+    } else {
+      setIsLoading(false);
+    }
   }, [connectedAccount]);
 
   const handleWalletConnect = (account: string) => {
     setConnectedAccount(account);
-    toast.success(`Wallet connected: ${account.substring(0, 6)}...${account.substring(account.length - 4)}`);
   };
 
   const handleStake = async () => {
@@ -156,7 +188,7 @@ const Staking = () => {
 
   return (
     <DashboardLayout>
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">MOR Token Staking</h1>
           <p className="text-muted-foreground">Stake your MOR tokens to unlock premium features</p>
@@ -164,36 +196,92 @@ const Staking = () => {
         <WalletConnect onConnect={handleWalletConnect} />
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {!connectedAccount && !isLoading && (
+        <Card className="mb-6 border-dashed">
+          <CardContent className="pt-6 flex flex-col sm:flex-row items-center gap-4">
+            <div className="rounded-full bg-amber-500/10 p-3">
+              <AlertTriangle className="h-6 w-6 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Connect your wallet</h3>
+              <p className="text-sm text-muted-foreground">
+                Connect your Ethereum wallet to view your MOR token balance and stake tokens.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Your Balance</CardTitle>
             <CardDescription>Current MOR token holdings</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <div className="p-2 bg-primary/10 rounded-full">
-                <Wallet className="h-6 w-6 text-primary" />
+            {isLoading ? (
+              <div className="space-y-2">
+                <div className="h-8 bg-muted animate-pulse rounded-md"></div>
+                <div className="h-4 w-24 bg-muted animate-pulse rounded-md"></div>
               </div>
-              <div>
-                <p className="text-3xl font-bold">{balance} MOR</p>
-                <p className="text-sm text-muted-foreground">Available balance</p>
+            ) : (
+              <div className="flex items-center space-x-4">
+                <div className="p-2 bg-primary/10 rounded-full">
+                  <Coins className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold">{balance} MOR</p>
+                  <p className="text-sm text-muted-foreground">Available balance</p>
+                </div>
               </div>
-            </div>
+            )}
             
-            <div className="flex items-center space-x-4">
-              <div className="p-2 bg-primary/10 rounded-full">
-                <Coins className="h-6 w-6 text-primary" />
+            {isLoading ? (
+              <div className="space-y-2">
+                <div className="h-8 bg-muted animate-pulse rounded-md"></div>
+                <div className="h-4 w-24 bg-muted animate-pulse rounded-md"></div>
               </div>
-              <div>
-                <p className="text-3xl font-bold">{stakedAmount} MOR</p>
-                <p className="text-sm text-muted-foreground">Total staked</p>
+            ) : (
+              <div className="flex items-center space-x-4">
+                <div className="p-2 bg-primary/10 rounded-full">
+                  <Wallet className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold">{stakedAmount} MOR</p>
+                  <p className="text-sm text-muted-foreground">Total staked</p>
+                </div>
               </div>
-            </div>
+            )}
             
             {connectedAccount && (
-              <div className="pt-2 text-xs text-muted-foreground">
-                Connected: {`${connectedAccount.substring(0, 6)}...${connectedAccount.substring(connectedAccount.length - 4)}`}
+              <div className="space-y-2 mt-4 pt-4 border-t">
+                <div className="text-sm font-medium">Contract Details</div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Staking Contract:</span>
+                    <a 
+                      href={`https://etherscan.io/address/${CONTRACT_ADDRESS}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-blue-500 hover:underline"
+                    >
+                      {`${CONTRACT_ADDRESS.substring(0, 6)}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)}`}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Token Contract:</span>
+                    <a 
+                      href={`https://etherscan.io/address/${TOKEN_ADDRESS}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-blue-500 hover:underline"
+                    >
+                      {`${TOKEN_ADDRESS.substring(0, 6)}...${TOKEN_ADDRESS.substring(TOKEN_ADDRESS.length - 4)}`}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>
@@ -201,157 +289,196 @@ const Staking = () => {
         
         <Card>
           <CardHeader>
-            <CardTitle>Stake Tokens</CardTitle>
-            <CardDescription>Stake your MOR tokens to access premium features</CardDescription>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="stake">Stake</TabsTrigger>
+                <TabsTrigger value="unstake">Unstake</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="stakeAmount">Amount to Stake</Label>
-              <div className="flex space-x-2">
-                <Input
-                  id="stakeAmount"
-                  type="number"
-                  placeholder="Enter amount"
-                  value={amountToStake}
-                  onChange={(e) => setAmountToStake(e.target.value)}
-                  disabled={!connectedAccount || isStaking}
-                />
-                <Button 
-                  onClick={handleStake} 
-                  disabled={isStaking || !connectedAccount}
-                >
-                  {isStaking ? 'Staking...' : 'Stake'}
-                  <ArrowUp className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="pt-2">
-              <Dialog open={showUnstakeDialog} onOpenChange={setShowUnstakeDialog}>
-                <DialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    disabled={!connectedAccount || stakedAmount <= 0}
-                  >
-                    Unstake Tokens
-                    <ArrowDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Unstake Tokens</DialogTitle>
-                    <DialogDescription>
-                      Withdraw your staked MOR tokens. Note that this may affect your tier level and benefits.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="unstakeAmount">Amount to Unstake</Label>
-                      <Input
-                        id="unstakeAmount"
-                        type="number"
-                        placeholder="Enter amount"
-                        value={amountToUnstake}
-                        onChange={(e) => setAmountToUnstake(e.target.value)}
-                      />
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Available: {stakedAmount} MOR
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowUnstakeDialog(false)}
+          <CardContent>
+            <TabsContent value="stake" className="mt-0">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="stakeAmount">Amount to Stake</Label>
+                  <div className="flex space-x-2">
+                    <Input
+                      id="stakeAmount"
+                      type="number"
+                      placeholder="Enter amount"
+                      value={amountToStake}
+                      onChange={(e) => setAmountToStake(e.target.value)}
+                      disabled={!connectedAccount || isStaking || isLoading}
+                    />
+                    <Button 
+                      onClick={handleStake} 
+                      disabled={isStaking || !connectedAccount || isLoading}
+                      className="min-w-24"
                     >
-                      Cancel
+                      {isStaking ? 'Staking...' : 'Stake'}
+                      <ArrowUp className="ml-2 h-4 w-4" />
                     </Button>
+                  </div>
+                  {connectedAccount && (
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>Available: {balance} MOR</span>
+                      <button 
+                        className="text-primary hover:underline" 
+                        onClick={() => setAmountToStake(balance.toString())}
+                        disabled={isLoading || balance <= 0}
+                      >
+                        Max
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-2 pt-2">
+                  <div className="text-sm">Staking Benefits:</div>
+                  <ul className="text-sm space-y-1">
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-500">•</span>
+                      <span>Access to premium API features</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-500">•</span>
+                      <span>Higher API rate limits based on your tier</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-500">•</span>
+                      <span>Priority support and dedicated account manager (Platinum tier)</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="unstake" className="mt-0">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="unstakeAmount">Amount to Unstake</Label>
+                  <div className="flex space-x-2">
+                    <Input
+                      id="unstakeAmount"
+                      type="number"
+                      placeholder="Enter amount"
+                      value={amountToUnstake}
+                      onChange={(e) => setAmountToUnstake(e.target.value)}
+                      disabled={!connectedAccount || isUnstaking || isLoading}
+                    />
                     <Button 
                       onClick={handleUnstake}
-                      disabled={isUnstaking}
+                      disabled={isUnstaking || !connectedAccount || isLoading}
+                      variant="outline"
+                      className="min-w-24"
                     >
-                      {isUnstaking ? 'Processing...' : 'Confirm Unstake'}
+                      {isUnstaking ? 'Processing...' : 'Unstake'}
+                      <ArrowDown className="ml-2 h-4 w-4" />
                     </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
+                  </div>
+                  {connectedAccount && (
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>Staked: {stakedAmount} MOR</span>
+                      <button 
+                        className="text-primary hover:underline" 
+                        onClick={() => setAmountToUnstake(stakedAmount.toString())}
+                        disabled={isLoading || stakedAmount <= 0}
+                      >
+                        Max
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="rounded-md bg-amber-50 dark:bg-amber-950/50 p-3 text-sm text-amber-800 dark:text-amber-200 mt-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <strong>Important:</strong> Unstaking tokens will reduce your tier level and associated benefits if your staked amount falls below a tier threshold.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
           </CardContent>
         </Card>
         
-        <Card className="md:col-span-2">
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Staking Tier</CardTitle>
             <CardDescription>Your current benefits and next tier progress</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold">Current Tier: {tier}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {tier === 'Basic' && 'Limited access to API features'}
-                  {tier === 'Silver' && 'Increased rate limits and standard support'}
-                  {tier === 'Gold' && 'Higher rate limits and priority support'}
-                  {tier === 'Platinum' && 'Maximum rate limits and dedicated support'}
-                </p>
+            {isLoading ? (
+              <div className="space-y-4">
+                <div className="h-8 bg-muted animate-pulse rounded-md"></div>
+                <div className="h-4 bg-muted animate-pulse rounded-md"></div>
+                <div className="h-2 bg-muted animate-pulse rounded-md"></div>
               </div>
-              <div className="bg-primary/10 text-primary font-semibold rounded-full px-4 py-1">
-                {tier}
-              </div>
-            </div>
-            
-            {tier !== 'Platinum' && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Progress to {nextTier.name}</span>
-                  <span>{stakedAmount} / {nextTier.required} MOR</span>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Current Tier: {tier}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {tier === 'Basic' && 'Limited access to API features'}
+                      {tier === 'Silver' && 'Increased rate limits and standard support'}
+                      {tier === 'Gold' && 'Higher rate limits and priority support'}
+                      {tier === 'Platinum' && 'Maximum rate limits and dedicated support'}
+                    </p>
+                  </div>
+                  <div className="bg-primary/10 text-primary font-semibold rounded-full px-4 py-1">
+                    {tier}
+                  </div>
                 </div>
-                <Progress value={progressToNextTier} className="h-2" />
-                <p className="text-sm text-muted-foreground">
-                  Stake {nextTier.required - stakedAmount} more MOR tokens to reach the {nextTier.name} tier.
-                </p>
-              </div>
+                
+                {tier !== 'Platinum' && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Progress to {nextTier.name}</span>
+                      <span>{stakedAmount} / {nextTier.required} MOR</span>
+                    </div>
+                    <Progress value={progressToNextTier} className="h-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Stake {nextTier.required - stakedAmount} more MOR tokens to reach the {nextTier.name} tier.
+                    </p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-semibold mb-2">Silver Tier Benefits</h4>
+                    <ul className="text-sm space-y-1">
+                      <li>• 100,000 requests per month</li>
+                      <li>• Access to standard models</li>
+                      <li>• Standard support response time</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">Requires 100 MOR</div>
+                  </div>
+                  
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-semibold mb-2">Gold Tier Benefits</h4>
+                    <ul className="text-sm space-y-1">
+                      <li>• 500,000 requests per month</li>
+                      <li>• Access to all models</li>
+                      <li>• Priority support</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">Requires 500 MOR</div>
+                  </div>
+                  
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-semibold mb-2">Platinum Tier Benefits</h4>
+                    <ul className="text-sm space-y-1">
+                      <li>• Unlimited requests</li>
+                      <li>• Early access to new models</li>
+                      <li>• Dedicated support</li>
+                      <li>• Custom model training</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">Requires 1000 MOR</div>
+                  </div>
+                </div>
+              </>
             )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-              <div className="border rounded-lg p-4">
-                <h4 className="font-semibold mb-2">Silver Tier Benefits</h4>
-                <ul className="text-sm space-y-1">
-                  <li>• 100,000 requests per month</li>
-                  <li>• Access to standard models</li>
-                  <li>• Standard support response time</li>
-                </ul>
-                <div className="mt-2 text-xs text-muted-foreground">Requires 100 MOR</div>
-              </div>
-              
-              <div className="border rounded-lg p-4">
-                <h4 className="font-semibold mb-2">Gold Tier Benefits</h4>
-                <ul className="text-sm space-y-1">
-                  <li>• 500,000 requests per month</li>
-                  <li>• Access to all models</li>
-                  <li>• Priority support</li>
-                </ul>
-                <div className="mt-2 text-xs text-muted-foreground">Requires 500 MOR</div>
-              </div>
-              
-              <div className="border rounded-lg p-4">
-                <h4 className="font-semibold mb-2">Platinum Tier Benefits</h4>
-                <ul className="text-sm space-y-1">
-                  <li>• Unlimited requests</li>
-                  <li>• Early access to new models</li>
-                  <li>• Dedicated support</li>
-                  <li>• Custom model training</li>
-                </ul>
-                <div className="mt-2 text-xs text-muted-foreground">Requires 1000 MOR</div>
-              </div>
-              
-              <div className="border border-dashed rounded-lg p-4 flex flex-col justify-center items-center text-center">
-                <h4 className="font-semibold mb-2">Need more tokens?</h4>
-                <p className="text-sm text-muted-foreground">Contact our sales team to purchase additional MOR tokens</p>
-                <Button variant="outline" className="mt-4">Contact Sales</Button>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
