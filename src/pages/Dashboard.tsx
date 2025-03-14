@@ -8,8 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ArrowRight, BarChart3, Activity, KeyRound, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants';
-
-const API_ENDPOINT = "https://token-auth-saas-1081887913409.us-west1.run.app";
+import { isAuthenticated, createAuthToken } from '@/lib/auth';
 
 const Dashboard = () => {
   const { toast } = useToast();
@@ -25,33 +24,37 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // Get API keys from localStorage
-        const storedApiKeys = localStorage.getItem('apiKeys');
-        let apiKey = '';
-        
-        if (storedApiKeys) {
-          const parsedTokens = JSON.parse(storedApiKeys);
-          const activeToken = parsedTokens.find(token => token.status === 'active');
-          
-          if (activeToken) {
-            apiKey = activeToken.token;
-          }
-        }
-        
-        if (!apiKey) {
+        // Check authentication
+        if (!isAuthenticated()) {
+          console.error('[DASHBOARD] User not authenticated');
           setIsLoading(false);
           toast({
-            title: "No active API key",
-            description: "Please create an API key to view metrics",
+            title: "Authentication required",
+            description: "Please log in to view your dashboard",
             variant: "destructive",
           });
           return;
         }
         
-        // Fetch metrics from the local API
-        const response = await fetch(`${FRONTEND_API_ENDPOINT}/metrics`, {
+        // Create auth token
+        const authToken = createAuthToken();
+        if (!authToken) {
+          console.error('[DASHBOARD] Failed to create auth token');
+          setIsLoading(false);
+          toast({
+            title: "Authentication error",
+            description: "Could not authenticate your session",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        console.log('[DASHBOARD] Fetching metrics using auth token');
+        
+        // Fetch metrics from the local API using user authentication
+        const response = await fetch(`${FRONTEND_API_ENDPOINT}/app/metrics`, {
           headers: {
-            'Authorization': `Bearer ${apiKey}`
+            'Authorization': `Bearer ${authToken}`
           }
         });
         
@@ -60,6 +63,7 @@ const Dashboard = () => {
         }
         
         const data = await response.json();
+        console.log('[DASHBOARD] Successfully fetched metrics:', data);
         
         // Set dashboard metrics
         setActiveTokens(data.activeTokens || 1);
@@ -104,7 +108,7 @@ const Dashboard = () => {
         }
         
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        console.error('[DASHBOARD] Error fetching dashboard data:', error);
         toast({
           title: "Failed to load metrics",
           description: error instanceof Error ? error.message : "An unknown error occurred",

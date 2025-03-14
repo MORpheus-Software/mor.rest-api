@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants';
+import { isAuthenticated, createAuthToken } from '@/lib/auth';
 
 // Define the API response types
 interface ApiKeyResponse {
@@ -31,12 +32,27 @@ interface ApiKeyDeleteResponse {
 // Function to fetch API keys from the server
 const fetchApiKeys = async (): Promise<Token[]> => {
   try {
-    // Fetch from the local API
-    const response = await fetch(`${FRONTEND_API_ENDPOINT}/keys`, {
+    // Check authentication using the auth helper
+    if (!isAuthenticated()) {
+      console.error('User not authenticated');
+      throw new Error('User not authenticated');
+    }
+    
+    // Create auth token using the helper function
+    const authToken = createAuthToken();
+    if (!authToken) {
+      console.error('Failed to create auth token');
+      throw new Error('Failed to create auth token');
+    }
+    
+    console.log('[TOKENS] Fetching API keys using auth token');
+    
+    // Fetch from the local API - use the app management endpoint
+    const response = await fetch(`${FRONTEND_API_ENDPOINT}/app/keys`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        // Add authentication headers here if needed
+        'Authorization': `Bearer ${authToken}`
       },
     });
 
@@ -45,6 +61,7 @@ const fetchApiKeys = async (): Promise<Token[]> => {
     }
 
     const data: ApiKeyListResponse = await response.json();
+    console.log('[TOKENS] Successfully fetched API keys:', data);
     
     // Map the API response to our Token format
     return data.data.map(key => ({
@@ -71,7 +88,7 @@ const fetchApiKeys = async (): Promise<Token[]> => {
       {
         id: uuidv4(),
         name: 'Production API',
-        token: `sk_${uuidv4().replace(/-/g, '')}`,
+        token: `sk-${uuidv4().replace(/-/g, '')}`,
         status: 'active',
         createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
         lastUsed: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
@@ -79,7 +96,7 @@ const fetchApiKeys = async (): Promise<Token[]> => {
       {
         id: uuidv4(),
         name: 'Development API',
-        token: `sk_${uuidv4().replace(/-/g, '')}`,
+        token: `sk-${uuidv4().replace(/-/g, '')}`,
         status: 'active',
         createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
         lastUsed: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
@@ -95,12 +112,27 @@ const fetchApiKeys = async (): Promise<Token[]> => {
 // Function to create a new API key on the server
 const createApiKey = async (name: string): Promise<Token> => {
   try {
-    // Try to create using the local API
-    const response = await fetch(`${FRONTEND_API_ENDPOINT}/keys`, {
+    // Check authentication using the auth helper
+    if (!isAuthenticated()) {
+      console.error('User not authenticated');
+      throw new Error('User not authenticated');
+    }
+    
+    // Create auth token using the helper function
+    const authToken = createAuthToken();
+    if (!authToken) {
+      console.error('Failed to create auth token');
+      throw new Error('Failed to create auth token');
+    }
+    
+    console.log(`[TOKENS] Creating new API key "${name}" using auth token`);
+    
+    // Try to create using the local API - use the app management endpoint
+    const response = await fetch(`${FRONTEND_API_ENDPOINT}/app/keys`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Add authentication headers here if needed
+        'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({ name })
     });
@@ -110,6 +142,7 @@ const createApiKey = async (name: string): Promise<Token> => {
     }
 
     const data: ApiKeyCreateResponse = await response.json();
+    console.log('[TOKENS] Successfully created API key:', data);
     
     // Map the API response to our Token format
     return {
@@ -129,7 +162,7 @@ const createApiKey = async (name: string): Promise<Token> => {
     return {
       id: uuidv4(),
       name,
-      token: `sk_${uuidv4().replace(/-/g, '')}`,
+      token: `sk-${uuidv4().replace(/-/g, '')}`,
       status: 'active',
       createdAt: new Date().toISOString(),
       lastUsed: null
@@ -152,12 +185,27 @@ const updateApiKeyStatus = async (id: string, status: 'active' | 'inactive'): Pr
 // Function to delete an API key on the server
 const deleteApiKey = async (id: string): Promise<boolean> => {
   try {
-    // Try to delete using the local API
-    const response = await fetch(`${FRONTEND_API_ENDPOINT}/keys/${id}`, {
+    // Check authentication using the auth helper
+    if (!isAuthenticated()) {
+      console.error('User not authenticated');
+      throw new Error('User not authenticated');
+    }
+    
+    // Create auth token using the helper function
+    const authToken = createAuthToken();
+    if (!authToken) {
+      console.error('Failed to create auth token');
+      throw new Error('Failed to create auth token');
+    }
+    
+    console.log(`[TOKENS] Deleting API key ${id} using auth token`);
+    
+    // Try to delete using the local API - use the app management endpoint
+    const response = await fetch(`${FRONTEND_API_ENDPOINT}/app/keys/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        // Add authentication headers here if needed
+        'Authorization': `Bearer ${authToken}`
       }
     });
 
@@ -166,6 +214,7 @@ const deleteApiKey = async (id: string): Promise<boolean> => {
     }
 
     const data: ApiKeyDeleteResponse = await response.json();
+    console.log('[TOKENS] Successfully deleted API key:', data);
     return data.data.deleted;
   } catch (error) {
     console.error('Error deleting API key on server:', error);

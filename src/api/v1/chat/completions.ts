@@ -52,6 +52,26 @@ export const formatStreamingResponse = (originalData: string): string => {
   }
 };
 
+// Helper to process streaming buffer and extract complete events
+const processStreamBuffer = (buffer: string): { events: string[], remainder: string } => {
+  if (!buffer.includes('\n\n')) {
+    // No complete events in the buffer yet
+    return { events: [], remainder: buffer };
+  }
+  
+  // Split by double newlines which typically separate SSE events
+  const parts = buffer.split('\n\n');
+  
+  // The last part might be incomplete (no trailing \n\n)
+  const remainder = parts.pop() || '';
+  
+  // Return complete events and the remainder
+  return {
+    events: parts.map(part => part + '\n\n'), // Re-add the separator that was removed by split
+    remainder
+  };
+};
+
 // Proxy function to forward requests to the base AI service
 export async function proxyToBaseImage(
   endpoint: string,
@@ -210,11 +230,12 @@ const chatCompletionsHandler = async (req: Request, res: Response) => {
     });
     
     // Stream the response data
-    if (proxyResponse.body) {
-      const reader = proxyResponse.body.getReader();
-      const decoder = new TextDecoder();
-      
-      try {
+    try {
+      // Check if the response body is a ReadableStream and can be processed with getReader
+      if (proxyResponse.body && typeof proxyResponse.body.getReader === 'function') {
+        const reader = proxyResponse.body.getReader();
+        const decoder = new TextDecoder();
+        
         let buffer = '';  // Buffer to handle partial chunks
         
         while (true) {
@@ -228,74 +249,137 @@ const chatCompletionsHandler = async (req: Request, res: Response) => {
                 res.write(formattedData);
               }
             }
-            
-            // Send final [DONE] event
-            res.write('data: [DONE]\n\n');
             break;
           }
           
-          // Decode the chunk and add to buffer
           const chunk = decoder.decode(value, { stream: true });
-          console.log(`[PROXY] Received chunk (${chunk.length} bytes): ${chunk.substring(0, 50)}${chunk.length > 50 ? '...' : ''}`);
-          
-          // Handle raw text streaming - if there are no newlines, this might be pure text
-          if (!chunk.includes('\n') && !buffer.includes('\n')) {
-            const formattedData = formatStreamingResponse(chunk);
-            if (formattedData) {
-              res.write(formattedData);
-            }
-            continue; // Skip buffer processing for pure text chunks
-          }
-          
           buffer += chunk;
           
-          // Process complete lines in the buffer
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // The last line might be incomplete
+          // Process and send complete events from the buffer
+          const processedBuffer = processStreamBuffer(buffer);
+          buffer = processedBuffer.remainder;
           
-          for (const line of lines) {
-            if (line.trim()) {
-              const formattedData = formatStreamingResponse(line);
+          if (processedBuffer.events.length > 0) {
+            processedBuffer.events.forEach(event => {
+              if (event.trim() && !event.includes('data: [DONE]')) {
+                const formattedData = formatStreamingResponse(event);
+                if (formattedData) {
+                  res.write(formattedData);
+                }
+              } else if (event.includes('data: [DONE]')) {
+                res.write('data: [DONE]\n\n');
+              }
+            });
+          }
+        }
+      } else {
+        // Alternative approach if getReader is not available - handle as a Node.js stream or plain response
+        console.log(`[PROXY] Response body is not a standard ReadableStream, using alternative approach`);
+        
+        // If we have a Node.js readable stream
+        if (proxyResponse.body && typeof proxyResponse.body.on === 'function') {
+          let buffer = '';
+          
+          proxyResponse.body.on('data', (chunk) => {
+            const decodedChunk = chunk.toString();
+            buffer += decodedChunk;
+            
+            // Process and send complete events from the buffer
+            const processedBuffer = processStreamBuffer(buffer);
+            buffer = processedBuffer.remainder;
+            
+            if (processedBuffer.events.length > 0) {
+              processedBuffer.events.forEach(event => {
+                if (event.trim() && !event.includes('data: [DONE]')) {
+                  const formattedData = formatStreamingResponse(event);
+                  if (formattedData) {
+                    res.write(formattedData);
+                  }
+                } else if (event.includes('data: [DONE]')) {
+                  res.write('data: [DONE]\n\n');
+                }
+              });
+            }
+          });
+          
+          proxyResponse.body.on('end', () => {
+            // Send any remaining data in the buffer
+            if (buffer.trim()) {
+              const formattedData = formatStreamingResponse(buffer);
               if (formattedData) {
                 res.write(formattedData);
               }
             }
-          }
+            res.write('data: [DONE]\n\n');
+            res.end();
+          });
           
-          // Flush response to avoid buffering (if supported)
-          if ('flush' in res && typeof res.flush === 'function') {
-            res.flush();
+          proxyResponse.body.on('error', (err) => {
+            console.error('[PROXY] Error streaming response:', err);
+            res.write(`data: { "error": "Streaming error: ${err.message}" }\n\n`);
+            res.write('data: [DONE]\n\n');
+            res.end();
+          });
+        } else {
+          // If it's neither a ReadableStream nor a Node.js stream, try to get the full response
+          console.log(`[PROXY] Falling back to full response handling`);
+          try {
+            const responseText = await proxyResponse.text();
+            
+            // Send the full response as one chunk
+            const formattedData = formatStreamingResponse(responseText);
+            if (formattedData) {
+              res.write(formattedData);
+            }
+            res.write('data: [DONE]\n\n');
+            res.end();
+          } catch (textError) {
+            console.error('[PROXY] Error getting full response text:', textError);
+            res.write(`data: { "error": "Failed to read response: ${textError.message}" }\n\n`);
+            res.write('data: [DONE]\n\n');
+            res.end();
           }
         }
-        
-        console.log(`[PROXY] Streaming completed successfully`);
-      } catch (error) {
-        console.error('[PROXY] Error streaming response:', error);
-        // Try to send an error in the stream
-        try {
-          res.write(`data: {"error":{"message":"Streaming error: ${(error as Error).message}"}}\n\n`);
-        } catch (writeError) {
-          console.error('[PROXY] Error sending error in stream:', writeError);
-        }
-      } finally {
-        res.end();
       }
-    } else {
-      // No response body
-      console.log(`[PROXY] No response body to stream`);
-      res.write('data: {"error":{"message":"No response body from proxy"}}\n\n');
-      res.write('data: [DONE]\n\n');
+    } catch (streamError) {
+      console.error('[PROXY] Error processing stream:', streamError);
+      
+      // Only try to write to the response if headers haven't been sent yet
+      if (!res.headersSent) {
+        res.write(`data: { "error": "Stream processing error: ${streamError.message}" }\n\n`);
+        res.write('data: [DONE]\n\n');
+      }
+      
+      // Always end the response stream
       res.end();
     }
   } catch (error) {
     console.error('[PROXY] Error proxying request:', error);
     
-    res.status(500).json({
-      error: {
-        message: 'An error occurred while processing your request',
-        type: 'server_error',
-      },
-    });
+    // Only send error response if headers haven't been sent yet
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: {
+          message: 'An error occurred while processing your request',
+          type: 'server_error',
+        },
+      });
+    } else {
+      // If headers have already been sent, try to send error in the stream format
+      try {
+        res.write(`data: {"error":{"message":"An error occurred while processing your request"}}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } catch (writeError) {
+        console.error('[PROXY] Error writing to stream after error:', writeError);
+        // Just end the response as a last resort
+        try {
+          res.end();
+        } catch (endError) {
+          console.error('[PROXY] Even ending the response failed:', endError);
+        }
+      }
+    }
   }
 };
 

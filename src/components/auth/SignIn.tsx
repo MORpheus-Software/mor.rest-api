@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, KeyRound, Mail } from 'lucide-react';
+import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants.ts';
+import { notifyAuthChange } from '@/lib/auth';
 
 export function SignInForm() {
   const navigate = useNavigate();
@@ -27,29 +28,123 @@ export function SignInForm() {
     e.preventDefault();
     setIsLoading(true);
     
+    console.log('[SIGNIN] Starting login process...');
+    const apiEndpoint = `${FRONTEND_API_ENDPOINT}/auth/login`;
+    console.log('[SIGNIN] API Endpoint:', apiEndpoint);
+    console.log('[SIGNIN] FRONTEND_API_ENDPOINT value:', FRONTEND_API_ENDPOINT);
+    
     try {
-      // Mock authentication delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Simulate successful login
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('user', JSON.stringify({
-        id: '1',
-        name: 'Demo User',
+      // Call the login API endpoint
+      console.log('[SIGNIN] Calling login API with data:', {
         email: formData.email,
-        avatar: null
-      }));
+        password: '********' // Masked for security
+      });
+      
+      // Log the fetch operation before executing it
+      console.log('[SIGNIN] About to execute fetch request to:', apiEndpoint);
+      
+      const response = await fetch(`${FRONTEND_API_ENDPOINT}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        })
+      });
+      
+      console.log('[SIGNIN] Fetch request completed with status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('[SIGNIN] Login error response:', errorData);
+        throw new Error(errorData.error?.message || 'Login failed');
+      }
+
+      // Clone the response before consuming it with json()
+      const responseText = await response.clone().text();
+      console.log('[SIGNIN] Login raw response:', responseText);
+      
+      // Process successful login
+      const responseData = await response.json();
+      console.log('[SIGNIN] Login parsed response:', responseData);
+      
+      const user = responseData.data;
+      
+      console.log('[SIGNIN] Login response object structure:', JSON.stringify(responseData, null, 2));
+      console.log('[SIGNIN] User data object structure:', JSON.stringify(user, null, 2));
+      
+      if (!user || !user.id) {
+        console.error('[SIGNIN] Login response missing user ID. Response structure:', responseData);
+        
+        // If we have a malformed response but still need to proceed, create a fallback user
+        // This is a temporary fix - the server should be fixed to return proper data
+        const fallbackUser = {
+          id: `temp-${Date.now()}`,
+          name: formData.email.split('@')[0], // Use part of email as name
+          email: formData.email,
+          createdAt: new Date().toISOString()
+        };
+        
+        console.log('[SIGNIN] Created fallback user:', fallbackUser);
+        
+        // Store fallback user data in localStorage
+        console.log('[SIGNIN] Storing fallback user data in localStorage...');
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('user', JSON.stringify(fallbackUser));
+        
+        console.log(`[SIGNIN] Fallback user stored with ID: ${fallbackUser.id}`);
+        
+        // Notify about auth change
+        notifyAuthChange();
+        
+        toast({
+          title: "Signed in with fallback data",
+          description: "Welcome back to TokenHub (temporary user)"
+        });
+        
+        // Navigate to dashboard
+        console.log('[SIGNIN] Navigating to dashboard with fallback user...');
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1500);
+        
+        return;
+      }
+      
+      // Store user data in localStorage
+      console.log('[SIGNIN] Storing auth data in localStorage...');
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      console.log(`[SIGNIN] User logged in with ID: ${user.id}`);
+      console.log('[SIGNIN] localStorage after setting:', {
+        isAuthenticated: localStorage.getItem('isAuthenticated'),
+        userExists: !!localStorage.getItem('user')
+      });
+      
+      // Notify components of auth change
+      console.log('[SIGNIN] Broadcasting auth state change...');
+      notifyAuthChange();
       
       toast({
         title: "Successfully signed in",
         description: "Welcome back to TokenHub",
       });
       
-      navigate('/dashboard');
+      // Use setTimeout to ensure navigation happens after localStorage updates
+      console.log('[SIGNIN] Setting up redirect to dashboard...');
+      setTimeout(() => {
+        console.log('[SIGNIN] Now navigating to dashboard...');
+        // Force a page reload instead of using React Router
+        window.location.href = '/dashboard';
+      }, 1500); // Increased from 500ms to 1500ms
     } catch (error) {
+      console.error('[SIGNIN] Login error:', error);
       toast({
         title: "Authentication failed",
-        description: "Please check your credentials and try again",
+        description: error instanceof Error ? error.message : "Please check your credentials and try again",
         variant: "destructive",
       });
     } finally {

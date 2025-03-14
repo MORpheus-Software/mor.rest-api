@@ -45,13 +45,22 @@ export function ApiPlayground() {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        // Add longer timeout support for fetch
+        signal: AbortSignal.timeout(60000), // 60 second timeout
       };
       
       if (method === 'POST' || method === 'PUT') {
         try {
           const parsedBody = JSON.parse(requestBody);
           options.body = JSON.stringify(parsedBody);
+          
+          // Check for streaming request
+          const isStreamingRequest = parsedBody.stream === true;
+          
+          if (isStreamingRequest) {
+            return handleStreamingRequest(endpoint, options, startTime);
+          }
         } catch (error) {
           toast({
             title: "Invalid JSON",
@@ -63,7 +72,8 @@ export function ApiPlayground() {
         }
       }
       
-      const response = await fetch(`${endpoint}`, options);
+      // For non-streaming requests
+      const response = await fetch(endpoint, options);
       const endTime = performance.now();
       setResponseTime(Math.round(endTime - startTime));
       
@@ -81,9 +91,116 @@ export function ApiPlayground() {
         data
       });
     } catch (error) {
-      console.error('API request error:', error);
+      console.error('Error making request:', error);
       toast({
         title: "Request failed",
+        description: `API request failed: ${(error as Error).message || "An unexpected error occurred"}`,
+        variant: "destructive",
+      });
+      
+      const endTime = performance.now();
+      setResponseTime(Math.round(endTime - startTime));
+      
+      setResponse({
+        status: 'Error',
+        error: (error as Error).message || "An unexpected error occurred"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // New function to handle streaming responses
+  const handleStreamingRequest = async (endpoint: string, options: RequestInit, startTime: number) => {
+    try {
+      // Initialize partial response
+      const partialResponse = {
+        status: 'Streaming',
+        data: { choices: [{ message: { content: '' } }] }
+      };
+      setResponse(partialResponse);
+      
+      // Start the request
+      const response = await fetch(endpoint, options);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        setResponse({
+          status: response.status,
+          data: errorData
+        });
+        return;
+      }
+      
+      if (!response.body) {
+        throw new Error('Response has no body');
+      }
+      
+      // Create a reader to read the stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
+      
+      // Start the read loop
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          const endTime = performance.now();
+          setResponseTime(Math.round(endTime - startTime));
+          break;
+        }
+        
+        // Decode the chunk
+        const chunk = decoder.decode(value, { stream: true });
+        
+        // Process server-sent events
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+            try {
+              const jsonData = JSON.parse(line.substring(6));
+              
+              if (jsonData.choices && jsonData.choices[0] && jsonData.choices[0].delta?.content) {
+                // For streaming format like OpenAI
+                accumulatedContent += jsonData.choices[0].delta.content;
+              } else if (jsonData.choices && jsonData.choices[0] && jsonData.choices[0].message?.content) {
+                // For complete message format
+                accumulatedContent = jsonData.choices[0].message.content;
+              }
+              
+              // Update UI with accumulated content
+              setResponse({
+                status: 'Streaming',
+                data: {
+                  choices: [{
+                    message: { content: accumulatedContent }
+                  }]
+                }
+              });
+            } catch (e) {
+              console.log('Non-JSON data line:', line);
+            }
+          }
+        }
+      }
+      
+      // Set final response
+      const finalResponse = {
+        status: 200,
+        data: {
+          choices: [{
+            message: { content: accumulatedContent }
+          }]
+        }
+      };
+      setResponse(finalResponse);
+      
+    } catch (error) {
+      console.error('Error in streaming request:', error);
+      toast({
+        title: "Streaming request failed",
         description: (error as Error).message || "An unexpected error occurred",
         variant: "destructive",
       });
@@ -95,6 +212,7 @@ export function ApiPlayground() {
         status: 'Error',
         error: (error as Error).message || "An unexpected error occurred"
       });
+      
     } finally {
       setIsLoading(false);
     }

@@ -1,9 +1,9 @@
-
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { LogOut, LayoutDashboard, Key, Play, User, Coins, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
+import { logout } from '@/lib/auth';
 
 export function Sidebar() {
   const location = useLocation();
@@ -42,51 +42,41 @@ export function Sidebar() {
   ];
 
   const handleLogout = () => {
-    // Remove authentication state
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('user');
-    
     toast.success('Logged out successfully');
-    
-    // Redirect to home page
-    window.location.href = '/';
+    logout();
   };
 
   return (
-    <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
-      <div className="p-6">
-        <Link to="/" className="flex items-center gap-2 font-medium">
+    <div className="min-h-screen w-64 border-r border-border bg-card">
+      <div className="flex h-14 items-center border-b border-border px-4">
+        <Link to="/dashboard" className="flex items-center gap-2 font-semibold">
           <div className="rounded-lg bg-primary p-1.5 text-white">API</div>
-          <span className="text-sidebar-foreground">TokenHub</span>
+          <span>TokenHub</span>
         </Link>
       </div>
-      
-      <div className="flex-1 py-2 px-4 space-y-1">
+      <div className="flex flex-col gap-1 p-4">
         {navItems.map((item) => (
           <Link
             key={item.href}
             to={item.href}
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
+              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted',
               location.pathname === item.href
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                ? 'bg-muted font-medium text-foreground'
+                : 'text-muted-foreground'
             )}
           >
-            <item.icon className="h-4 w-4" />
+            <item.icon size={18} />
             {item.title}
           </Link>
         ))}
-      </div>
-      
-      <div className="p-6 mt-auto">
         <Button
-          variant="outline"
-          className="w-full justify-start text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent/50"
+          variant="ghost"
+          className="mt-2 justify-start gap-3 px-3 text-sm text-muted-foreground hover:bg-transparent hover:text-destructive"
           onClick={handleLogout}
         >
-          <LogOut className="mr-2 h-4 w-4" />
-          Log Out
+          <LogOut size={18} />
+          Log out
         </Button>
       </div>
     </div>

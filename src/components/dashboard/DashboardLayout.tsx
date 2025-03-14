@@ -1,22 +1,14 @@
-
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
+import { ReactNode } from 'react';
+import { Sidebar } from '@/components/dashboard/Sidebar';
 
 interface DashboardLayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const navigate = useNavigate();
+  // Authentication is now handled by AuthCheck and ProtectedRoute
+  // No need for redundant checks here
   
-  useEffect(() => {
-    const isAuthenticated = localStorage.getItem('isAuthenticated');
-    if (!isAuthenticated) {
-      navigate('/signin');
-    }
-  }, [navigate]);
-
   return (
     <div className="flex h-screen w-full">
       <Sidebar />

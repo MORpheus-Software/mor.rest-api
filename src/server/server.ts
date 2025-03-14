@@ -6,7 +6,14 @@ import chalk from 'chalk';
 import chatCompletionsHandler from '../api/v1/chat/completions.js';
 import keyHandlers from '../api/v1/keys.js';
 import metricsHandlers from '../api/v1/metrics.js';
+import authHandlers from '../api/v1/auth.js';
 import { checkRedisConnection } from './setupRedis.js';
+import { 
+  userAuthMiddleware, 
+  apiKeyAuthMiddleware, 
+  requireAuth 
+} from '../lib/api/auth-middleware.js';
+import { verifyRedisConnection } from '../lib/redis-adapter.js';
 
 // Load environment variables
 dotenv.config();
@@ -27,7 +34,7 @@ app.use(bodyParser.json());
 
 // Logging middleware
 app.use((req, res, next) => {
-  console.log(chalk.blue(`[SERVER] ${req.method} ${req.url}`));
+  console.log(chalk.blue(`[SERVER] ${req.method} ${req.path}`));
   // Log request body for debugging (sanitize in production)
   if (req.method === 'POST' && Object.keys(req.body || {}).length > 0) {
     const sanitizedBody = { ...req.body };
@@ -58,32 +65,83 @@ app.get('/api/health', (req, res) => {
 // API routes
 const apiRouter = express.Router();
 
-// API Key endpoints
-apiRouter.get('/keys', (req, res) => {
+// Create separate routers for API key management and NFA service proxying
+const appManagementRouter = express.Router();
+const nfaServiceRouter = express.Router();
+const authRouter = express.Router();
+
+// Authentication endpoints - no auth required for registration/login
+authRouter.post('/register', (req, res) => {
+  console.log(chalk.green('[SERVER] Processing registration request'));
+  authHandlers.register(req, res);
+});
+
+authRouter.post('/login', (req, res) => {
+  console.log(chalk.green('[SERVER] Processing login request'));
+  authHandlers.login(req, res);
+});
+
+// Auth endpoint requiring authentication
+authRouter.get('/me', userAuthMiddleware, requireAuth, (req, res) => {
+  authHandlers.me(req, res);
+});
+
+// Apply app user authentication to app management endpoints
+appManagementRouter.use(userAuthMiddleware);
+
+// API Key management endpoints - require user authentication
+appManagementRouter.get('/keys', requireAuth, (req, res) => {
   keyHandlers.getKeys(req, res);
 });
 
-apiRouter.post('/keys', (req, res) => {
+appManagementRouter.post('/keys', requireAuth, (req, res) => {
   console.log(chalk.green('[SERVER] Processing API key creation request'));
   keyHandlers.createKey(req, res);
 });
 
-apiRouter.delete('/keys/:id', (req, res) => {
+appManagementRouter.delete('/keys/:id', requireAuth, (req, res) => {
   keyHandlers.deleteKey(req, res);
 });
 
-// Chat completions endpoint
-apiRouter.post('/chat/completions', (req, res) => {
-  chatCompletionsHandler(req, res);
-});
-
-// Metrics endpoint
-apiRouter.get('/metrics', (req, res) => {
+// Metrics endpoint also uses user authentication
+appManagementRouter.get('/metrics', requireAuth, (req, res) => {
   metricsHandlers.getMetrics(req, res);
 });
 
-// Mount API routes
-app.use('/api/v1', apiRouter);
+// Apply API key authentication to NFA service proxy endpoints
+nfaServiceRouter.use(apiKeyAuthMiddleware);
+
+// NFA service proxy endpoints - require API key authentication
+nfaServiceRouter.post('/chat/completions', requireAuth, (req, res) => {
+  chatCompletionsHandler(req, res);
+});
+
+// Auth verification endpoint
+nfaServiceRouter.get('/auth/verify', requireAuth, (req, res) => {
+  res.json({ authenticated: true, userId: (req as any).userId });
+});
+
+// Mount auth routes
+app.use('/api/v1/auth', authRouter);
+
+// Mount app management routes
+app.use('/api/v1/app', appManagementRouter);
+
+// Mount NFA service proxy routes 
+app.use('/api/v1', nfaServiceRouter);
+
+// Verify Redis connection on startup
+verifyRedisConnection()
+  .then(isConnected => {
+    if (isConnected) {
+      console.log(chalk.green('[SERVER] Redis connection verified ✓'));
+    } else {
+      console.error(chalk.red('[SERVER] Redis connection test failed! Using fallback storage.'));
+    }
+  })
+  .catch(error => {
+    console.error(chalk.red('[SERVER] Redis connection verification error:'), error);
+  });
 
 // Start server
 async function startServer() {
@@ -98,6 +156,7 @@ async function startServer() {
     redisAvailable = await checkRedisConnection();
   } catch (error) {
     console.error(chalk.red('[SERVER] Error checking Redis connection:'), error);
+    console.log(chalk.yellow('[SERVER] Continuing without Redis...'));
   }
   
   if (redisAvailable) {
