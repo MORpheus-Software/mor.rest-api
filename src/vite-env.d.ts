@@ -16,3 +16,30 @@ declare module '*.svg' {
   const src: string;
   export default src;
 }
+
+// Add DOM type references to ensure browser APIs are available
+interface Window {
+  dispatchEvent(event: Event): boolean;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+}
+
+interface Storage {
+  key(index: number): string | null;
+  readonly length: number;
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  clear(): void;
+}
+
+interface EventInit {
+  bubbles?: boolean;
+  cancelable?: boolean;
+  composed?: boolean;
+}
+
+interface EventListenerOrEventListenerObject {
+  handleEvent?(evt: Event): void;
+  (evt: Event): void;
+}

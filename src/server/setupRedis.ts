@@ -16,8 +16,8 @@ export async function checkRedisConnection(): Promise<boolean> {
     try {
       // Connect to Upstash Redis
       const upstashUrl = `rediss://default:${upstashToken}@${upstashDomain}:6379`;
-      // Create Redis client properly - Import directly for proper typing
-      const client = new Redis(upstashUrl);
+      // Create Redis client properly with instance
+      const client = createRedisClient(upstashUrl);
       
       // Test connection by setting and getting a key
       await client.set('test-connection', 'success');
@@ -44,10 +44,10 @@ export async function checkRedisConnection(): Promise<boolean> {
   try {
     console.log(chalk.blue('[REDIS] Checking local Redis connection...'));
     
-    // Connect to local Redis using direct import of Redis
+    // Connect to local Redis
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    // Use the Redis class directly from ioredis
-    const client = new Redis(redisUrl);
+    // Create Redis client properly with instance
+    const client = createRedisClient(redisUrl);
     
     // Add error handler
     client.on('error', (err: Error) => {
@@ -71,4 +71,9 @@ export async function checkRedisConnection(): Promise<boolean> {
     console.error(chalk.red('[REDIS] Failed to connect to Redis:'), error);
     return false;
   }
+}
+
+// Helper function to create a Redis client
+function createRedisClient(url: string): Redis {
+  return new Redis(url);
 }

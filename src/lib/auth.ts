@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 
 // Helper to check if we're in a browser environment
@@ -177,8 +178,8 @@ export function setupAuthListeners(): void {
   }
   
   // Listen for localStorage changes from other tabs/windows
-  if (typeof window !== 'undefined') {
-    window.addEventListener('storage', (event: StorageEvent) => {
+  if (isBrowser) {
+    window.addEventListener('storage', (event: Storage) => {
       if (event.key === 'isAuthenticated') {
         const newValue = event.newValue === 'true';
         console.log('[AUTH] Auth changed in another tab:', newValue);
@@ -198,10 +199,14 @@ function emitAuthChangeEvent(isAuthenticated: boolean): void {
     return;
   }
   
-  if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
-    const event = new CustomEvent('authChanged', { 
-      detail: { isAuthenticated } 
-    });
+  if (isBrowser) {
+    const event = new Event('authChanged', {
+      bubbles: true,
+      cancelable: true,
+    }) as any;
+    
+    // Add detail property to the event
+    event.detail = { isAuthenticated };
     
     window.dispatchEvent(event);
     console.log('[AUTH] Auth change event emitted:', isAuthenticated);
