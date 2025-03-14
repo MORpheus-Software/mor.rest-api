@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { set, get, del, exists, sadd, srem, smembers } from '../redis-adapter.js';
-import { USER_PREFIX, USER_EMAIL_INDEX, ALL_USERS_SET } from './constants.ts';
+import { USER_PREFIX, USER_EMAIL_INDEX, ALL_USERS_SET } from './constants.js';
 
 export interface User {
   id: string;
@@ -183,4 +183,4 @@ export async function getAllUsers(limit: number = 100, offset: number = 0): Prom
     console.error('[USERS] Error retrieving all users:', error);
     return [];
   }
-} 
+}

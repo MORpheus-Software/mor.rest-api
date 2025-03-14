@@ -1,4 +1,3 @@
-
 /**
  * User interface representing the authenticated user data
  */
@@ -156,10 +155,7 @@ export function createTestUser(overrideExisting: boolean = false): User {
   
   // Force a storage event to notify other components
   if (isBrowser) {
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'isAuthenticated',
-      newValue: 'true'
-    }));
+    window.dispatchEvent(new Event('storage'));
   }
   
   return testUser;
@@ -193,19 +189,20 @@ export function notifyAuthChange(): void {
   console.log('[AUTH] Broadcasting auth state change');
   
   // Method 1: Use the storage event (works across tabs)
-  window.dispatchEvent(new StorageEvent('storage', {
-    key: 'isAuthenticated',
-    newValue: localStorage.getItem('isAuthenticated')
-  }));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('storage'));
+  }
   
   // Method 2: Use a custom event (works better within the same tab)
-  const authEvent = new CustomEvent('auth-state-changed', { 
-    detail: { 
-      isAuthenticated: localStorage.getItem('isAuthenticated'),
-      userId: getCurrentUser()?.id
-    } 
-  });
-  window.dispatchEvent(authEvent);
+  if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+    const authEvent = new CustomEvent('auth-state-changed', { 
+      detail: { 
+        isAuthenticated: localStorage.getItem('isAuthenticated'),
+        userId: getCurrentUser()?.id
+      } 
+    });
+    window.dispatchEvent(authEvent);
+  }
   
   console.log('[AUTH] Auth state change broadcast complete');
-} 
+}

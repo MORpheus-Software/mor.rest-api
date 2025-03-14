@@ -1,3 +1,4 @@
+
 import { Request, Response } from 'express';
 import { 
   createUser, 
@@ -5,7 +6,7 @@ import {
   getUserByEmail, 
   getUserById, 
   updateUser 
-} from '../../lib/api/users';
+} from '../../lib/api/users.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**

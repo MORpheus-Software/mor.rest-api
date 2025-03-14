@@ -1,6 +1,6 @@
 
 import { createClient } from 'redis';
-import * as Redis from 'ioredis';
+import Redis from 'ioredis';
 import chalk from 'chalk';
 
 export async function checkRedisConnection(): Promise<boolean> {
@@ -16,7 +16,7 @@ export async function checkRedisConnection(): Promise<boolean> {
       try {
         // Connect to Upstash Redis
         const upstashUrl = `rediss://default:${upstashToken}@${upstashDomain}:6379`;
-        const client = new Redis.default(upstashUrl);
+        const client = new Redis(upstashUrl);
         
         // Test connection by setting and getting a key
         await client.set('test-connection', 'success');
@@ -59,7 +59,7 @@ export async function checkRedisConnection(): Promise<boolean> {
           });
           
           // Add error handler
-          client.on('error', (err) => {
+          client.on('error', (err: Error) => {
             console.error(chalk.red(`[REDIS] Connection error: ${err.message}`));
           });
           
