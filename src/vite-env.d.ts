@@ -43,3 +43,26 @@ interface EventListenerOrEventListenerObject {
   handleEvent?(evt: Event): void;
   (evt: Event): void;
 }
+
+// Add additional DOM types needed for auth.ts
+interface StorageEvent extends Event {
+  readonly key: string | null;
+  readonly newValue: string | null;
+  readonly oldValue: string | null;
+  readonly storageArea: Storage | null;
+  readonly url: string;
+}
+
+interface CustomEventInit<T = any> extends EventInit {
+  detail?: T;
+}
+
+interface CustomEvent<T = any> extends Event {
+  readonly detail: T;
+  initCustomEvent(type: string, bubbles?: boolean, cancelable?: boolean, detail?: T): void;
+}
+
+declare var CustomEvent: {
+  prototype: CustomEvent;
+  new<T>(typeArg: string, eventInitDict?: CustomEventInit<T>): CustomEvent<T>;
+};

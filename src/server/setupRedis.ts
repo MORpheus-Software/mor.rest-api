@@ -16,7 +16,7 @@ export async function checkRedisConnection(): Promise<boolean> {
     try {
       // Connect to Upstash Redis
       const upstashUrl = `rediss://default:${upstashToken}@${upstashDomain}:6379`;
-      // Create Redis client properly with instance
+      // Create Redis client properly
       const client = new Redis(upstashUrl);
       
       // Test connection by setting and getting a key
@@ -46,7 +46,7 @@ export async function checkRedisConnection(): Promise<boolean> {
     
     // Connect to local Redis
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    // Create Redis client with correct instantiation
+    // Create Redis client properly
     const client = new Redis(redisUrl);
     
     // Add error handler

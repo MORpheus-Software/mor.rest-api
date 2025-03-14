@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 
 // Helper to check if we're in a browser environment
@@ -177,13 +178,15 @@ export function setupAuthListeners(): void {
   }
   
   // Listen for localStorage changes from other tabs/windows
-  window.addEventListener('storage', (event: StorageEvent) => {
-    if (event.key === 'isAuthenticated') {
-      const newValue = event.newValue === 'true';
-      console.log('[AUTH] Auth changed in another tab:', newValue);
-      emitAuthChangeEvent(newValue);
-    }
-  });
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (event: StorageEvent) => {
+      if (event.key === 'isAuthenticated') {
+        const newValue = event.newValue === 'true';
+        console.log('[AUTH] Auth changed in another tab:', newValue);
+        emitAuthChangeEvent(newValue);
+      }
+    });
+  }
   
   console.log('[AUTH] Auth listeners set up');
 }
@@ -196,14 +199,16 @@ function emitAuthChangeEvent(isAuthenticated: boolean): void {
     return;
   }
   
-  const event = new CustomEvent('authChanged', {
-    bubbles: true,
-    cancelable: true,
-    detail: { isAuthenticated }
-  });
-  
-  window.dispatchEvent(event);
-  console.log('[AUTH] Auth change event emitted:', isAuthenticated);
+  if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+    const event = new CustomEvent('authChanged', {
+      bubbles: true,
+      cancelable: true,
+      detail: { isAuthenticated }
+    });
+    
+    window.dispatchEvent(event);
+    console.log('[AUTH] Auth change event emitted:', isAuthenticated);
+  }
 }
 
 /**
