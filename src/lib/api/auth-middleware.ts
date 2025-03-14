@@ -1,6 +1,6 @@
 
 import { Request, Response, NextFunction } from 'express';
-import { get } from '../redis-adapter.js';
+import { createRedisClient } from '../redis-adapter.js';
 import { API_KEY_PREFIX } from './constants.js';
 
 // Safer environment detection that works in both Node.js and browser environments
@@ -130,11 +130,10 @@ export async function apiKeyAuthMiddleware(req: Request, res: Response, next: Ne
         try {
           // Initialize Redis client if not done already
           if (!redisClient) {
-            const { createRedisClient } = await import('../redis-adapter.js');
             redisClient = await createRedisClient();
           }
           
-          // Use Redis client to get user ID
+          // Use Redis client to check the key
           console.log('[API KEY AUTH] Looking up key in Redis:', `${API_KEY_PREFIX}${token}`);
           const userId = await redisClient.get(`${API_KEY_PREFIX}${token}`);
           console.log('[API KEY AUTH] Redis lookup result:', userId);
@@ -237,11 +236,10 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         try {
           // Initialize Redis client if not done already
           if (!redisClient) {
-            const { createRedisClient } = await import('../redis-adapter.js');
             redisClient = await createRedisClient();
           }
           
-          // Use Redis client to get user ID
+          // Use Redis client to check the key
           console.log('[AUTH] Looking up key in Redis:', `${API_KEY_PREFIX}${token}`);
           const userId = await redisClient.get(`${API_KEY_PREFIX}${token}`);
           console.log('[AUTH] Redis lookup result:', userId);

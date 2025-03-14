@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +41,25 @@ const ApiPlayground = () => {
   
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [selectedApiKey, setSelectedApiKey] = useState<string>('');
+
+  // Define updateRequestCode with useCallback before it's used
+  const updateRequestCode = useCallback((model: string, promptText: string, streaming: boolean, apiKey: string) => {
+    const modelName = models.find(m => m.id === model)?.name || model;
+    const code = `fetch('${FRONTEND_API_ENDPOINT}/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ${apiKey}'
+  },
+  body: JSON.stringify({
+    model: '${modelName}',
+    messages: [{ role: 'user', content: '${promptText || 'Say hello'}' }],
+    stream: ${streaming}
+  })
+})`;
+    
+    setRequestCode(code);
+  }, []);
 
   useEffect(() => {
     const storedApiKeys = localStorage.getItem('apiKeys');
@@ -88,7 +106,7 @@ const ApiPlayground = () => {
         updateRequestCode(selectedModel, prompt, isStreaming, matchingKey.value);
       }
     }
-  }, [location.search]);
+  }, [location.search, isStreaming, prompt, selectedModel, updateRequestCode]);
 
   const handleModelChange = (value: string) => {
     setSelectedModel(value);
@@ -118,24 +136,6 @@ const ApiPlayground = () => {
       checked, 
       apiKeys.find(k => k.id === selectedApiKey)?.value || ''
     );
-  };
-
-  const updateRequestCode = (model: string, promptText: string, streaming: boolean, apiKey: string) => {
-    const modelName = models.find(m => m.id === model)?.name || model;
-    const code = `fetch('${FRONTEND_API_ENDPOINT}/chat/completions', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer ${apiKey}'
-  },
-  body: JSON.stringify({
-    model: '${modelName}',
-    messages: [{ role: 'user', content: '${promptText || 'Say hello'}' }],
-    stream: ${streaming}
-  })
-})`;
-    
-    setRequestCode(code);
   };
 
   const handleApiKeyChange = (value: string) => {

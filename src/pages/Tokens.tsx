@@ -249,7 +249,7 @@ const TokensPage = () => {
     }
     
     loadTokens();
-  }, []);
+  }, [toast]);
   
   const handleCreateToken = async (tokenData: { name: string }) => {
     try {

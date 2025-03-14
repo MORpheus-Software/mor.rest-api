@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Wallet, AlertCircle, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,30 +17,76 @@ type WalletConnectProps = {
 };
 
 const WalletConnect = ({ onConnect }: WalletConnectProps) => {
+  const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState(false);
   const [account, setAccount] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState(true);
-  const [currentNetwork, setCurrentNetwork] = useState<string | null>(null);
+  const [network, setNetwork] = useState<string | null>(null);
+  const [chainId, setChainId] = useState<string | null>(null);
 
+  // Define callback functions first
+  const updateNetworkInfo = useCallback((chainId: string) => {
+    // Map chainId to network name
+    const networks: Record<string, string> = {
+      '0x1': 'Mainnet',
+      '0x3': 'Ropsten',
+      '0x4': 'Rinkeby',
+      '0x5': 'Goerli',
+      '0xaa36a7': 'Sepolia',
+      '0x89': 'Polygon',
+      '0xa': 'Optimism',
+      '0xa4b1': 'Arbitrum'
+    };
+    
+    setChainId(chainId);
+    setNetwork(networks[chainId] || `Unknown (${chainId})`);
+  }, []);
+
+  const handleAccountsChanged = useCallback((accounts: string[]) => {
+    if (accounts.length === 0) {
+      setAccount(null);
+      toast.error("Disconnected from MetaMask");
+    } else {
+      const newAccount = accounts[0];
+      setAccount(newAccount);
+      onConnect(newAccount);
+      toast.success("Connected to MetaMask");
+    }
+  }, [onConnect]);
+
+  const checkIfWalletIsConnected = useCallback(async (): Promise<string | null> => {
+    if (!window.ethereum) return null;
+    
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      
+      if (accounts.length !== 0) {
+        return accounts[0];
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Error checking wallet connection:", error);
+      return null;
+    }
+  }, []);
+
+  // Now use the callbacks in useEffect
   useEffect(() => {
     const checkMetaMaskInstalled = async () => {
-      setIsMetaMaskInstalled(!!window.ethereum);
+      if (typeof window.ethereum === 'undefined') {
+        setIsMetaMaskInstalled(false);
+        return;
+      }
+      setIsMetaMaskInstalled(true);
       
-      if (window.ethereum) {
-        try {
-          const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-          updateNetworkInfo(chainId);
-        } catch (error) {
-          console.error("Failed to get chain ID:", error);
-        }
+      try {
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        updateNetworkInfo(chainId);
+      } catch (error) {
+        console.error("Failed to get chain ID:", error);
       }
     };
     
-    checkMetaMaskInstalled();
-  }, []);
-
-  useEffect(() => {
-    // Check if already connected
     const checkConnection = async () => {
       const connectedAccount = await checkIfWalletIsConnected();
       if (connectedAccount) {
@@ -49,6 +94,7 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
       }
     };
     
+    checkMetaMaskInstalled();
     checkConnection();
     
     if (window.ethereum) {
@@ -65,35 +111,7 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
         window.ethereum.removeListener('chainChanged', updateNetworkInfo);
       }
     };
-  }, []);
-
-  const updateNetworkInfo = (chainId: string) => {
-    // Map chainId to network name
-    const networks: Record<string, string> = {
-      '0x1': 'Mainnet',
-      '0x3': 'Ropsten',
-      '0x4': 'Rinkeby',
-      '0x5': 'Goerli',
-      '0xaa36a7': 'Sepolia',
-      '0x89': 'Polygon',
-      '0xa': 'Optimism',
-      '0xa4b1': 'Arbitrum'
-    };
-    
-    setCurrentNetwork(networks[chainId] || `Chain ID: ${chainId}`);
-  };
-
-  const handleAccountsChanged = (accounts: string[]) => {
-    if (accounts.length === 0) {
-      setAccount(null);
-      toast.error("Disconnected from MetaMask");
-    } else {
-      const newAccount = accounts[0];
-      setAccount(newAccount);
-      onConnect(newAccount);
-      toast.success("Connected to MetaMask");
-    }
-  };
+  }, [handleAccountsChanged, updateNetworkInfo, checkIfWalletIsConnected]);
 
   const handleConnectWallet = async () => {
     if (!window.ethereum) {
@@ -155,11 +173,11 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
           <Button variant="outline" className="flex gap-2">
             <Wallet className="h-4 w-4" />
             {`${account.substring(0, 6)}...${account.substring(account.length - 4)}`}
-            {currentNetwork && (
+            {network && (
               <>
                 <span className="hidden md:inline mx-1">|</span>
                 <span className="hidden md:inline text-xs bg-primary/10 px-2 py-0.5 rounded-full">
-                  {currentNetwork}
+                  {network}
                 </span>
               </>
             )}
