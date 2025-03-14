@@ -5,7 +5,6 @@ import { isAuthenticated, getCurrentUser } from '@/lib/auth';
 
 // List of routes that don't require authentication
 const publicRoutes = [
-  '/',
   '/signin',
   '/signup',
   '/forgot-password',

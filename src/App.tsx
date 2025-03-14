@@ -23,7 +23,11 @@ const queryClient = new QueryClient();
 
 // Component to handle root path redirection based on authentication
 const RootRedirect = () => {
-  return isAuthenticated() ? <Navigate to="/playground" replace /> : <Index />;
+  const authenticated = isAuthenticated();
+  console.log('[ROOT_REDIRECT] Authentication check result:', authenticated);
+  console.log('[ROOT_REDIRECT] Will redirect to:', authenticated ? '/playground' : '/signin');
+  
+  return authenticated ? <Navigate to="/playground" replace /> : <Navigate to="/signin" replace />;
 };
 
 const App = () => (
@@ -38,7 +42,7 @@ const App = () => (
       />
       <BrowserRouter>
         <AuthCheck>
-          <Routes>
+          <Routes key={`routes-${Date.now()}`}>
             {/* Public routes */}
             <Route path="/" element={<RootRedirect />} />
             <Route path="/signup" element={<SignUp />} />

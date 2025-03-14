@@ -69,9 +69,13 @@ HEALTHCHECK --interval=5s --timeout=5s --start-period=5s --retries=3 \
 # Create a startup script that prints diagnostic info before starting
 RUN echo '#!/bin/sh\n\
 echo "Starting server..."\n\
+echo "Node environment: $NODE_ENV"\n\
+echo "Available files in public directory:"\n\
+ls -la public || echo "No public files found"\n\
 echo "Available files in dist/server:"\n\
 ls -la dist/server || echo "No server files found"\n\
 echo "Starting node with server.js"\n\
+# Make sure the server can access the public directory properly\n\
 exec node --experimental-json-modules --loader ts-node/esm dist/server/server.js\n\
 ' > start.sh && chmod +x start.sh
 

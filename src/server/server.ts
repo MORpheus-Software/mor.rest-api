@@ -3,6 +3,8 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import * as chatCompletionsHandler from '../api/v1/chat/completions.js';
 import keyHandlers from '../api/v1/keys.js';
 import metricsHandlers from '../api/v1/metrics.js';
@@ -26,6 +28,10 @@ console.log(chalk.cyan(`  REDIS_URL: ${process.env.REDIS_URL || 'redis://localho
 // Create Express server
 const app = express();
 const PORT = parseInt(process.env.PORT || '4000', 10);
+
+// Determine the dirname (ES module compatible)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Middleware
 app.use(cors());
@@ -128,6 +134,20 @@ app.use('/api/v1/app', appManagementRouter);
 
 // Mount NFA service proxy routes 
 app.use('/api/v1', nfaServiceRouter);
+
+// Serve static files from the public directory (React app)
+const publicPath = path.resolve(process.env.NODE_ENV === 'production' 
+  ? path.join(__dirname, '../../public') 
+  : path.join(__dirname, '../../../dist'));
+
+console.log(chalk.cyan(`[SERVER] Serving static files from: ${publicPath}`));
+app.use(express.static(publicPath));
+
+// Handle all other routes by serving the index.html
+app.get('*', (req, res) => {
+  console.log(chalk.blue(`[SERVER] Serving index.html for route: ${req.path}`));
+  res.sendFile(path.join(publicPath, 'index.html'));
+});
 
 // Verify Redis connection on startup
 checkRedisConnection()

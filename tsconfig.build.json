@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noEmit": false,
+    "noEmitOnError": false,
+    "strict": false,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "lib": ["ES2023", "DOM"],
+    "typeRoots": ["./node_modules/@types"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+} 
