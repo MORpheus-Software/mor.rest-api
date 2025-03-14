@@ -4,13 +4,14 @@ import { createClient } from 'redis';
 // Redis configuration
 // -----------------
 
-// Redis connection configuration
-const REDIS_URL = process.env?.REDIS_URL || 'redis://localhost:6379';
+interface RedisAdapterOptions {
+  clusterMode?: boolean;
+}
 
-// Safer environment detection that works in both Node.js and browser environments
-const isBrowser = typeof process === 'undefined' || 
-  !process.versions ||
-  !process.versions.node;
+export class RedisAdapter {
+  private url: string;
+  private clusterMode: boolean;
+  private redisClient: RedisClient | null = null;
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -94,11 +95,10 @@ const browserStorage = {
           keys.push(key);
         }
       }
-      return keys;
+    } finally {
+      redis.quit();
     }
-    return [];
-  },
-};
+  }
 
 // Server memory storage using Maps
 const serverStorageMap = new Map<string, string>();
@@ -152,7 +152,7 @@ const serverStorage = {
     console.log(`[REDIS] Server SMEMBERS ${key}`);
     if (!serverSetMap.has(key)) {
       return [];
-    }
+    } 
     return Array.from(serverSetMap.get(key)!);
   },
   keys: async (pattern: string) => {
