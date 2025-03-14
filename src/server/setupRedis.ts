@@ -1,6 +1,6 @@
 
 import { createClient } from 'redis';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import chalk from 'chalk';
 
 export async function checkRedisConnection(): Promise<boolean> {

@@ -1,6 +1,6 @@
 
 import { Request, Response, NextFunction } from 'express';
-import { get } from '../redis-adapter.ts';
+import { createRedisClient } from '../redis-adapter.js';
 import { API_KEY_PREFIX } from './constants.js';
 
 // Safer environment detection that works in both Node.js and browser environments
@@ -16,6 +16,9 @@ export interface AuthenticatedRequest extends Request {
   // Any error message if authentication failed
   authError?: string;
 }
+
+// Redis client
+let redisClient: any = null;
 
 /**
  * User authentication middleware (for app backend routes)
@@ -124,20 +127,31 @@ export async function apiKeyAuthMiddleware(req: Request, res: Response, next: Ne
           return next();
         }
         
-        // Use redis-adapter to check the key
-        console.log('[API KEY AUTH] Looking up key in Redis:', `${API_KEY_PREFIX}${token}`);
-        const userId = await get(`${API_KEY_PREFIX}${token}`);
-        console.log('[API KEY AUTH] Redis lookup result:', userId);
-        
-        if (userId) {
-          // API key is valid
-          console.log('[API KEY AUTH] API key is valid for user:', userId);
-          authReq.isAuthenticated = true;
-          authReq.userId = userId;
-          return next();
-        } else {
-          console.log('[API KEY AUTH] API key not found in Redis');
-          authReq.authError = 'Invalid API key';
+        try {
+          // Initialize Redis client if not done already
+          if (!redisClient) {
+            redisClient = await createRedisClient();
+          }
+          
+          // Use Redis client to check the key
+          console.log('[API KEY AUTH] Looking up key in Redis:', `${API_KEY_PREFIX}${token}`);
+          const userId = await redisClient.get(`${API_KEY_PREFIX}${token}`);
+          console.log('[API KEY AUTH] Redis lookup result:', userId);
+          
+          if (userId) {
+            // API key is valid
+            console.log('[API KEY AUTH] API key is valid for user:', userId);
+            authReq.isAuthenticated = true;
+            authReq.userId = userId;
+            return next();
+          } else {
+            console.log('[API KEY AUTH] API key not found in Redis');
+            authReq.authError = 'Invalid API key';
+            return next();
+          }
+        } catch (error) {
+          console.error('[API KEY AUTH] Error checking API key:', error);
+          authReq.authError = 'Error validating API key';
           return next();
         }
       } catch (error) {
@@ -219,20 +233,31 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
           return next();
         }
         
-        // Use redis-adapter to check the key
-        console.log('[AUTH] Looking up key in Redis:', `${API_KEY_PREFIX}${token}`);
-        const userId = await get(`${API_KEY_PREFIX}${token}`);
-        console.log('[AUTH] Redis lookup result:', userId);
-        
-        if (userId) {
-          // API key is valid
-          console.log('[AUTH] API key is valid for user:', userId);
-          authReq.isAuthenticated = true;
-          authReq.userId = userId;
-          return next();
-        } else {
-          console.log('[AUTH] API key not found in Redis');
-          authReq.authError = 'Invalid API key';
+        try {
+          // Initialize Redis client if not done already
+          if (!redisClient) {
+            redisClient = await createRedisClient();
+          }
+          
+          // Use Redis client to check the key
+          console.log('[AUTH] Looking up key in Redis:', `${API_KEY_PREFIX}${token}`);
+          const userId = await redisClient.get(`${API_KEY_PREFIX}${token}`);
+          console.log('[AUTH] Redis lookup result:', userId);
+          
+          if (userId) {
+            // API key is valid
+            console.log('[AUTH] API key is valid for user:', userId);
+            authReq.isAuthenticated = true;
+            authReq.userId = userId;
+            return next();
+          } else {
+            console.log('[AUTH] API key not found in Redis');
+            authReq.authError = 'Invalid API key';
+            return next();
+          }
+        } catch (error) {
+          console.error('[AUTH] Error checking API key:', error);
+          authReq.authError = 'Error validating API key';
           return next();
         }
       } catch (error) {

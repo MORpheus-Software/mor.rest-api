@@ -1,3 +1,4 @@
+
 import express, { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
@@ -13,7 +14,6 @@ import {
   apiKeyAuthMiddleware, 
   requireAuth 
 } from '../lib/api/auth-middleware.js';
-import { verifyRedisConnection } from '../lib/redis-adapter.js';
 
 // Load environment variables
 dotenv.config();
@@ -113,7 +113,11 @@ nfaServiceRouter.use(apiKeyAuthMiddleware);
 
 // NFA service proxy endpoints - require API key authentication
 nfaServiceRouter.post('/chat/completions', requireAuth, (req, res) => {
-  chatCompletionsHandler(req, res);
+  if (chatCompletionsHandler && typeof chatCompletionsHandler.postChatCompletion === 'function') {
+    chatCompletionsHandler.postChatCompletion(req, res);
+  } else {
+    res.status(501).json({ error: { message: 'Not implemented', type: 'not_implemented' } });
+  }
 });
 
 // Auth verification endpoint
@@ -131,15 +135,15 @@ app.use('/api/v1/app', appManagementRouter);
 app.use('/api/v1', nfaServiceRouter);
 
 // Verify Redis connection on startup
-verifyRedisConnection()
-  .then(isConnected => {
+checkRedisConnection()
+  .then((isConnected: boolean) => {
     if (isConnected) {
       console.log(chalk.green('[SERVER] Redis connection verified ✓'));
     } else {
       console.error(chalk.red('[SERVER] Redis connection test failed! Using fallback storage.'));
     }
   })
-  .catch(error => {
+  .catch((error: Error) => {
     console.error(chalk.red('[SERVER] Redis connection verification error:'), error);
   });
 

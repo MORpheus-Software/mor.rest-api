@@ -1,6 +1,18 @@
+
 import { v4 as uuidv4 } from 'uuid';
-import { set, get, del, exists, sadd, srem, smembers } from '../redis-adapter.js';
+import { createRedisClient } from '../redis-adapter.js';
 import { USER_PREFIX, USER_EMAIL_INDEX, ALL_USERS_SET } from './constants.js';
+
+// Redis client
+let redisClient: any = null;
+
+// Initialize Redis client
+async function getRedisClient() {
+  if (!redisClient) {
+    redisClient = await createRedisClient();
+  }
+  return redisClient;
+}
 
 export interface User {
   id: string;
@@ -27,14 +39,16 @@ export async function createUser(userData: Omit<User, 'id' | 'createdAt'>): Prom
     createdAt: now
   };
   
+  const client = await getRedisClient();
+  
   // Store user data by ID
-  await set(`${USER_PREFIX}${userId}`, JSON.stringify(user));
+  await client.set(`${USER_PREFIX}${userId}`, JSON.stringify(user));
   
   // Add user ID to the index by email for lookup
-  await set(`${USER_EMAIL_INDEX}${user.email.toLowerCase()}`, userId);
+  await client.set(`${USER_EMAIL_INDEX}${user.email.toLowerCase()}`, userId);
   
   // Add user to the set of all users
-  await sadd(ALL_USERS_SET, userId);
+  await client.sadd(ALL_USERS_SET, userId);
   
   console.log(`[USERS] Created user: ${userId} (${user.email})`);
   
@@ -45,7 +59,9 @@ export async function createUser(userData: Omit<User, 'id' | 'createdAt'>): Prom
  * Get a user by ID
  */
 export async function getUserById(userId: string): Promise<User | null> {
-  const userData = await get(`${USER_PREFIX}${userId}`);
+  const client = await getRedisClient();
+  
+  const userData = await client.get(`${USER_PREFIX}${userId}`);
   
   if (!userData) {
     console.log(`[USERS] User not found: ${userId}`);
@@ -65,7 +81,9 @@ export async function getUserById(userId: string): Promise<User | null> {
  * Get a user by email
  */
 export async function getUserByEmail(email: string): Promise<User | null> {
-  const userId = await get(`${USER_EMAIL_INDEX}${email.toLowerCase()}`);
+  const client = await getRedisClient();
+  
+  const userId = await client.get(`${USER_EMAIL_INDEX}${email.toLowerCase()}`);
   
   if (!userId) {
     console.log(`[USERS] No user found with email: ${email}`);
@@ -92,17 +110,19 @@ export async function updateUser(userId: string, updates: Partial<Omit<User, 'id
     updatedAt: new Date().toISOString()
   };
   
+  const client = await getRedisClient();
+  
   // If email is being updated, update the email index
   if (updates.email && updates.email !== existingUser.email) {
     // Remove old email index
-    await del(`${USER_EMAIL_INDEX}${existingUser.email.toLowerCase()}`);
+    await client.del(`${USER_EMAIL_INDEX}${existingUser.email.toLowerCase()}`);
     
     // Add new email index
-    await set(`${USER_EMAIL_INDEX}${updates.email.toLowerCase()}`, userId);
+    await client.set(`${USER_EMAIL_INDEX}${updates.email.toLowerCase()}`, userId);
   }
   
   // Update user data
-  await set(`${USER_PREFIX}${userId}`, JSON.stringify(updatedUser));
+  await client.set(`${USER_PREFIX}${userId}`, JSON.stringify(updatedUser));
   
   console.log(`[USERS] Updated user: ${userId}`);
   
@@ -120,14 +140,16 @@ export async function deleteUser(userId: string): Promise<boolean> {
     return false;
   }
   
+  const client = await getRedisClient();
+  
   // Remove user from email index
-  await del(`${USER_EMAIL_INDEX}${user.email.toLowerCase()}`);
+  await client.del(`${USER_EMAIL_INDEX}${user.email.toLowerCase()}`);
   
   // Remove user data
-  await del(`${USER_PREFIX}${userId}`);
+  await client.del(`${USER_PREFIX}${userId}`);
   
   // Remove user from all users set
-  await srem(ALL_USERS_SET, userId);
+  await client.srem(ALL_USERS_SET, userId);
   
   console.log(`[USERS] Deleted user: ${userId}`);
   
@@ -165,7 +187,9 @@ export async function authenticateUser(email: string, password: string): Promise
  */
 export async function getAllUsers(limit: number = 100, offset: number = 0): Promise<User[]> {
   try {
-    const userIds = await smembers(ALL_USERS_SET);
+    const client = await getRedisClient();
+    
+    const userIds = await client.smembers(ALL_USERS_SET);
     const paginatedIds = userIds.slice(offset, offset + limit);
     
     const users: User[] = [];

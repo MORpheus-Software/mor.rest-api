@@ -68,8 +68,10 @@ export function isAuthenticated(verbose: boolean = false): boolean {
   } catch (error) {
     console.error('[AUTH] Auth check failed: Error parsing user data:', error);
     // Clear corrupted data
-    localStorage.removeItem('user');
-    localStorage.removeItem('isAuthenticated');
+    if (isBrowser) {
+      localStorage.removeItem('user');
+      localStorage.removeItem('isAuthenticated');
+    }
   }
   
   return false;
@@ -158,7 +160,8 @@ export function createTestUser(overrideExisting: boolean = false): User {
   
   // Force a storage event to notify other components
   if (isBrowser) {
-    window.dispatchEvent(new Event('storage'));
+    const event = new Event('storage');
+    window.dispatchEvent(event);
   }
   
   return testUser;
@@ -193,12 +196,15 @@ export function notifyAuthChange(): void {
   
   // Method 1: Use the storage event (works across tabs)
   if (isBrowser) {
-    window.dispatchEvent(new Event('storage'));
+    const event = new Event('storage');
+    window.dispatchEvent(event);
   }
   
   // Method 2: Use a custom event (works better within the same tab)
   if (isBrowser && typeof CustomEvent !== 'undefined') {
-    const authEvent = new CustomEvent('auth-state-changed', { 
+    type AuthEventDetail = { isAuthenticated: string | null; userId: string | undefined };
+    
+    const authEvent = new CustomEvent<AuthEventDetail>('auth-state-changed', { 
       detail: { 
         isAuthenticated: localStorage.getItem('isAuthenticated'),
         userId: getCurrentUser()?.id

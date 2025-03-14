@@ -1,13 +1,14 @@
-import Redis from 'ioredis';
+
+import { Redis } from 'ioredis';
 import chalk from 'chalk';
 
 // Redis connection options
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
-const REDIS_PORT = process.env.REDIS_PORT || 6379;
+const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
 const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
 
 // Function to create a Redis client
-async function createRedisClient() {
+async function createRedisClient(): Promise<Redis> {
   try {
     console.log(chalk.blue('[REDIS] Creating Redis client'));
     
@@ -15,10 +16,10 @@ async function createRedisClient() {
     const redisUrl = process.env.REDIS_URL || `redis://${REDIS_HOST}:${REDIS_PORT}`;
     
     // Redis connection options
-    const redisOptions: Redis.RedisOptions = {
+    const redisOptions: any = {
       lazyConnect: true,
-      reconnectOnError: (err) => {
-        console.error(chalk.red('[REDIS] Reconnect error:', err));
+      reconnectOnError: (err: Error) => {
+        console.error(chalk.red('[REDIS] Reconnect error:'), err);
         return 2; // Reconnect after 2 seconds
       },
       maxRetriesPerRequest: 3,
@@ -49,7 +50,7 @@ async function createRedisClient() {
 }
 
 // Upstash Redis client creation
-async function createUpstashRedisClient() {
+async function createUpstashRedisClient(): Promise<Redis> {
   try {
     console.log(chalk.blue('[REDIS] Creating Upstash Redis client'));
     
@@ -64,7 +65,6 @@ async function createUpstashRedisClient() {
     
     // Create Upstash Redis client using IoRedis
     const upstashUrl = `rediss://default:${UPSTASH_REST_API_TOKEN}@${UPSTASH_REST_API_DOMAIN}:6379`;
-    // Create IoRedis client correctly (need to properly import Redis)
     const client = new Redis(upstashUrl);
     
     // Handle errors without crashing
@@ -88,6 +88,17 @@ async function setex(client: Redis, key: string, seconds: number, value: string)
   try {
     await client.setex(key, seconds, value);
     console.log(chalk.green(`[REDIS] Set key ${key} with expiration ${seconds}s`));
+  } catch (error) {
+    console.error(chalk.red(`[REDIS] Failed to set key ${key}:`), error);
+    throw error;
+  }
+}
+
+// Method to set a key-value pair
+async function set(client: Redis, key: string, value: string): Promise<void> {
+  try {
+    await client.set(key, value);
+    console.log(chalk.green(`[REDIS] Set key ${key}`));
   } catch (error) {
     console.error(chalk.red(`[REDIS] Failed to set key ${key}:`), error);
     throw error;
@@ -172,6 +183,18 @@ async function srem(client: Redis, key: string, value: string): Promise<void> {
   }
 }
 
+// Method to get keys matching a pattern
+async function keys(client: Redis, pattern: string): Promise<string[]> {
+  try {
+    const keys = await client.keys(pattern);
+    console.log(chalk.green(`[REDIS] Found ${keys.length} keys matching pattern ${pattern}`));
+    return keys;
+  } catch (error) {
+    console.error(chalk.red(`[REDIS] Failed to get keys matching pattern ${pattern}:`), error);
+    throw error;
+  }
+}
+
 // Method to increment a value
 async function incr(client: Redis, key: string): Promise<number> {
     try {
@@ -196,16 +219,32 @@ async function decr(client: Redis, key: string): Promise<number> {
     }
 }
 
+// Verify Redis connection is working
+async function verifyRedisConnection(): Promise<boolean> {
+  try {
+    const client = await createRedisClient();
+    await client.ping();
+    await client.quit();
+    return true;
+  } catch (error) {
+    console.error(chalk.red('[REDIS] Connection verification failed:'), error);
+    return false;
+  }
+}
+
 export {
     createRedisClient,
     createUpstashRedisClient,
+    verifyRedisConnection,
     setex,
+    set,
     get,
     del,
     exists,
     sadd,
     smembers,
     srem,
+    keys,
     incr,
     decr,
 };

@@ -1,7 +1,18 @@
 
 import { v4 as uuidv4 } from 'uuid';
-import { set, get, del, exists, sadd, srem, smembers, keys as redisKeys } from '../redis-adapter.js';
+import { createRedisClient } from '../redis-adapter.js';
 import { API_KEY_PREFIX, USER_KEYS_PREFIX } from './constants.js';
+
+// Redis client
+let redisClient: any = null;
+
+// Initialize Redis client
+async function getRedisClient() {
+  if (!redisClient) {
+    redisClient = await createRedisClient();
+  }
+  return redisClient;
+}
 
 export interface ApiKeyInfo {
   key: string;
@@ -16,8 +27,10 @@ export interface ApiKeyInfo {
  */
 export async function hasAnyApiKeys(): Promise<boolean> {
   try {
+    const client = await getRedisClient();
+    
     // Check if there are any keys with the API_KEY_PREFIX
-    const apiKeys = await redisKeys(`${API_KEY_PREFIX}*`).catch(() => []);
+    const apiKeys = await client.keys(`${API_KEY_PREFIX}*`);
     
     // Filter out key metadata (entries with :info suffix)
     const actualKeys = apiKeys.filter((key: string) => !key.endsWith(':info'));
@@ -47,15 +60,17 @@ export async function createApiKey(userId: string, name: string): Promise<ApiKey
     createdAt: now
   };
   
+  const client = await getRedisClient();
+  
   // Store the API key in Redis
   // 1. Map the API key to the user ID
-  await set(`${API_KEY_PREFIX}${key}`, userId);
+  await client.set(`${API_KEY_PREFIX}${key}`, userId);
   
   // 2. Add the API key to the user's set of keys
-  await sadd(`${USER_KEYS_PREFIX}${userId}`, key);
+  await client.sadd(`${USER_KEYS_PREFIX}${userId}`, key);
   
   // 3. Store the key metadata
-  await set(`${API_KEY_PREFIX}${key}:info`, JSON.stringify(keyInfo));
+  await client.set(`${API_KEY_PREFIX}${key}:info`, JSON.stringify(keyInfo));
   
   console.log(`[API-KEYS] Created API key: ${key.substring(0, 8)}... for user: ${userId}`);
   
@@ -66,14 +81,16 @@ export async function createApiKey(userId: string, name: string): Promise<ApiKey
  * Get all API keys for a user
  */
 export async function getUserApiKeys(userId: string): Promise<ApiKeyInfo[]> {
+  const client = await getRedisClient();
+  
   // Get the set of API keys for the user
-  const userKeys = await smembers(`${USER_KEYS_PREFIX}${userId}`);
+  const userKeys = await client.smembers(`${USER_KEYS_PREFIX}${userId}`);
   
   // Get the info for each key
   const keyInfos: ApiKeyInfo[] = [];
   
   for (const key of userKeys) {
-    const infoJson = await get(`${API_KEY_PREFIX}${key}:info`);
+    const infoJson = await client.get(`${API_KEY_PREFIX}${key}:info`);
     
     if (infoJson) {
       try {
@@ -94,8 +111,10 @@ export async function getUserApiKeys(userId: string): Promise<ApiKeyInfo[]> {
  * Update the last used timestamp for an API key
  */
 export async function updateKeyLastUsed(key: string): Promise<void> {
+  const client = await getRedisClient();
+  
   // Get the info for the key
-  const infoJson = await get(`${API_KEY_PREFIX}${key}:info`);
+  const infoJson = await client.get(`${API_KEY_PREFIX}${key}:info`);
   
   if (infoJson) {
     try {
@@ -105,7 +124,7 @@ export async function updateKeyLastUsed(key: string): Promise<void> {
       info.lastUsedAt = new Date().toISOString();
       
       // Save the updated info
-      await set(`${API_KEY_PREFIX}${key}:info`, JSON.stringify(info));
+      await client.set(`${API_KEY_PREFIX}${key}:info`, JSON.stringify(info));
       
       console.log(`[API-KEYS] Updated last used timestamp for key: ${key.substring(0, 8)}...`);
     } catch (error) {
@@ -118,8 +137,10 @@ export async function updateKeyLastUsed(key: string): Promise<void> {
  * Delete an API key
  */
 export async function deleteApiKey(key: string): Promise<boolean> {
+  const client = await getRedisClient();
+  
   // Get the user ID for the key
-  const userId = await get(`${API_KEY_PREFIX}${key}`);
+  const userId = await client.get(`${API_KEY_PREFIX}${key}`);
   
   if (!userId) {
     console.log(`[API-KEYS] Key not found: ${key.substring(0, 8)}...`);
@@ -128,13 +149,13 @@ export async function deleteApiKey(key: string): Promise<boolean> {
   
   // Delete the key from Redis
   // 1. Delete the mapping from key to user ID
-  await del(`${API_KEY_PREFIX}${key}`);
+  await client.del(`${API_KEY_PREFIX}${key}`);
   
   // 2. Remove the key from the user's set of keys
-  await srem(`${USER_KEYS_PREFIX}${userId}`, key);
+  await client.srem(`${USER_KEYS_PREFIX}${userId}`, key);
   
   // 3. Delete the key metadata
-  await del(`${API_KEY_PREFIX}${key}:info`);
+  await client.del(`${API_KEY_PREFIX}${key}:info`);
   
   console.log(`[API-KEYS] Deleted key: ${key.substring(0, 8)}... for user: ${userId}`);
   
@@ -145,8 +166,10 @@ export async function deleteApiKey(key: string): Promise<boolean> {
  * Validate an API key
  */
 export async function validateApiKey(key: string): Promise<string | null> {
+  const client = await getRedisClient();
+  
   // Get the user ID for the key
-  const userId = await get(`${API_KEY_PREFIX}${key}`);
+  const userId = await client.get(`${API_KEY_PREFIX}${key}`);
   
   if (!userId) {
     console.log(`[API-KEYS] Invalid key: ${key.substring(0, 8)}...`);
