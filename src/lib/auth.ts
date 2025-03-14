@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 
 // Helper to check if we're in a browser environment
@@ -6,9 +5,10 @@ const isBrowser = typeof window !== 'undefined';
 
 // Define global browser types for TypeScript
 declare global {
-  // No need to redefine Window since it's already in lib.dom.d.ts
   interface Window {
-    // Don't redefine properties here to avoid collisions
+    dispatchEvent(event: Event): boolean;
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+    removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
   }
 }
 
@@ -178,15 +178,13 @@ export function setupAuthListeners(): void {
   }
   
   // Listen for localStorage changes from other tabs/windows
-  if (typeof window !== 'undefined') {
-    window.addEventListener('storage', (event: StorageEvent) => {
-      if (event.key === 'isAuthenticated') {
-        const newValue = event.newValue === 'true';
-        console.log('[AUTH] Auth changed in another tab:', newValue);
-        emitAuthChangeEvent(newValue);
-      }
-    });
-  }
+  window.addEventListener('storage', (event: StorageEvent) => {
+    if (event.key === 'isAuthenticated') {
+      const newValue = event.newValue === 'true';
+      console.log('[AUTH] Auth changed in another tab:', newValue);
+      emitAuthChangeEvent(newValue);
+    }
+  });
   
   console.log('[AUTH] Auth listeners set up');
 }
@@ -199,16 +197,14 @@ function emitAuthChangeEvent(isAuthenticated: boolean): void {
     return;
   }
   
-  if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
-    const event = new CustomEvent('authChanged', {
-      bubbles: true,
-      cancelable: true,
-      detail: { isAuthenticated }
-    });
-    
-    window.dispatchEvent(event);
-    console.log('[AUTH] Auth change event emitted:', isAuthenticated);
-  }
+  const event = new CustomEvent('authChanged', {
+    bubbles: true,
+    cancelable: true,
+    detail: { isAuthenticated }
+  });
+  
+  window.dispatchEvent(event);
+  console.log('[AUTH] Auth change event emitted:', isAuthenticated);
 }
 
 /**
