@@ -16,12 +16,12 @@ PROJECT_NAME="morsaas"
 IMAGE_NAME="morsaas-app"
 REGION="us-west1"  # Change this to your preferred region
 SERVICE_NAME="morsaas"
-MEMORY="1Gi"
+MEMORY="2Gi"
 CPU="1"
 CONCURRENCY="80"
 MIN_INSTANCES="0"
 MAX_INSTANCES="10"
-TIMEOUT="300s"
+TIMEOUT="600s"
 UPSTASH_PRODUCTION_URL="redis://global:UPSTASH_SECRET@us1-engaged-cattle-39555.upstash.io:39555"
 
 # Function to display a section header
@@ -188,6 +188,9 @@ deploy_to_cloud_run() {
     --min-instances="$MIN_INSTANCES" \
     --max-instances="$MAX_INSTANCES" \
     --timeout="$TIMEOUT" \
+    --startup-cpu-boost \
+    --execution-environment=gen2 \
+    --no-cpu-throttling \
     --set-env-vars="REDIS_URL=${redis_url},NODE_ENV=production" \
     --allow-unauthenticated
   

@@ -52,12 +52,15 @@ jobs:
           --image gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
           --platform managed \
           --region ${{ env.REGION }} \
-          --memory 1Gi \
+          --memory 2Gi \
           --cpu 1 \
           --concurrency 80 \
           --min-instances 0 \
           --max-instances 10 \
-          --timeout 300s \
+          --timeout 600s \
+          --startup-cpu-boost \
+          --execution-environment gen2 \
+          --no-cpu-throttling \
           --set-env-vars "NODE_ENV=production,REDIS_URL=${{ secrets.REDIS_URL }}" \
           --allow-unauthenticated
           
