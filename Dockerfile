@@ -29,16 +29,6 @@ RUN npm install -g typescript
 RUN echo "Compiling TypeScript to JavaScript (ignoring errors)..." && \
     tsc --project tsconfig.build.json || echo "TypeScript compilation had errors, but we're continuing the build"
 
-# Fix ES module imports by adding .js extensions to relative imports
-# This is necessary for Node.js ES modules which require file extensions
-RUN echo "Fixing ES module imports by adding .js extensions..." && \
-    find dist -name "*.js" -type f -exec sed -i 's/from "\([^"\.][^"]*\)";/from "\1.js";/g' {} \; && \
-    find dist -name "*.js" -type f -exec sed -i "s/from '\([^'\.][^']*\)';/from '\1.js';/g" {} \; && \
-    find dist -name "*.js" -type f -exec sed -i 's/from "\(\.\.\/[^"]*\)";/from "\1.js";/g' {} \; && \
-    find dist -name "*.js" -type f -exec sed -i "s/from '\(\.\.\/[^']*\)';/from '\1.js';/g" {} \; && \
-    find dist -name "*.js" -type f -exec sed -i 's/from "\(\.\/[^"]*\)";/from "\1.js";/g' {} \; && \
-    find dist -name "*.js" -type f -exec sed -i "s/from '\(\.\/[^']*\)';/from '\1.js';/g" {} \;
-
 # Debug: Show the directory structure after compilation
 RUN find dist -type d | sort && \
     echo "Compiled files:" && \
@@ -77,5 +67,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
-# Use the correct path to server.js
-CMD ["node", "--experimental-json-modules", "dist/src/server/server.js"] 
+# Use the correct path to server.js with experimental specifier resolution
+# This allows Node.js to resolve imports without file extensions
+CMD ["node", "--experimental-json-modules", "--experimental-specifier-resolution=node", "dist/src/server/server.js"] 
