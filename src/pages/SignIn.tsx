@@ -30,6 +30,7 @@ const SignIn = () => {
         </div>
         
         <div className="space-y-4">
+          {/* Hidden for demo
           <div className="grid grid-cols-1 gap-3">
             <Button 
               variant="outline" 
@@ -52,6 +53,7 @@ const SignIn = () => {
               </span>
             </div>
           </div>
+          */}
           
           {/* Use the API-integrated SignInForm component */}
           <SignInForm />

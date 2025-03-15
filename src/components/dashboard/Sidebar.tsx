@@ -9,11 +9,12 @@ export function Sidebar() {
   const location = useLocation();
   
   const navItems = [
-    {
-      title: 'Dashboard',
-      href: '/dashboard',
-      icon: LayoutDashboard,
-    },
+    // Dashboard hidden for demo
+    // {
+    //   title: 'Dashboard',
+    //   href: '/dashboard',
+    //   icon: LayoutDashboard,
+    // },
     {
       title: 'API Tokens',
       href: '/tokens',
@@ -50,7 +51,7 @@ export function Sidebar() {
   return (
     <div className="min-h-screen w-64 border-r border-border bg-card">
       <div className="flex h-14 items-center border-b border-border px-4">
-        <Link to="/dashboard" className="flex items-center gap-2 font-semibold">
+        <Link to="/playground" className="flex items-center gap-2 font-semibold">
           <div className="rounded-lg bg-primary p-1.5 text-white">API</div>
           <span>TokenHub</span>
         </Link>

@@ -134,11 +134,11 @@ export function SignInForm() {
       });
       
       // Use setTimeout to ensure navigation happens after localStorage updates
-      console.log('[SIGNIN] Setting up redirect to dashboard...');
+      console.log('[SIGNIN] Setting up redirect to playground...');
       setTimeout(() => {
-        console.log('[SIGNIN] Now navigating to dashboard...');
+        console.log('[SIGNIN] Now navigating to playground...');
         // Force a page reload instead of using React Router
-        window.location.href = '/dashboard';
+        window.location.href = '/playground';
       }, 1500); // Increased from 500ms to 1500ms
     } catch (error) {
       console.error('[SIGNIN] Login error:', error);
@@ -178,6 +178,7 @@ export function SignInForm() {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Password</Label>
+          {/* Hidden for demo
           <Link 
             to="#" 
             className="text-xs text-primary hover:underline"
@@ -191,6 +192,7 @@ export function SignInForm() {
           >
             Forgot password?
           </Link>
+          */}
         </div>
         <div className="relative">
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">

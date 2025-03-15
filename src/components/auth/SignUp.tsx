@@ -151,11 +151,11 @@ export function SignUpForm() {
       
       // Use setTimeout to ensure navigation happens after localStorage updates
       // Increasing timeout to give more time for localStorage to propagate
-      console.log('[SIGNUP] Setting up redirect to dashboard...');
+      console.log('[SIGNUP] Setting up redirect to playground...');
       setTimeout(() => {
-        console.log('[SIGNUP] Now navigating to dashboard...');
+        console.log('[SIGNUP] Now navigating to playground...');
         // Force a page reload instead of using React Router
-        window.location.href = '/dashboard';
+        window.location.href = '/playground';
       }, 1500); // Increased from 500ms to 1500ms
     } catch (error) {
       console.error('[SIGNUP] Registration error:', error);

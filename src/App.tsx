@@ -48,11 +48,16 @@ const App = () => (
             <Route path="/signup" element={<SignUp />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            {/* GitHub auth hidden for demo
             <Route path="/auth/github/callback" element={<GitHubCallback />} />
+            */}
             <Route path="/debug" element={<DebugPage />} />
             
             {/* Protected routes */}
+            {/* Dashboard route hidden for demo
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            */}
+            <Route path="/dashboard" element={<Navigate to="/playground" replace />} />
             <Route path="/tokens" element={<ProtectedRoute><Tokens /></ProtectedRoute>} />
             <Route path="/playground" element={<ProtectedRoute><ApiPlayground /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
