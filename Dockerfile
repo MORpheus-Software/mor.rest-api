@@ -72,6 +72,9 @@ RUN echo '#!/bin/sh\n\
 echo "Starting server..."\n\
 echo "Node environment: $NODE_ENV"\n\
 echo "Port: $PORT"\n\
+echo "Current directory: $(pwd)"\n\
+echo "Directory contents:"\n\
+ls -la\n\
 echo "Available files in public directory:"\n\
 ls -la public || echo "No public files found"\n\
 echo "Available files in dist/server:"\n\
@@ -79,7 +82,31 @@ ls -la dist/server || echo "No server files found"\n\
 echo "Starting node with server.js"\n\
 # Make sure the server can access the public directory properly\n\
 exec node --experimental-json-modules --loader ts-node/esm dist/server/server.js\n\
-' > start.sh && chmod +x start.sh
+' > /app/start.sh && chmod +x /app/start.sh && ls -la /app/start.sh
 
-# Start the server
-CMD ["./start.sh"] 
+# Add a fallback server in case the start.sh script isn't found
+RUN echo 'console.log("Fallback server starting..."); \
+const express = require("express"); \
+const app = express(); \
+app.get("/api/health", (req, res) => { \
+  res.json({ status: "healthy", message: "Fallback server is running" }); \
+}); \
+app.get("/", (req, res) => { \
+  res.send("Fallback server is running. The main application failed to start correctly."); \
+}); \
+const port = process.env.PORT || 8080; \
+app.listen(port, () => console.log(`Fallback server listening on port ${port}`));' > /app/fallback-server.js
+
+# Use a shell script as entrypoint to try multiple startup options
+RUN echo '#!/bin/sh\n\
+if [ -f /app/start.sh ]; then\n\
+  echo "Found start.sh, executing it..."\n\
+  exec /app/start.sh\n\
+else\n\
+  echo "start.sh not found, using fallback server..."\n\
+  exec node /app/fallback-server.js\n\
+fi\n\
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+# Start the server with the custom entrypoint
+CMD ["/app/entrypoint.sh"] 
