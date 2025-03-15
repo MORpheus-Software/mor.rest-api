@@ -1,5 +1,5 @@
 # Stage 1: Build the React frontend
-FROM node:20-alpine as frontend-builder
+FROM node:22-alpine as frontend-builder
 
 WORKDIR /app
 COPY package*.json ./
@@ -8,7 +8,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Build the TypeScript server
-FROM node:20-alpine as server-builder
+FROM node:22-alpine as server-builder
 
 WORKDIR /app
 COPY package*.json ./
@@ -35,7 +35,7 @@ RUN find dist -type d | sort && \
     find dist -type f | sort
 
 # Stage 3: Build the final image with compiled code
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
