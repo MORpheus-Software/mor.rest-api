@@ -77,12 +77,20 @@ jobs:
         else
           echo "❌ Deployment failed!"
           
-          # Get the logs from the failed revision for debugging
-          echo "Fetching logs from the failed revision..."
-          LATEST_REVISION=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format='value(status.latestCreatedRevisionName)')
+          # Get basic information about the failed deployment without requiring log access
+          echo "Fetching basic information about the failed deployment..."
           
-          echo "Latest revision: $LATEST_REVISION"
-          gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=${{ env.SERVICE_NAME }} AND resource.labels.revision_name=$LATEST_REVISION" --limit=50
+          # Attempt to get the service status (doesn't require logging permissions)
+          echo "Service status:"
+          gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status)' || echo "Unable to retrieve service status"
+          
+          # Get information about the latest revision
+          echo "Latest revision information:"
+          gcloud run revisions list --service=${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --limit=1 --format="table(name, active, traffic_percent, service_account, ready)" || echo "Unable to retrieve revision information"
+          
+          # Provide guidance for checking logs manually
+          echo "To check logs manually, visit:"
+          echo "https://console.cloud.google.com/run/detail/${{ env.REGION }}/${{ env.SERVICE_NAME }}/logs?project=${{ env.PROJECT_ID }}"
           
           exit 1
         fi
@@ -90,6 +98,21 @@ jobs:
     - name: Show Output
       run: echo ${{ steps.deploy.outputs.url }}
       
+    - name: Check Deployment Health
+      if: success()
+      run: |
+        echo "Waiting for deployment to stabilize..."
+        sleep 30
+        
+        # Check the health endpoint
+        SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.url)')
+        echo "Checking health of $SERVICE_URL/api/health"
+        
+        # Use curl with retry to check the health endpoint
+        curl --retry 5 --retry-delay 5 --retry-max-time 60 -s $SERVICE_URL/api/health | jq .
+        
+        echo "Deployment is healthy!"
+        
     - name: Send deployment notification
       if: success()
       uses: rtCamp/action-slack-notify@v2

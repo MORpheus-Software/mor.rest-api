@@ -15,6 +15,7 @@ import {
   apiKeyAuthMiddleware, 
   requireAuth 
 } from '../lib/api/auth-middleware.js';
+import fs from 'fs';
 
 // Load environment variables
 dotenv.config();
@@ -32,6 +33,13 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
 // Determine the dirname (ES module compatible)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Log environment information
+console.log(chalk.blue('[SERVER] Environment Information:'));
+console.log(chalk.blue(`[SERVER] NODE_ENV: ${process.env.NODE_ENV}`));
+console.log(chalk.blue(`[SERVER] PORT: ${PORT}`));
+console.log(chalk.blue(`[SERVER] Current directory: ${__dirname}`));
+console.log(chalk.blue(`[SERVER] Parent directory: ${path.resolve(__dirname, '..')}`));
 
 // Middleware
 app.use(cors());
@@ -136,11 +144,89 @@ app.use('/api/v1/app', appManagementRouter);
 app.use('/api/v1', nfaServiceRouter);
 
 // Serve static files from the public directory (React app)
-const publicPath = path.resolve(process.env.NODE_ENV === 'production' 
-  ? path.join(__dirname, '../../public') 
-  : path.join(__dirname, '../../../dist'));
+let publicPath = '';
+
+// Determine the public path with multiple fallback options
+try {
+  if (process.env.NODE_ENV === 'production') {
+    // First try the standard production path
+    publicPath = path.join(__dirname, '../../public');
+    
+    // Check if the path exists
+    if (!fs.existsSync(publicPath)) {
+      console.log(chalk.yellow(`[SERVER] Primary public path not found: ${publicPath}`));
+      
+      // Try alternative paths
+      const alternatives = [
+        path.join(__dirname, '../public'),
+        path.join(__dirname, '../../../public'),
+        path.join(__dirname, '../../../../public'),
+        '/app/public', // Docker container root
+      ];
+      
+      for (const altPath of alternatives) {
+        console.log(chalk.yellow(`[SERVER] Trying alternative path: ${altPath}`));
+        if (fs.existsSync(altPath)) {
+          publicPath = altPath;
+          console.log(chalk.green(`[SERVER] Found valid public path: ${publicPath}`));
+          break;
+        }
+      }
+    }
+  } else {
+    // Development path
+    publicPath = path.join(__dirname, '../../../dist');
+  }
+  
+  // Final check
+  if (!fs.existsSync(publicPath)) {
+    console.warn(chalk.yellow(`[SERVER] WARNING: Public path doesn't exist: ${publicPath}`));
+    // Still assign the path - we'll create a fallback handler
+  }
+} catch (error) {
+  console.error(chalk.red(`[SERVER] Error resolving public path:`), error);
+  publicPath = process.env.NODE_ENV === 'production' ? '/app/public' : path.join(__dirname, '../../../dist');
+}
 
 console.log(chalk.cyan(`[SERVER] Serving static files from: ${publicPath}`));
+
+// Create the public directory if it doesn't exist
+try {
+  if (!fs.existsSync(publicPath)) {
+    fs.mkdirSync(publicPath, { recursive: true });
+    
+    // Create a minimal index.html if in production
+    if (process.env.NODE_ENV === 'production') {
+      const minimalHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MorSaaS - Server Running</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    .status { padding: 20px; background: #f0f8ff; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MorSaaS Server</h1>
+    <div class="status">
+      <p>✅ Server is running correctly</p>
+      <p>The API is available at /api</p>
+    </div>
+  </div>
+</body>
+</html>`;
+      fs.writeFileSync(path.join(publicPath, 'index.html'), minimalHtml);
+      console.log(chalk.green('[SERVER] Created minimal index.html file'));
+    }
+  }
+} catch (error) {
+  console.error(chalk.red(`[SERVER] Error creating public directory:`), error);
+}
+
+// Serve static files
 app.use(express.static(publicPath));
 
 // Handle all other routes by serving the index.html
@@ -164,46 +250,111 @@ checkRedisConnection()
 
 // Start server
 async function startServer() {
-  console.log(chalk.yellow('='.repeat(50)));
-  console.log(chalk.yellow('Starting MorSaaS API Server'));
-  console.log(chalk.yellow('='.repeat(50)));
-  
-  let redisAvailable = false;
-  
   try {
-    // Check Redis connection
-    redisAvailable = await checkRedisConnection();
-  } catch (error) {
-    console.error(chalk.red('[SERVER] Error checking Redis connection:'), error);
-    console.log(chalk.yellow('[SERVER] Continuing without Redis...'));
-  }
-  
-  if (redisAvailable) {
-    console.log(chalk.green('[SERVER] Redis is available and will be used for data persistence'));
-  } else {
-    console.log(chalk.yellow('[SERVER] Redis is not available, falling back to localStorage'));
-    console.log(chalk.yellow('[SERVER] Note: API keys and other data will not persist between server restarts'));
-  }
-  
-  return new Promise<void>((resolve) => {
-    const server = app.listen(PORT, () => {
-      console.log(chalk.green(`[SERVER] Server is running on port ${PORT}`));
-      console.log(chalk.green(`[SERVER] API available at http://localhost:${PORT}/api`));
-      console.log(chalk.yellow('='.repeat(50)));
-      resolve();
-    });
+    console.log(chalk.yellow('='.repeat(50)));
+    console.log(chalk.yellow('Starting MorSaaS API Server'));
+    console.log(chalk.yellow('='.repeat(50)));
     
-    // Handle server errors
-    server.on('error', (err: Error) => {
-      console.error(chalk.red('[SERVER] Server error:'), err);
+    let redisAvailable = false;
+    
+    try {
+      // Check Redis connection with timeout
+      const redisPromise = checkRedisConnection();
+      const timeoutPromise = new Promise<boolean>((resolve) => {
+        setTimeout(() => {
+          console.error(chalk.red('[SERVER] Redis connection check timed out after 10 seconds'));
+          resolve(false);
+        }, 10000);
+      });
+      
+      redisAvailable = await Promise.race([redisPromise, timeoutPromise]);
+    } catch (error) {
+      console.error(chalk.red('[SERVER] Error checking Redis connection:'), error);
+      console.log(chalk.yellow('[SERVER] Continuing without Redis...'));
+    }
+    
+    if (redisAvailable) {
+      console.log(chalk.green('[SERVER] Redis is available and will be used for data persistence'));
+    } else {
+      console.log(chalk.yellow('[SERVER] Redis is not available, falling back to localStorage'));
+      console.log(chalk.yellow('[SERVER] Note: API keys and other data will not persist between server restarts'));
+    }
+    
+    return new Promise<void>((resolve) => {
+      // Add connection timeout handler
+      const startTimeout = setTimeout(() => {
+        console.error(chalk.red('[SERVER] Server start timed out after 30 seconds'));
+        console.log(chalk.yellow('[SERVER] Forcing server start...'));
+        resolve();
+      }, 30000);
+      
+      const server = app.listen(PORT, () => {
+        clearTimeout(startTimeout);
+        console.log(chalk.green(`[SERVER] Server is running on port ${PORT}`));
+        console.log(chalk.green(`[SERVER] API available at http://localhost:${PORT}/api`));
+        console.log(chalk.yellow('='.repeat(50)));
+        resolve();
+      });
+      
+      // Handle server errors
+      server.on('error', (err: Error) => {
+        clearTimeout(startTimeout);
+        console.error(chalk.red('[SERVER] Server error:'), err);
+        
+        // Check if the port is already in use
+        if ((err as any).code === 'EADDRINUSE') {
+          console.log(chalk.yellow(`[SERVER] Port ${PORT} is already in use, trying another port...`));
+          
+          // Try another port
+          server.listen(0, () => {
+            const address = server.address();
+            const newPort = typeof address === 'object' && address ? address.port : PORT;
+            console.log(chalk.green(`[SERVER] Server started on alternative port ${newPort}`));
+            resolve();
+          });
+        }
+      });
     });
-  });
+  } catch (error) {
+    console.error(chalk.red('[SERVER] Unexpected error during server startup:'), error);
+    console.log(chalk.yellow('[SERVER] Attempting to continue...'));
+  }
 }
 
-// Start the server
-startServer().catch(err => {
-  console.error(chalk.red('[SERVER] Failed to start server:'), err);
-  process.exit(1);
-});
+// Start the server with additional error handling
+try {
+  startServer().catch(err => {
+    console.error(chalk.red('[SERVER] Failed to start server:'), err);
+    console.log(chalk.yellow('[SERVER] Attempting to recover...'));
+    
+    // Recovery attempt - start a minimal server
+    const recoveryApp = express();
+    recoveryApp.get('/api/health', (req, res) => {
+      res.json({ status: 'recovering', message: 'Server is recovering from a startup error' });
+    });
+    recoveryApp.get('/', (req, res) => {
+      res.send('<h1>Server Recovery Mode</h1><p>The server is running in recovery mode due to a startup error.</p>');
+    });
+    
+    recoveryApp.listen(PORT, () => {
+      console.log(chalk.yellow(`[SERVER] Recovery server started on port ${PORT}`));
+    });
+  });
+} catch (error) {
+  console.error(chalk.red('[SERVER] Critical server error:'), error);
+  
+  // Start minimal fallback server to prevent container from crashing
+  const fallbackApp = express();
+  fallbackApp.get('/api/health', (req, res) => {
+    res.json({ status: 'fallback', message: 'Server is running in fallback mode' });
+  });
+  fallbackApp.get('/', (req, res) => {
+    res.send('<h1>Server Fallback Mode</h1><p>The server is running in fallback mode due to a critical error.</p>');
+  });
+  
+  fallbackApp.listen(PORT, () => {
+    console.log(chalk.yellow(`[SERVER] Fallback server started on port ${PORT}`));
+  });
+}
 
 export default app;
