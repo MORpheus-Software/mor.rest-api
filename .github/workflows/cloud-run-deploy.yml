@@ -42,8 +42,8 @@ jobs:
       
     - name: Build and push Docker image
       run: |
-        docker build -t gcr.io/$PROJECT_ID/$SERVICE_NAME:${{ github.sha }} .
-        docker push gcr.io/$PROJECT_ID/$SERVICE_NAME:${{ github.sha }}
+        docker build -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
+        docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
         
     - name: Create Cloud Run YAML configuration
       run: |
@@ -79,27 +79,27 @@ jobs:
         REDIS_URL="${{ secrets.REDIS_URL }}"
         
         # Extract Redis credentials for alternative formats
-        if [[ "$REDIS_URL" == redis://* || "$REDIS_URL" == rediss://* ]]; then
+        if [[ "${REDIS_URL}" == redis://* || "${REDIS_URL}" == rediss://* ]]; then
           # Extract the password and hostname from the URL for alternative formats
-          REDIS_PASSWORD=$(echo "$REDIS_URL" | sed -E 's|redis(s)?://[^:]*:([^@]*)@.*|\2|')
-          REDIS_HOST=$(echo "$REDIS_URL" | sed -E 's|redis(s)?://[^@]*@([^:]*):.*|\2|')
+          REDIS_PASSWORD=$(echo "${REDIS_URL}" | sed -E 's|redis(s)?://[^:]*:([^@]*)@.*|\2|')
+          REDIS_HOST=$(echo "${REDIS_URL}" | sed -E 's|redis(s)?://[^@]*@([^:]*):.*|\2|')
           
           echo "Extracted Redis host for alternative config: ${REDIS_HOST}"
           echo "Extracted Redis password: (hidden for security)"
         fi
         
         # Replace placeholder values
-        sed -i "s|PROJECT_ID|$PROJECT_ID|g" cloud-run-deploy-config.yaml
+        sed -i "s|PROJECT_ID|${{ env.PROJECT_ID }}|g" cloud-run-deploy-config.yaml
         sed -i "s|COMMIT_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
         sed -i "s|YOUR_REDIS_URL|${{ secrets.REDIS_URL }}|g" cloud-run-deploy-config.yaml
         
         # Update alternative Redis credentials if available
-        if [[ -n "$REDIS_PASSWORD" ]]; then
-          sed -i "s|REDIS_PASSWORD_ONLY|$REDIS_PASSWORD|g" cloud-run-deploy-config.yaml
+        if [[ -n "${REDIS_PASSWORD}" ]]; then
+          sed -i "s|REDIS_PASSWORD_ONLY|${REDIS_PASSWORD}|g" cloud-run-deploy-config.yaml
         fi
         
-        if [[ -n "$REDIS_HOST" ]]; then
-          sed -i "s|REDIS_HOSTNAME_ONLY|$REDIS_HOST|g" cloud-run-deploy-config.yaml
+        if [[ -n "${REDIS_HOST}" ]]; then
+          sed -i "s|REDIS_HOSTNAME_ONLY|${REDIS_HOST}|g" cloud-run-deploy-config.yaml
         fi
         
         # Display the configuration (without sensitive data)
@@ -117,7 +117,7 @@ jobs:
           
           # Get the deployed service URL
           SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.url)')
-          echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "url=${SERVICE_URL}" >> $GITHUB_OUTPUT
           
           echo "Deployed with extended startup probe timeout (240 seconds)"
         else
@@ -152,10 +152,10 @@ jobs:
         
         # Check the health endpoint
         SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.url)')
-        echo "Checking health of $SERVICE_URL/api/health"
+        echo "Checking health of ${SERVICE_URL}/api/health"
         
         # Use curl with retry to check the health endpoint
-        curl --retry 5 --retry-delay 5 --retry-max-time 60 -s $SERVICE_URL/api/health | jq .
+        curl --retry 5 --retry-delay 5 --retry-max-time 60 -s ${SERVICE_URL}/api/health | jq .
         
         echo "Deployment is healthy!"
         

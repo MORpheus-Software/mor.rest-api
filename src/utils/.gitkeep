@@ -1,0 +1,2 @@
+# This file exists to ensure the utils directory is not empty
+# and can be copied during Docker build 

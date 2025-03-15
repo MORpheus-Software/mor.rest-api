@@ -21,7 +21,11 @@ COPY tsconfig*.json ./
 COPY src/server ./src/server
 COPY src/api ./src/api
 COPY src/lib ./src/lib
-COPY src/utils ./src/utils
+
+# Create utils directory and copy its contents (if any)
+RUN mkdir -p ./src/utils
+COPY src/utils/. ./src/utils/
+
 COPY vite.config.ts ./
 
 # Install TypeScript
