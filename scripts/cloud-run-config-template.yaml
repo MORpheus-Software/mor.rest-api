@@ -26,6 +26,9 @@ spec:
           # Format MUST be: rediss://default:TOKEN@HOSTNAME.upstash.io:6379
           # Always use rediss:// (secure) for Upstash connections
           value: YOUR_REDIS_URL
+        - name: VITE_API_BASE_URL
+          # This is used by both frontend (through import.meta.env) and backend (through process.env)
+          value: https://nfa-proxy-1081887913409.us-west1.run.app
         ports:
         - containerPort: 8080
           name: http1
