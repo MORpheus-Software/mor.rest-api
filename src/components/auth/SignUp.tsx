@@ -119,11 +119,17 @@ export function SignUpForm() {
           description: "Welcome to TokenHub (temporary user)"
         });
         
-        // Navigate to playground directly
+        // Navigate to playground using both approaches to ensure it works
         console.log('[SIGNUP] Navigating to playground with fallback user...');
+        
+        // First attempt: Use navigate from React Router
+        navigate('/playground', { replace: true });
+        
+        // Backup approach: Direct location change after a delay
         setTimeout(() => {
+          console.log('[SIGNUP] Fallback redirect: Using window.location.href');
           window.location.href = '/playground';
-        }, 1500);
+        }, 500);
         
         return;
       }
@@ -149,14 +155,18 @@ export function SignUpForm() {
         description: "Welcome to TokenHub",
       });
       
-      // Use setTimeout to ensure navigation happens after localStorage updates
-      // Increasing timeout to give more time for localStorage to propagate
+      // Use both React Router navigate and window.location for maximum reliability
       console.log('[SIGNUP] Setting up redirect to playground...');
+      
+      // First attempt: Use navigate from React Router
+      navigate('/playground', { replace: true });
+      
+      // Backup approach: Direct location change after a delay
       setTimeout(() => {
-        console.log('[SIGNUP] Now navigating to playground...');
-        // Force a page reload instead of using React Router
+        console.log('[SIGNUP] Backup redirect: Using window.location.href');
         window.location.href = '/playground';
-      }, 1500); // Increased from 500ms to 1500ms
+      }, 500);
+      
     } catch (error) {
       console.error('[SIGNUP] Registration error:', error);
       toast({

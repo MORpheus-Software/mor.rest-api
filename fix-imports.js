@@ -50,9 +50,9 @@ function fixImports(filePath) {
     // First, clean up any .js.js that might have been added previously
     content = content.replace(/\.js\.js/g, '.js');
     
-    // Then only fix relative imports (starting with ./ or ../) that don't already have .js extension
-    // This regex is specifically designed to not match if the path already ends with .js
-    const importRegex = /from\s+(['"])(\.\.?\/[^'"]+)(?!\.js['"])(['"])/g;
+    // FIXED REGEX: Only target relative imports without .js extension
+    // This improved regex explicitly looks for paths that don't end with .js
+    const importRegex = /from\s+(['"])(\.\.?\/[^'"]+?)(?!\.js)(['"])/g;
     
     // Replace with the same import but add .js extension before the closing quote
     content = content.replace(importRegex, 'from $1$2.js$3');

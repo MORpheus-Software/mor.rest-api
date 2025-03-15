@@ -1,6 +1,5 @@
 # Stage 1: Build the React frontend
-FROM node:22-alpine as frontend-builder
-
+FROM node:22-alpine AS frontend-builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
@@ -8,48 +7,42 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Build the TypeScript server
-FROM node:22-alpine as server-builder
-
+FROM node:22-alpine AS server-builder
 WORKDIR /app
+
+# Copy package files and install dependencies (including dev dependencies for TypeScript)
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
 
-# Copy all TypeScript configuration files
+# Copy TypeScript configuration files
 COPY tsconfig*.json ./
 
-# Copy source files that will be compiled
+# Copy source files
 COPY src ./src
 COPY vite.config.ts ./
-COPY fix-imports.js ./
 
-# Install TypeScript
-RUN npm install -g typescript
+# Compile TypeScript to JavaScript
+# Use the project's TypeScript compiler, not a global one
+RUN echo "Compiling TypeScript to JavaScript..." && \
+    npx tsc --project tsconfig.build.json
 
-# Compile TypeScript to JavaScript using the build-specific config
-# This config allows compilation to continue despite errors
-RUN echo "Compiling TypeScript to JavaScript (ignoring errors)..." && \
-    tsc --project tsconfig.build.json || echo "TypeScript compilation had errors, but we're continuing the build"
+# Create package.json to mark the dist directory as ES module
+RUN echo '{ "type": "module" }' > dist/package.json
 
-# Debug the directory structure for troubleshooting
-RUN echo "Current directory structure:" && \
-    ls -la && \
-    echo "Dist directory contents:" && \
-    ls -la dist || echo "Dist directory not found"
+# Debug - show compiled imports
+RUN echo "Checking compiled imports:" && \
+    cat dist/src/api/v1/chat/completions.js | grep "import"
 
-# Run the fix-imports script to ensure all relative imports have .js extensions
-RUN node fix-imports.js || echo "Fix imports script failed, but continuing build"
-
-# Debug: Show the directory structure after compilation
+# Show the directory structure
 RUN find dist -type d | sort && \
     echo "Compiled files:" && \
     find dist -type f | sort
 
-# Stage 3: Build the final image with compiled code
+# Stage 3: Final image with only production dependencies
 FROM node:22-alpine
-
 WORKDIR /app
 
-# Install production dependencies only
+# Install production dependencies
 COPY package*.json ./
 RUN npm ci --only=production --no-audit --no-fund
 
@@ -59,24 +52,19 @@ COPY --from=server-builder /app/dist ./dist
 # Copy static frontend files from frontend-builder
 COPY --from=frontend-builder /app/dist ./public
 
-# Debug: Show the directory structure in the final image
-RUN echo "Final file structure:" && \
-    find . -type f | grep -v "node_modules" | sort
+# Add runtime dependencies if needed
+RUN npm install --production --no-audit --no-fund --save express dotenv cors ioredis
 
-# Install necessary runtime dependencies
-RUN npm install --production --no-audit --no-fund --save express dotenv cors ioredis ts-node
-
-# Set environment variables
-ENV PORT=8080
-ENV NODE_ENV=production
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Expose the port
 EXPOSE 8080
 
-# Set a healthcheck to verify the app is running
-HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=8080
 
-# Use the correct path to server.js with experimental-specifier-resolution
-# This allows the app to run even if .js extensions are missing in the imports
-CMD ["node", "--experimental-json-modules", "--experimental-specifier-resolution=node", "dist/src/server/server.js"] 
+# Start the server - we don't need experimental flags now
+CMD ["node", "dist/src/server/server.js"] 

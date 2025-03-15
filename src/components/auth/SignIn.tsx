@@ -104,11 +104,17 @@ export function SignInForm() {
           description: "Welcome back to TokenHub (temporary user)"
         });
         
-        // Navigate to dashboard
-        console.log('[SIGNIN] Navigating to dashboard with fallback user...');
+        // Navigate to playground using both approaches to ensure it works
+        console.log('[SIGNIN] Navigating to playground with fallback user...');
+        
+        // First attempt: Use navigate from React Router
+        navigate('/playground', { replace: true });
+        
+        // Backup approach: Direct location change after a delay
         setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 1500);
+          console.log('[SIGNIN] Fallback redirect: Using window.location.href');
+          window.location.href = '/playground';
+        }, 500);
         
         return;
       }
@@ -133,13 +139,18 @@ export function SignInForm() {
         description: "Welcome back to TokenHub",
       });
       
-      // Use setTimeout to ensure navigation happens after localStorage updates
+      // Use both React Router navigate and window.location for maximum reliability
       console.log('[SIGNIN] Setting up redirect to playground...');
+      
+      // First attempt: Use navigate from React Router
+      navigate('/playground', { replace: true });
+      
+      // Backup approach: Direct location change after a delay
       setTimeout(() => {
-        console.log('[SIGNIN] Now navigating to playground...');
-        // Force a page reload instead of using React Router
+        console.log('[SIGNIN] Backup redirect: Using window.location.href');
         window.location.href = '/playground';
-      }, 1500); // Increased from 500ms to 1500ms
+      }, 500);
+      
     } catch (error) {
       console.error('[SIGNIN] Login error:', error);
       toast({
