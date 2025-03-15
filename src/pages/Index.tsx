@@ -68,7 +68,7 @@ const Index = () => {
           
           <div className="flex items-center gap-4">
             {isAuthenticated ? <Button asChild>
-                <Link to="/dashboard">
+                <Link to="/playground">
                   Dashboard
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
@@ -98,7 +98,7 @@ const Index = () => {
           </p>
           <div className="flex flex-wrap gap-4 justify-center pt-4">
             <Button size="lg" asChild>
-              <Link to={isAuthenticated ? "/dashboard" : "/signup"}>
+              <Link to={isAuthenticated ? "/playground" : "/signup"}>
                 Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -140,7 +140,7 @@ const Index = () => {
           
           <div className="mt-16 text-center">
             <Button size="lg" asChild>
-              <Link to={isAuthenticated ? "/dashboard" : "/signup"}>
+              <Link to={isAuthenticated ? "/playground" : "/signup"}>
                 Start Managing Your Tokens
                 <ChevronRight className="ml-1 h-4 w-4" />
               </Link>

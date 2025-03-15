@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 
 // Helper to check if we're in a browser environment
@@ -129,6 +128,10 @@ export function logout(debug: boolean = false): void {
   
   // Emit auth change event
   emitAuthChangeEvent(false);
+  
+  // Redirect to login page
+  console.log('[AUTH] Redirecting to login page');
+  window.location.href = '/signin';
 }
 
 /**

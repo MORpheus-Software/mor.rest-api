@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import { createRedisClient } from '../redis-adapter.js';
 import { USER_PREFIX, USER_EMAIL_INDEX, ALL_USERS_SET } from './constants.js';
@@ -161,7 +160,6 @@ export async function deleteUser(userId: string): Promise<boolean> {
  * In a real app, this would validate password hashes
  */
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
-  // For demo purposes, we're using a simple authentication process
   // In a production app, you would:
   // 1. Get the user by email
   // 2. Hash the provided password with the same algorithm used during registration
@@ -175,7 +173,11 @@ export async function authenticateUser(email: string, password: string): Promise
   }
   
   // In a real app, compare password hashes
-  // For demo, we'll accept any password
+  // For now, we'll require a non-empty password
+  if (!password) {
+    console.log(`[USERS] Authentication failed: Empty password for user ${user.id}`);
+    return null;
+  }
   
   console.log(`[USERS] User authenticated: ${user.id} (${user.email})`);
   

@@ -25,8 +25,8 @@ TESTKEY=$(node scripts/add-test-key.js | grep "Bearer" | awk '{print $2}')
 echo "Using API Key: $TESTKEY"
 
 echo "Adding test key to Redis directly..."
-docker-compose exec redis redis-cli set "apikey:$TESTKEY" "local-test-user"
-echo "Test key added to Redis"
+# docker-compose exec redis redis-cli set "apikey:$TESTKEY" "local-test-user"
+# echo "Test key added to Redis"
 
 # Set environment variables for the application
 export REDIS_URL="redis://localhost:6379"

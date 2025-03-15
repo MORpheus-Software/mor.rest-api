@@ -106,5 +106,53 @@
     "permissions": [
       "all"
     ]
+  },
+  {
+    "id": "ce295f8c91dd18b9",
+    "token": "sk-cd6e65e5dec632bd058fadb8dd5919f6",
+    "name": "Test API Key",
+    "status": "active",
+    "userId": "local-user",
+    "created": "2025-03-15T02:34:02.118Z",
+    "lastUpdated": "2025-03-15T02:34:02.119Z",
+    "permissions": [
+      "all"
+    ]
+  },
+  {
+    "id": "3b9f96bb035ca781",
+    "token": "sk-5f45c9e134d24a11e67c9af0a296c324",
+    "name": "Test API Key",
+    "status": "active",
+    "userId": "local-user",
+    "created": "2025-03-15T02:35:47.990Z",
+    "lastUpdated": "2025-03-15T02:35:47.991Z",
+    "permissions": [
+      "all"
+    ]
+  },
+  {
+    "id": "0fbb163f4f0cbe04",
+    "token": "sk-cb76ca598bb98c0d52c6975fffa5a59d",
+    "name": "Test API Key",
+    "status": "active",
+    "userId": "local-user",
+    "created": "2025-03-15T02:42:31.869Z",
+    "lastUpdated": "2025-03-15T02:42:31.870Z",
+    "permissions": [
+      "all"
+    ]
+  },
+  {
+    "id": "05d837c7b8bda47a",
+    "token": "sk-76c565182f7fab9e408312ce1e8198d5",
+    "name": "Test API Key",
+    "status": "active",
+    "userId": "local-user",
+    "created": "2025-03-15T02:43:24.343Z",
+    "lastUpdated": "2025-03-15T02:43:24.344Z",
+    "permissions": [
+      "all"
+    ]
   }
 ]
