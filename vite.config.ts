@@ -1,4 +1,3 @@
-
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -48,7 +47,11 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       // Fix for "process is not defined" error
-      'process.env': {},
+      // Properly handle environment variables in both development and production
+      'process.env': {
+        NODE_ENV: JSON.stringify(mode),
+        VITE_API_BASE_URL: JSON.stringify(process.env.VITE_API_BASE_URL || 'https://nfa-proxy-1081887913409.us-west1.run.app'),
+      },
     },
   };
 });
