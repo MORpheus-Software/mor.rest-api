@@ -24,6 +24,8 @@ spec:
           value: production
         - name: REDIS_URL
           value: YOUR_REDIS_URL
+        - name: UPSTASH_REDIS_URL
+          value: YOUR_REDIS_URL
         ports:
         - containerPort: 8080
           name: http1

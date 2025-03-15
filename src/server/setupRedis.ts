@@ -4,7 +4,9 @@ import chalk from 'chalk';
 
 // Helper function to create a Redis instance with timeout and retry
 const createRedisInstance = (url: string) => {
-  console.log(chalk.blue(`[REDIS] Creating Redis instance with URL: ${url.replace(/redis.*?@/, 'redis://[credentials-hidden]@')}`));
+  // Mask credentials in log output
+  const maskedUrl = url.replace(/\/\/(.+?)@/, '//[credentials-hidden]@');
+  console.log(chalk.blue(`[REDIS] Creating Redis instance with URL: ${maskedUrl}`));
   
   const options = {
     connectTimeout: 10000,
@@ -13,7 +15,9 @@ const createRedisInstance = (url: string) => {
       const delay = Math.min(times * 200, 3000);
       console.log(chalk.yellow(`[REDIS] Connection attempt ${times}, retrying in ${delay}ms`));
       return delay;
-    }
+    },
+    // Fix for TLS issues
+    tls: url.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined
   };
   
   try {
@@ -45,11 +49,12 @@ export async function checkRedisConnection(): Promise<boolean> {
   // First check if we have a direct REDIS_URL environment variable
   if (process.env.REDIS_URL) {
     console.log(chalk.blue('[REDIS] Using REDIS_URL environment variable...'));
-    
     try {
-      // Connect to Redis using the URL
+      // Some debug info to help with troubleshooting
       const redisUrl = process.env.REDIS_URL;
-      // Create Redis client properly
+      console.log(chalk.blue(`[REDIS] URL format check: ${redisUrl.startsWith('redis://') ? 'Standard Redis' : redisUrl.startsWith('rediss://') ? 'Secure Redis' : 'Unknown format'}`));
+      
+      // Create Redis client
       const client = createRedisInstance(redisUrl);
       
       // Test connection by setting and getting a key with timeout
@@ -69,6 +74,12 @@ export async function checkRedisConnection(): Promise<boolean> {
             resolve(false);
           }
         } catch (error) {
+          console.error(chalk.red('[REDIS] Error during connection test:'), error);
+          try {
+            await client.quit();
+          } catch (e) {
+            // Ignore errors during client quit
+          }
           reject(error);
         }
       });
@@ -89,18 +100,23 @@ export async function checkRedisConnection(): Promise<boolean> {
     }
   }
   
-  // Fallback to Upstash Redis (for production)
-  const upstashToken = process.env.UPSTASH_REST_API_TOKEN;
-  const upstashDomain = process.env.UPSTASH_REST_API_DOMAIN;
+  // Check for Upstash format directly (newer format)
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    console.log(chalk.blue('[REDIS] Using Upstash Redis REST client...'));
+    // This is a placeholder for the REST API implementation
+    // Upstash has a REST API that could be used as a fallback
+    console.log(chalk.yellow('[REDIS] REST API implementation not available, trying standard connection...'));
+  }
   
-  if (upstashToken && upstashDomain) {
-    console.log(chalk.blue('[REDIS] Checking Upstash Redis connection...'));
+  // Fallback to Upstash Redis (for production) - standard Redis protocol
+  const upstashRedisUrl = process.env.UPSTASH_REDIS_URL;
+  
+  if (upstashRedisUrl) {
+    console.log(chalk.blue('[REDIS] Checking Upstash Redis connection using URL...'));
     
     try {
-      // Connect to Upstash Redis
-      const upstashUrl = `rediss://default:${upstashToken}@${upstashDomain}:6379`;
       // Create Redis client properly
-      const client = createRedisInstance(upstashUrl);
+      const client = createRedisInstance(upstashRedisUrl);
       
       // Test connection by setting and getting a key
       await client.set('test-connection', 'success');
@@ -114,6 +130,55 @@ export async function checkRedisConnection(): Promise<boolean> {
       }
       
       await client.quit();
+    } catch (error) {
+      console.error(chalk.yellow('[REDIS] Failed to connect to Upstash Redis:'), error);
+      console.log(chalk.blue('[REDIS] Trying alternative Upstash connection method...'));
+    }
+  }
+  
+  // Try classic Upstash connection format with token and domain
+  const upstashToken = process.env.UPSTASH_REST_API_TOKEN;
+  const upstashDomain = process.env.UPSTASH_REST_API_DOMAIN;
+  
+  if (upstashToken && upstashDomain) {
+    console.log(chalk.blue('[REDIS] Checking Upstash Redis connection using token and domain...'));
+    
+    try {
+      // Connect to Upstash Redis using the standard format
+      // Note: Upstash format changed over time, trying multiple formats
+      const upstashFormats = [
+        `rediss://default:${upstashToken}@${upstashDomain}:6379`,
+        `redis://default:${upstashToken}@${upstashDomain}:6379`,
+        `rediss://:${upstashToken}@${upstashDomain}:6379`
+      ];
+      
+      for (const upstashUrl of upstashFormats) {
+        try {
+          console.log(chalk.blue(`[REDIS] Trying Upstash format: ${upstashUrl.replace(/\/\/(.+?)@/, '//[credentials-hidden]@')}`));
+          
+          // Create Redis client properly
+          const client = createRedisInstance(upstashUrl);
+          
+          // Test connection by setting and getting a key
+          await client.set('test-connection', 'success');
+          const value = await client.get('test-connection');
+          
+          // Verify connection worked
+          if (value === 'success') {
+            console.log(chalk.green('[REDIS] Successfully connected to Upstash Redis!'));
+            // Store the successful URL in an environment variable for future use
+            process.env.UPSTASH_REDIS_URL = upstashUrl;
+            await client.quit();
+            return true;
+          }
+          
+          await client.quit();
+        } catch (formatError) {
+          console.error(chalk.yellow(`[REDIS] Failed with format ${upstashUrl.replace(/\/\/(.+?)@/, '//[credentials-hidden]@')}:`), formatError.message);
+        }
+      }
+      
+      console.error(chalk.red('[REDIS] All Upstash connection formats failed'));
     } catch (error) {
       console.error(chalk.yellow('[REDIS] Failed to connect to Upstash Redis:'), error);
       console.log(chalk.blue('[REDIS] Falling back to local Redis...'));

@@ -50,6 +50,16 @@ jobs:
         # Create a copy of the template YAML file
         cp ./scripts/cloud-run-config-template.yaml cloud-run-deploy-config.yaml
         
+        # Debug Redis URL format (without exposing secrets)
+        echo "Redis URL format check:"
+        if [[ "${{ secrets.REDIS_URL }}" == redis://* ]]; then
+          echo "Standard Redis format detected"
+        elif [[ "${{ secrets.REDIS_URL }}" == rediss://* ]]; then
+          echo "Secure Redis format detected"
+        else
+          echo "Unknown Redis format, please verify the URL"
+        fi
+        
         # Replace placeholder values
         sed -i "s|PROJECT_ID|$PROJECT_ID|g" cloud-run-deploy-config.yaml
         sed -i "s|COMMIT_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
@@ -58,7 +68,7 @@ jobs:
         
         # Display the configuration (without sensitive data)
         echo "Deploying with the following configuration:"
-        grep -v "REDIS_URL" cloud-run-deploy-config.yaml
+        grep -v "REDIS_URL\|UPSTASH_REDIS_URL" cloud-run-deploy-config.yaml
         
     - name: Deploy to Cloud Run using YAML
       id: deploy
