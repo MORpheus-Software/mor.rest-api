@@ -20,6 +20,7 @@ COPY tsconfig*.json ./
 # Copy source files that will be compiled
 COPY src ./src
 COPY vite.config.ts ./
+COPY fix-imports.js ./
 
 # Install TypeScript
 RUN npm install -g typescript
@@ -28,6 +29,15 @@ RUN npm install -g typescript
 # This config allows compilation to continue despite errors
 RUN echo "Compiling TypeScript to JavaScript (ignoring errors)..." && \
     tsc --project tsconfig.build.json || echo "TypeScript compilation had errors, but we're continuing the build"
+
+# Debug the directory structure for troubleshooting
+RUN echo "Current directory structure:" && \
+    ls -la && \
+    echo "Dist directory contents:" && \
+    ls -la dist || echo "Dist directory not found"
+
+# Run the fix-imports script to ensure all relative imports have .js extensions
+RUN node fix-imports.js || echo "Fix imports script failed, but continuing build"
 
 # Debug: Show the directory structure after compilation
 RUN find dist -type d | sort && \
@@ -67,6 +77,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
-# Use the correct path to server.js with experimental specifier resolution
-# This allows Node.js to resolve imports without file extensions
+# Use the correct path to server.js with experimental-specifier-resolution
+# This allows the app to run even if .js extensions are missing in the imports
 CMD ["node", "--experimental-json-modules", "--experimental-specifier-resolution=node", "dist/src/server/server.js"] 

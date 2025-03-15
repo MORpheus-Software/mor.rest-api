@@ -11,6 +11,13 @@
     "typeRoots": ["./node_modules/@types"],
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "removeComments": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true
   }
 } 

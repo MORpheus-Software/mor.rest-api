@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import chalk from 'chalk';
-import { API_BASE_URL } from '../../../lib/api/constants';
-import { AuthenticatedRequest } from '../../../lib/api/auth-middleware';
+import { API_BASE_URL } from '../../../lib/api/constants.js';
+import { AuthenticatedRequest } from '../../../lib/api/auth-middleware.js';
 
 const NFA_PROXY_URL = API_BASE_URL;
 

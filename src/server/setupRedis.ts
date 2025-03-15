@@ -1,5 +1,5 @@
 import { createClient } from 'redis';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import chalk from 'chalk';
 import dns from 'dns';
 import { promisify } from 'util';
@@ -50,6 +50,8 @@ export const createRedisInstance = (url: string): Redis => {
   // Configure Redis with more resilient options
   const options: any = {
     connectTimeout: 20000,
+    // Enable offline queue by default (allow commands to be queued until connection is established)
+    enableOfflineQueue: true,
     // Lower the maxRetriesPerRequest to avoid excessive reconnections
     maxRetriesPerRequest: 3,
     // Avoid hammering the server with reconnection attempts
@@ -78,7 +80,6 @@ export const createRedisInstance = (url: string): Redis => {
   // Development-specific configuration for local Redis
   if (isDevelopment && isLocalhost) {
     console.log(chalk.green('[REDIS] Using development-specific Redis configuration'));
-    options.enableOfflineQueue = true; // Enable offline queue for local development
     options.autoResubscribe = true;    // Auto resubscribe for local development
     options.autoResendUnfulfilledCommands = true;
     options.maxRetriesPerRequest = 5;  // More retries for local development
@@ -86,9 +87,20 @@ export const createRedisInstance = (url: string): Redis => {
       return Math.min(times * 200, 2000); // Faster retries for local
     };
   } else {
-    // More strict settings for production
-    options.enableOfflineQueue = false;
+    // Production settings
+    console.log(chalk.blue('[REDIS] Using production Redis configuration'));
     options.autoResubscribe = false;
+    
+    // Special handling for Docker environments
+    if (redisUrl.includes('host.docker.internal')) {
+      console.log(chalk.blue('[REDIS] Docker host detected in Redis URL, applying special handling...'));
+      options.retryStrategy = function(times: number) {
+        const delay = Math.min(times * 1000, 10000); // Slower retries for Docker
+        console.log(chalk.yellow(`[REDIS] Connection attempt ${times}, retrying in ${delay}ms`));
+        return delay;
+      };
+      options.maxRetriesPerRequest = 10; // More retries for Docker
+    }
   }
   
   try {
