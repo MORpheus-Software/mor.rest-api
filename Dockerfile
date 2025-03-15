@@ -97,16 +97,24 @@ app.get("/", (req, res) => { \
 const port = process.env.PORT || 8080; \
 app.listen(port, () => console.log(`Fallback server listening on port ${port}`));' > /app/fallback-server.js
 
-# Use a shell script as entrypoint to try multiple startup options
+# Create a docker-entrypoint.sh script that will be run directly
 RUN echo '#!/bin/sh\n\
+echo "Starting container with entrypoint script"\n\
+echo "Checking for start.sh..."\n\
 if [ -f /app/start.sh ]; then\n\
-  echo "Found start.sh, executing it..."\n\
+  echo "Found start.sh at $(ls -la /app/start.sh)"\n\
   exec /app/start.sh\n\
 else\n\
-  echo "start.sh not found, using fallback server..."\n\
+  echo "ERROR: start.sh not found in $(pwd)"\n\
+  echo "Directory contents:"\n\
+  ls -la\n\
+  echo "Using fallback server..."\n\
   exec node /app/fallback-server.js\n\
 fi\n\
-' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+' > /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Start the server with the custom entrypoint
-CMD ["/app/entrypoint.sh"] 
+# Set the entrypoint script directly using ENTRYPOINT
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Use an empty CMD which will be ignored in favor of the ENTRYPOINT
+CMD [] 
