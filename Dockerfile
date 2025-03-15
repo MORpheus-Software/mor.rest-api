@@ -29,6 +29,16 @@ RUN npm install -g typescript
 RUN echo "Compiling TypeScript to JavaScript (ignoring errors)..." && \
     tsc --project tsconfig.build.json || echo "TypeScript compilation had errors, but we're continuing the build"
 
+# Fix ES module imports by adding .js extensions to relative imports
+# This is necessary for Node.js ES modules which require file extensions
+RUN echo "Fixing ES module imports by adding .js extensions..." && \
+    find dist -name "*.js" -type f -exec sed -i 's/from "\([^"\.][^"]*\)";/from "\1.js";/g' {} \; && \
+    find dist -name "*.js" -type f -exec sed -i "s/from '\([^'\.][^']*\)';/from '\1.js';/g" {} \; && \
+    find dist -name "*.js" -type f -exec sed -i 's/from "\(\.\.\/[^"]*\)";/from "\1.js";/g' {} \; && \
+    find dist -name "*.js" -type f -exec sed -i "s/from '\(\.\.\/[^']*\)';/from '\1.js';/g" {} \; && \
+    find dist -name "*.js" -type f -exec sed -i 's/from "\(\.\/[^"]*\)";/from "\1.js";/g' {} \; && \
+    find dist -name "*.js" -type f -exec sed -i "s/from '\(\.\/[^']*\)';/from '\1.js';/g" {} \;
+
 # Debug: Show the directory structure after compilation
 RUN find dist -type d | sort && \
     echo "Compiled files:" && \
