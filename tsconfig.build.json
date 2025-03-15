@@ -11,11 +11,6 @@
     "typeRoots": ["./node_modules/@types"],
     "paths": {
       "@/*": ["./src/*"]
-    },
-    "outDir": "dist",
-    "rootDir": "src",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext"
-  },
-  "include": ["src/**/*.ts"]
+    }
+  }
 } 
