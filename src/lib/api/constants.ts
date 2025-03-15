@@ -2,8 +2,9 @@
 export const FRONTEND_API_ENDPOINT = '/api/v1';
 
 // Redis key prefixes
-export const API_KEY_PREFIX = 'apikey:';
-export const USER_KEYS_PREFIX = 'user-keys:';
+export const API_KEY_PREFIX = 'api:key:';
+export const API_KEY_SET = 'api:keys:all';
+export const USER_KEYS_PREFIX = 'api:keys:user:';
 export const USER_PREFIX = 'user:';
 export const USER_EMAIL_INDEX = 'user-email-index:';
 export const ALL_USERS_SET = 'all-users';

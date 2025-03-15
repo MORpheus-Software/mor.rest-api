@@ -1,7 +1,6 @@
-
 import { Request, Response } from 'express';
 import { authMiddleware, requireAuth, AuthenticatedRequest } from '../../lib/api/auth-middleware.js';
-import { createApiKey, getUserApiKeys, deleteApiKey, ApiKeyInfo, hasAnyApiKeys } from '../../lib/api/keys.js';
+import { createApiKey, getApiKeysForUser, deleteApiKey, ApiKeyInfo, userHasApiKeys } from '../../lib/api/keys.js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Get all API keys for the current user
@@ -31,13 +30,13 @@ const getKeys = async (req: Request, res: Response) => {
       });
     }
     
-    const keys = await getUserApiKeys(userId);
+    const keys = await getApiKeysForUser(userId);
     
     console.log(`[API] Returning ${keys.length} keys for user ${userId}`);
     
     return res.json({
       data: keys.map(key => ({
-        id: key.key,
+        id: key.id,
         name: key.name,
         lastUsed: key.lastUsedAt,
         created: key.createdAt
@@ -99,7 +98,7 @@ const createKey = async (req: Request, res: Response) => {
     
     return res.status(201).json({
       data: {
-        id: key.key,
+        id: key.id,
         name: key.name,
         created: key.createdAt,
         key: key.key
@@ -133,6 +132,17 @@ const deleteKey = async (req: Request, res: Response) => {
       });
     }
     
+    const userId = authReq.userId;
+    
+    if (!userId) {
+      return res.status(400).json({
+        error: {
+          message: 'Missing user ID',
+          type: 'invalid_request_error'
+        }
+      });
+    }
+    
     const { id } = req.params;
     
     if (!id) {
@@ -144,7 +154,7 @@ const deleteKey = async (req: Request, res: Response) => {
       });
     }
     
-    const success = await deleteApiKey(id);
+    const success = await deleteApiKey(id, userId);
     
     if (!success) {
       return res.status(404).json({
@@ -180,7 +190,7 @@ const checkKeys = async (req: Request, res: Response) => {
   try {
     console.log('[API] Checking if API keys exist');
     
-    const hasKeys = await hasAnyApiKeys();
+    const hasKeys = await userHasApiKeys('admin'); // Check if admin user has keys
     
     console.log(`[API] API keys exist: ${hasKeys}`);
     

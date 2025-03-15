@@ -1,12 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
 import { createRedisClient } from '../redis-adapter.js';
 import { API_KEY_PREFIX } from './constants.js';
-import { getRedisClient } from '../../server/setupRedis.js';
+// import { getRedisClient } from '../../server/setupRedis.js'; // Removed to solve circular dependency
+import { validateApiKey } from './keys.js';
+// import { verifyToken } from './auth.js'; // Commented out as it's not available
+import { Redis } from 'ioredis';
 
 // Safer environment detection that works in both Node.js and browser environments
 const isBrowser = typeof process === 'undefined' || 
   !process.versions ||
   !process.versions.node;
+
+// Define a mock verifyToken function if needed by the rest of this file
+function verifyToken(token: string): Promise<any> {
+  console.log('[AUTH] Using mock verifyToken, this should be replaced with actual implementation');
+  return Promise.resolve(null);
+}
 
 export interface AuthenticatedRequest extends Request {
   // The user ID associated with the API key if authentication was successful
@@ -15,6 +24,8 @@ export interface AuthenticatedRequest extends Request {
   isAuthenticated: boolean;
   // Any error message if authentication failed
   authError?: string;
+  // Additional information about the API key
+  apiKeyInfo?: any;
 }
 
 // Redis client
@@ -188,49 +199,26 @@ export async function apiKeyAuthMiddleware(req: Request, res: Response, next: Ne
         }
         
         try {
-          // Use the persistent Redis client
-          redisClient = getRedisClient();
+          // Use the validateApiKey function
+          console.log('[API KEY AUTH] Validating API key');
+          const apiKeyInfo = await validateApiKey(token);
           
-          // Use Redis client to check the key
-          console.log('[API KEY AUTH] Looking up key in Redis:', `${API_KEY_PREFIX}${token}`);
-          const userId = await redisClient.get(`${API_KEY_PREFIX}${token}`);
-          console.log('[API KEY AUTH] Redis lookup result:', userId);
-          
-          if (userId) {
+          if (apiKeyInfo) {
             // API key is valid
-            console.log('[API KEY AUTH] API key is valid for user:', userId);
+            console.log('[API KEY AUTH] API key is valid for user:', apiKeyInfo.userId);
             authReq.isAuthenticated = true;
-            authReq.userId = userId;
+            authReq.userId = apiKeyInfo.userId;
+            authReq.apiKeyInfo = apiKeyInfo;
             return next();
           } else {
-            // Check if we should try localStorage as a fallback
-            const allowLocalStorage = process.env.ALLOW_LOCAL_STORAGE === 'true';
-            
-            if (allowLocalStorage) {
-              console.log('[API KEY AUTH] Checking localStorage as fallback');
-              const fallbackResult = checkApiKeyInLocalStorage(token);
-              
-              if (fallbackResult.valid) {
-                console.log('[API KEY AUTH] API key found in localStorage:', fallbackResult.userId);
-                
-                // Store the key in Redis for future use
-                await redisClient.set(`${API_KEY_PREFIX}${token}`, fallbackResult.userId);
-                console.log('[API KEY AUTH] Stored key in Redis for future use');
-                
-                authReq.isAuthenticated = true;
-                authReq.userId = fallbackResult.userId;
-                return next();
-              }
-            }
-            
             // API key is invalid
             console.log('[API KEY AUTH] API key is invalid');
             authReq.authError = 'Invalid API key';
             return next();
           }
         } catch (error) {
-          console.error('[API KEY AUTH] Redis error:', error);
-          authReq.authError = 'Redis connection error';
+          console.error('[API KEY AUTH] Error validating API key:', error);
+          authReq.authError = 'Error validating API key';
           return next();
         }
       } catch (error) {

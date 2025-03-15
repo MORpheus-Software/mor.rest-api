@@ -1,69 +1,122 @@
 import { Redis } from 'ioredis';
 import chalk from 'chalk';
-import { getRedisClient } from '../server/setupRedis.js';
 
 // Redis connection options
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
 const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
 
+// Global Redis client instance
+let globalRedisClient: Redis | null = null;
+
 // Function to create a Redis client
 async function createRedisClient(): Promise<Redis> {
   try {
-    console.log(chalk.blue('[REDIS] Creating Redis client from adapter'));
-    // Use the persistent client from setupRedis
-    return getRedisClient();
+    if (globalRedisClient) {
+      console.log(chalk.blue('[REDIS_ADAPTER] Returning existing Redis client'));
+      return globalRedisClient;
+    }
+
+    console.log(chalk.blue('[REDIS_ADAPTER] Creating new Redis client'));
+    
+    // First try to use REDIS_URL if available
+    if (process.env.REDIS_URL) {
+      console.log(chalk.blue(`[REDIS_ADAPTER] Using REDIS_URL: ${process.env.REDIS_URL.replace(/\/\/(.+?)@/, '//[credentials-hidden]@')}`));
+      
+      // Ensure we're using rediss:// for Upstash connections
+      let redisUrl = process.env.REDIS_URL;
+      if (redisUrl.includes('upstash.io') && !redisUrl.startsWith('rediss://')) {
+        redisUrl = redisUrl.replace('redis://', 'rediss://');
+        console.log(chalk.yellow('[REDIS_ADAPTER] Upgraded connection to use SSL (rediss://)'));
+      }
+      
+      // Configure Redis client options
+      const options: any = {
+        connectTimeout: 20000,
+        enableOfflineQueue: true,
+        maxRetriesPerRequest: 3,
+        retryStrategy(times: number) {
+          const delay = Math.min(times * 500, 5000);
+          console.log(chalk.yellow(`[REDIS_ADAPTER] Connection attempt ${times}, retrying in ${delay}ms`));
+          return delay;
+        }
+      };
+      
+      // Create Redis client with URL
+      const client = new Redis(redisUrl, options);
+      
+      // Add event listeners
+      client.on('connect', () => {
+        console.log(chalk.green('[REDIS_ADAPTER] Connected successfully'));
+      });
+      
+      client.on('error', (err: Error) => {
+        console.error(chalk.red(`[REDIS_ADAPTER] Connection error: ${err.message}`));
+      });
+      
+      // Store the client globally
+      globalRedisClient = client;
+      
+      // Verify connection
+      await client.ping();
+      console.log(chalk.green('[REDIS_ADAPTER] Connection verified with PING'));
+      
+      return client;
+    } else {
+      // Fall back to host/port configuration
+      console.log(chalk.blue(`[REDIS_ADAPTER] Using configuration - Host: ${REDIS_HOST}, Port: ${REDIS_PORT}`));
+      
+      const client = new Redis({
+        host: REDIS_HOST,
+        port: REDIS_PORT,
+        password: REDIS_PASSWORD,
+        connectTimeout: 20000,
+        maxRetriesPerRequest: 3,
+        enableOfflineQueue: true
+      });
+      
+      // Add event listeners
+      client.on('connect', () => {
+        console.log(chalk.green('[REDIS_ADAPTER] Connected successfully'));
+      });
+      
+      client.on('error', (err: Error) => {
+        console.error(chalk.red(`[REDIS_ADAPTER] Connection error: ${err.message}`));
+      });
+      
+      // Store the client globally
+      globalRedisClient = client;
+      
+      // Verify connection
+      await client.ping();
+      console.log(chalk.green('[REDIS_ADAPTER] Connection verified with PING'));
+      
+      return client;
+    }
   } catch (error) {
-    console.error(chalk.red('[REDIS] Failed to connect to Redis:'), error);
+    console.error(chalk.red('[REDIS_ADAPTER] Failed to connect to Redis:'), error);
     
     // Implement retry logic for development environment
-    if (process.env.NODE_ENV === 'development') {
-      console.log(chalk.yellow('[REDIS] Development environment detected, attempting recovery...'));
+    if (process.env.NODE_ENV === 'development' || process.env.USE_LOCAL_REDIS === 'true') {
+      console.log(chalk.yellow('[REDIS_ADAPTER] Development environment detected, attempting recovery...'));
       
       try {
-        // Wait a short time and try again
+        // Wait a short time and try again with a direct localhost connection
         await new Promise(resolve => setTimeout(resolve, 2000));
-        console.log(chalk.yellow('[REDIS] Retrying Redis connection...'));
-        return getRedisClient();
+        console.log(chalk.yellow('[REDIS_ADAPTER] Retrying Redis connection with localhost...'));
+        
+        const client = new Redis('redis://localhost:6379');
+        globalRedisClient = client;
+        
+        await client.ping();
+        console.log(chalk.green('[REDIS_ADAPTER] Recovery connection successful'));
+        
+        return client;
       } catch (retryError) {
-        console.error(chalk.red('[REDIS] Retry failed:'), retryError);
+        console.error(chalk.red('[REDIS_ADAPTER] Retry failed:'), retryError);
       }
     }
     
-    throw error;
-  }
-}
-
-// Upstash Redis client creation
-async function createUpstashRedisClient(): Promise<Redis> {
-  try {
-    console.log(chalk.blue('[REDIS] Creating Upstash Redis client'));
-    
-    // Get Upstash credentials from environment variables
-    const UPSTASH_REST_API_TOKEN = process.env.UPSTASH_REST_API_TOKEN;
-    const UPSTASH_REST_API_DOMAIN = process.env.UPSTASH_REST_API_DOMAIN;
-    
-    if (!UPSTASH_REST_API_TOKEN || !UPSTASH_REST_API_DOMAIN) {
-      console.error(chalk.red('[REDIS] Missing Upstash credentials in environment variables'));
-      throw new Error('Missing Upstash credentials');
-    }
-    
-    // Create Upstash Redis client using IoRedis
-    const upstashUrl = `rediss://default:${UPSTASH_REST_API_TOKEN}@${UPSTASH_REST_API_DOMAIN}:6379`;
-    const client = new Redis(upstashUrl);
-    
-    // Handle errors without crashing
-    client.on('error', (err: Error) => {
-      console.error(chalk.red(`[REDIS] Upstash Redis error: ${err.message}`));
-    });
-    
-    // Test the connection
-    await client.ping();
-    console.log(chalk.green('[REDIS] Connected to Upstash Redis'));
-    
-    return client;
-  } catch (error) {
-    console.error(chalk.red('[REDIS] Failed to connect to Upstash Redis:'), error);
     throw error;
   }
 }
@@ -72,9 +125,9 @@ async function createUpstashRedisClient(): Promise<Redis> {
 async function setex(client: Redis, key: string, seconds: number, value: string): Promise<void> {
   try {
     await client.setex(key, seconds, value);
-    console.log(chalk.green(`[REDIS] Set key ${key} with expiration ${seconds}s`));
+    console.log(chalk.green(`[REDIS_ADAPTER] Set key ${key} with expiration ${seconds}s`));
   } catch (error) {
-    console.error(chalk.red(`[REDIS] Failed to set key ${key}:`), error);
+    console.error(chalk.red(`[REDIS_ADAPTER] Failed to set key ${key}:`), error);
     throw error;
   }
 }
@@ -83,9 +136,9 @@ async function setex(client: Redis, key: string, seconds: number, value: string)
 async function set(client: Redis, key: string, value: string): Promise<void> {
   try {
     await client.set(key, value);
-    console.log(chalk.green(`[REDIS] Set key ${key}`));
+    console.log(chalk.green(`[REDIS_ADAPTER] Set key ${key}`));
   } catch (error) {
-    console.error(chalk.red(`[REDIS] Failed to set key ${key}:`), error);
+    console.error(chalk.red(`[REDIS_ADAPTER] Failed to set key ${key}:`), error);
     throw error;
   }
 }
@@ -95,13 +148,13 @@ async function get(client: Redis, key: string): Promise<string | null> {
   try {
     const value = await client.get(key);
     if (value) {
-      console.log(chalk.green(`[REDIS] Get key ${key}: ${value.substring(0, 20)}...`));
+      console.log(chalk.green(`[REDIS_ADAPTER] Get key ${key}: ${value.substring(0, 20)}...`));
     } else {
-      console.log(chalk.yellow(`[REDIS] Key ${key} not found`));
+      console.log(chalk.yellow(`[REDIS_ADAPTER] Key ${key} not found`));
     }
     return value;
   } catch (error) {
-    console.error(chalk.red(`[REDIS] Failed to get key ${key}:`), error);
+    console.error(chalk.red(`[REDIS_ADAPTER] Failed to get key ${key}:`), error);
     throw error;
   }
 }
@@ -110,9 +163,9 @@ async function get(client: Redis, key: string): Promise<string | null> {
 async function del(client: Redis, key: string): Promise<void> {
   try {
     await client.del(key);
-    console.log(chalk.green(`[REDIS] Deleted key ${key}`));
+    console.log(chalk.green(`[REDIS_ADAPTER] Deleted key ${key}`));
   } catch (error) {
-    console.error(chalk.red(`[REDIS] Failed to delete key ${key}:`), error);
+    console.error(chalk.red(`[REDIS_ADAPTER] Failed to delete key ${key}:`), error);
     throw error;
   }
 }
@@ -122,14 +175,10 @@ async function exists(client: Redis, key: string): Promise<boolean> {
   try {
     const result = await client.exists(key);
     const exists = result === 1;
-    if (exists) {
-      console.log(chalk.green(`[REDIS] Key ${key} exists`));
-    } else {
-      console.log(chalk.yellow(`[REDIS] Key ${key} does not exist`));
-    }
+    console.log(chalk.green(`[REDIS_ADAPTER] Key ${key} exists: ${exists}`));
     return exists;
   } catch (error) {
-    console.error(chalk.red(`[REDIS] Failed to check if key ${key} exists:`), error);
+    console.error(chalk.red(`[REDIS_ADAPTER] Failed to check if key ${key} exists:`), error);
     throw error;
   }
 }
@@ -138,9 +187,9 @@ async function exists(client: Redis, key: string): Promise<boolean> {
 async function sadd(client: Redis, key: string, value: string): Promise<void> {
   try {
     await client.sadd(key, value);
-    console.log(chalk.green(`[REDIS] Added value ${value} to set ${key}`));
+    console.log(chalk.green(`[REDIS_ADAPTER] Added value ${value} to set ${key}`));
   } catch (error) {
-    console.error(chalk.red(`[REDIS] Failed to add value ${value} to set ${key}:`), error);
+    console.error(chalk.red(`[REDIS_ADAPTER] Failed to add value ${value} to set ${key}:`), error);
     throw error;
   }
 }
@@ -149,10 +198,10 @@ async function sadd(client: Redis, key: string, value: string): Promise<void> {
 async function smembers(client: Redis, key: string): Promise<string[]> {
   try {
     const members = await client.smembers(key);
-    console.log(chalk.green(`[REDIS] Retrieved members from set ${key}`));
+    console.log(chalk.green(`[REDIS_ADAPTER] Retrieved ${members.length} members from set ${key}`));
     return members;
   } catch (error) {
-    console.error(chalk.red(`[REDIS] Failed to retrieve members from set ${key}:`), error);
+    console.error(chalk.red(`[REDIS_ADAPTER] Failed to retrieve members from set ${key}:`), error);
     throw error;
   }
 }
@@ -161,9 +210,9 @@ async function smembers(client: Redis, key: string): Promise<string[]> {
 async function srem(client: Redis, key: string, value: string): Promise<void> {
   try {
     await client.srem(key, value);
-    console.log(chalk.green(`[REDIS] Removed value ${value} from set ${key}`));
+    console.log(chalk.green(`[REDIS_ADAPTER] Removed value ${value} from set ${key}`));
   } catch (error) {
-    console.error(chalk.red(`[REDIS] Failed to remove value ${value} from set ${key}:`), error);
+    console.error(chalk.red(`[REDIS_ADAPTER] Failed to remove value ${value} from set ${key}:`), error);
     throw error;
   }
 }
@@ -172,36 +221,12 @@ async function srem(client: Redis, key: string, value: string): Promise<void> {
 async function keys(client: Redis, pattern: string): Promise<string[]> {
   try {
     const keys = await client.keys(pattern);
-    console.log(chalk.green(`[REDIS] Found ${keys.length} keys matching pattern ${pattern}`));
+    console.log(chalk.green(`[REDIS_ADAPTER] Found ${keys.length} keys matching pattern ${pattern}`));
     return keys;
   } catch (error) {
-    console.error(chalk.red(`[REDIS] Failed to get keys matching pattern ${pattern}:`), error);
+    console.error(chalk.red(`[REDIS_ADAPTER] Failed to get keys matching pattern ${pattern}:`), error);
     throw error;
   }
-}
-
-// Method to increment a value
-async function incr(client: Redis, key: string): Promise<number> {
-    try {
-        const result = await client.incr(key);
-        console.log(chalk.green(`[REDIS] Incremented key ${key} to ${result}`));
-        return result;
-    } catch (error) {
-        console.error(chalk.red(`[REDIS] Failed to increment key ${key}:`), error);
-        throw error;
-    }
-}
-
-// Method to decrement a value
-async function decr(client: Redis, key: string): Promise<number> {
-    try {
-        const result = await client.decr(key);
-        console.log(chalk.green(`[REDIS] Decremented key ${key} to ${result}`));
-        return result;
-    } catch (error) {
-        console.error(chalk.red(`[REDIS] Failed to decrement key ${key}:`), error);
-        throw error;
-    }
 }
 
 // Verify Redis connection is working
@@ -209,17 +234,16 @@ async function verifyRedisConnection(): Promise<boolean> {
   try {
     const client = await createRedisClient();
     await client.ping();
-    await client.quit();
+    console.log(chalk.green('[REDIS_ADAPTER] Connection verification successful'));
     return true;
   } catch (error) {
-    console.error(chalk.red('[REDIS] Connection verification failed:'), error);
+    console.error(chalk.red('[REDIS_ADAPTER] Connection verification failed:'), error);
     return false;
   }
 }
 
 export {
     createRedisClient,
-    createUpstashRedisClient,
     verifyRedisConnection,
     setex,
     set,
@@ -230,6 +254,4 @@ export {
     smembers,
     srem,
     keys,
-    incr,
-    decr,
 };
