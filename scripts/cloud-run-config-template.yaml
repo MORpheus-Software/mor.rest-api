@@ -23,8 +23,7 @@ spec:
         - name: NODE_ENV
           value: production
         - name: REDIS_URL
-          value: YOUR_REDIS_URL
-        - name: UPSTASH_REDIS_URL
+          # Format must be: rediss://default:TOKEN@HOSTNAME.upstash.io:6379
           value: YOUR_REDIS_URL
         ports:
         - containerPort: 8080

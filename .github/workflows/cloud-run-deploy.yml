@@ -55,20 +55,49 @@ jobs:
         if [[ "${{ secrets.REDIS_URL }}" == redis://* ]]; then
           echo "Standard Redis format detected"
         elif [[ "${{ secrets.REDIS_URL }}" == rediss://* ]]; then
-          echo "Secure Redis format detected"
+          echo "Secure Redis format detected (Upstash preferred format)"
         else
           echo "Unknown Redis format, please verify the URL"
+          echo "IMPORTANT: For Upstash, the URL must be in this format: rediss://default:TOKEN@HOSTNAME.upstash.io:6379"
+        fi
+        
+        # Verify the Redis URL is properly formatted for Upstash
+        # (No secrets are printed, just checking format)
+        if [[ ! "${{ secrets.REDIS_URL }}" == *"@"*".upstash.io:"* ]]; then
+          echo "Warning: Redis URL doesn't appear to be in the expected Upstash format"
+          echo "REQUIRED FORMAT: rediss://default:TOKEN@HOSTNAME.upstash.io:6379"
+          echo "Please update the REDIS_URL secret in GitHub repository settings."
+        else
+          echo "Redis URL appears to have the correct Upstash format"
+        fi
+        
+        # Extract Redis credentials for alternative formats
+        if [[ "$REDIS_URL" == redis://* || "$REDIS_URL" == rediss://* ]]; then
+          # Extract the password and hostname from the URL for alternative formats
+          REDIS_PASSWORD=$(echo "$REDIS_URL" | sed -E 's|redis(s)?://[^:]*:([^@]*)@.*|\2|')
+          REDIS_HOST=$(echo "$REDIS_URL" | sed -E 's|redis(s)?://[^@]*@([^:]*):.*|\2|')
+          
+          echo "Extracted Redis host for alternative config: ${REDIS_HOST}"
+          echo "Extracted Redis password: (hidden for security)"
         fi
         
         # Replace placeholder values
         sed -i "s|PROJECT_ID|$PROJECT_ID|g" cloud-run-deploy-config.yaml
         sed -i "s|COMMIT_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
-        sed -i "s|YOUR_REDIS_URL|${{ secrets.REDIS_URL }}|g" cloud-run-deploy-config.yaml
-        sed -i "s|GITHUB_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
+        sed -i "s|YOUR_REDIS_URL|$REDIS_URL|g" cloud-run-deploy-config.yaml
+        
+        # Update alternative Redis credentials if available
+        if [[ -n "$REDIS_PASSWORD" ]]; then
+          sed -i "s|REDIS_PASSWORD_ONLY|$REDIS_PASSWORD|g" cloud-run-deploy-config.yaml
+        fi
+        
+        if [[ -n "$REDIS_HOST" ]]; then
+          sed -i "s|REDIS_HOSTNAME_ONLY|$REDIS_HOST|g" cloud-run-deploy-config.yaml
+        fi
         
         # Display the configuration (without sensitive data)
         echo "Deploying with the following configuration:"
-        grep -v "REDIS_URL\|UPSTASH_REDIS_URL" cloud-run-deploy-config.yaml
+        grep -v "REDIS_URL\|UPSTASH_REDIS_URL\|UPSTASH_TOKEN\|UPSTASH_ENDPOINT" cloud-run-deploy-config.yaml
         
     - name: Deploy to Cloud Run using YAML
       id: deploy
