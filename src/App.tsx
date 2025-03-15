@@ -9,13 +9,10 @@ import SignIn from "./pages/SignIn";
 import ForgotPassword from "./pages/ForgotPassword";
 import ApiPlayground from "./pages/ApiPlayground";
 import ProfilePage from "./pages/ProfilePage";
-import Staking from "./pages/Staking";
 import Documentation from "./pages/Documentation";
-import Dashboard from "./pages/Dashboard";
 import Tokens from "./pages/Tokens";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AuthCheck from "./components/auth/AuthCheck";
-import GitHubCallback from "./pages/GitHubCallback";
 import DebugPage from "./pages/Debug";
 import { isAuthenticated } from "./lib/auth";
 
@@ -48,20 +45,14 @@ const App = () => (
             <Route path="/signup" element={<SignUp />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            {/* GitHub auth hidden for demo
-            <Route path="/auth/github/callback" element={<GitHubCallback />} />
-            */}
             <Route path="/debug" element={<DebugPage />} />
             
             {/* Protected routes */}
-            {/* Dashboard route hidden for demo
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            */}
             <Route path="/dashboard" element={<Navigate to="/playground" replace />} />
             <Route path="/tokens" element={<ProtectedRoute><Tokens /></ProtectedRoute>} />
             <Route path="/playground" element={<ProtectedRoute><ApiPlayground /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-            <Route path="/staking" element={<ProtectedRoute><Staking /></ProtectedRoute>} />
+            <Route path="/staking" element={<Navigate to="/playground" replace />} />
             <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
             
             {/* Catch-all route */}

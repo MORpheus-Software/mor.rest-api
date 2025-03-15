@@ -1,4 +1,3 @@
-
 import { Request, Response } from 'express';
 import { 
   createUser, 
@@ -28,8 +27,30 @@ export const register = async (req: Request, res: Response) => {
       });
     }
     
-    // Check if email is already registered
-    const existingUser = await getUserByEmail(email);
+    // Add retry logic for Redis connection issues
+    let existingUser = null;
+    let retries = 0;
+    const maxRetries = 3;
+    
+    while (retries < maxRetries) {
+      try {
+        // Check if email is already registered
+        existingUser = await getUserByEmail(email);
+        break; // If successful, exit the retry loop
+      } catch (redisError) {
+        console.error(`[AUTH] Redis error during getUserByEmail (Attempt ${retries + 1}/${maxRetries}):`, redisError);
+        
+        if (retries >= maxRetries - 1) {
+          // If we've reached max retries, throw the error to be caught by the outer catch
+          throw redisError;
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1)));
+        retries++;
+      }
+    }
+    
     if (existingUser) {
       return res.status(409).json({
         error: {
@@ -43,12 +64,32 @@ export const register = async (req: Request, res: Response) => {
     // const passwordHash = await bcrypt.hash(password, 10);
     const passwordHash = `mock_hash_${password}_${Date.now()}`;
     
-    // Create the user
-    const user = await createUser({
-      name,
-      email,
-      passwordHash
-    });
+    // Add retry logic for Redis connection issues during user creation
+    retries = 0;
+    let user = null;
+    
+    while (retries < maxRetries) {
+      try {
+        // Create the user
+        user = await createUser({
+          name,
+          email,
+          passwordHash
+        });
+        break; // If successful, exit the retry loop
+      } catch (redisError) {
+        console.error(`[AUTH] Redis error during createUser (Attempt ${retries + 1}/${maxRetries}):`, redisError);
+        
+        if (retries >= maxRetries - 1) {
+          // If we've reached max retries, throw the error to be caught by the outer catch
+          throw redisError;
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1)));
+        retries++;
+      }
+    }
     
     // Remove sensitive data before sending response
     const { passwordHash: _, ...safeUser } = user;
@@ -60,6 +101,16 @@ export const register = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('[AUTH] Registration error:', error);
+    
+    // Determine the appropriate error response
+    if (error.message && error.message.includes('Redis')) {
+      return res.status(503).json({
+        error: {
+          message: 'Service temporarily unavailable',
+          type: 'service_unavailable'
+        }
+      });
+    }
     
     return res.status(500).json({
       error: {

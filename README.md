@@ -132,30 +132,34 @@ sudo systemctl start redis
 docker run -d -p 6379:6379 --name redis redis:alpine
 ```
 
-## Local Development with Redis
+## Local Redis Setup with Docker
 
-For local development, the application can use a Redis Docker container. Here's how to set it up:
+For local development, you can run Redis in a Docker container:
 
-1. Make sure your `.env` file is configured to use the local Redis:
-   ```
-   # For local development with Docker
-   REDIS_URL=redis://localhost:6379
-   ```
+1. Make sure you have Docker and Docker Compose installed
 
-2. Start the Redis container using Docker Compose:
+2. Start Redis using Docker Compose:
    ```bash
    docker-compose up -d redis
    ```
 
-3. Run the application in development mode:
+3. Add a test API key for local development:
    ```bash
-   npm run dev
+   node scripts/add-test-key.js
    ```
 
-The development environment includes special handling for Redis connections to ensure compatibility with the Docker setup. These settings only apply in development mode and won't affect production deployments.
+4. Run the application with Redis environment variables set:
+   ```bash
+   REDIS_URL=redis://localhost:6379 npm run dev
+   ```
 
-If you want to check your Redis data, you can use Redis Commander UI by running:
+Alternatively, you can use the start-dev.sh script to do all of this in one step:
 ```bash
-npm run redis-ui
+chmod +x scripts/start-dev.sh
+./scripts/start-dev.sh
 ```
-Then visit http://localhost:8081 in your browser to access the Redis UI.
+
+This will:
+- Start the Redis container using Docker Compose
+- Set the correct environment variables
+- Start the application in development mode

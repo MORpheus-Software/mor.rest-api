@@ -1,5 +1,6 @@
 import { Redis } from 'ioredis';
 import chalk from 'chalk';
+import { getRedisClient } from '../server/setupRedis.js';
 
 // Redis connection options
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
@@ -9,56 +10,26 @@ const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
 // Function to create a Redis client
 async function createRedisClient(): Promise<Redis> {
   try {
-    console.log(chalk.blue('[REDIS] Creating Redis client'));
-    
-    // Redis connection URL
-    const redisUrl = process.env.REDIS_URL || `redis://${REDIS_HOST}:${REDIS_PORT}`;
-    
-    // Redis connection options
-    const redisOptions: any = {
-      lazyConnect: true,
-      reconnectOnError: (err: Error) => {
-        console.error(chalk.red('[REDIS] Reconnect error:'), err);
-        return 2; // Reconnect after 2 seconds
-      },
-      maxRetriesPerRequest: 3,
-    };
-    
-    // Add development-specific options
-    if (process.env.NODE_ENV === 'development') {
-      console.log(chalk.blue('[REDIS] Using development-specific Redis options'));
-      // Enable offline queue to prevent "Stream isn't writeable" errors in development
-      redisOptions.enableOfflineQueue = true;
-      // Add connection timeout
-      redisOptions.connectTimeout = 10000;
-      // Add retry strategy with exponential backoff
-      redisOptions.retryStrategy = (times: number) => {
-        const delay = Math.min(times * 500, 5000);
-        console.log(chalk.yellow(`[REDIS] Connection attempt ${times}, retrying in ${delay}ms`));
-        return delay;
-      };
-    }
-    
-    // Add password if available
-    if (REDIS_PASSWORD) {
-      redisOptions.password = REDIS_PASSWORD;
-    }
-    
-    // Create Redis client using IoRedis
-    const client = new Redis(redisUrl, redisOptions);
-    
-    // Handle errors without crashing
-    client.on('error', (err: Error) => {
-      console.error(chalk.red(`[REDIS] Redis error: ${err.message}`));
-    });
-    
-    // Test the connection
-    await client.ping();
-    console.log(chalk.green('[REDIS] Connected to Redis'));
-    
-    return client;
+    console.log(chalk.blue('[REDIS] Creating Redis client from adapter'));
+    // Use the persistent client from setupRedis
+    return getRedisClient();
   } catch (error) {
     console.error(chalk.red('[REDIS] Failed to connect to Redis:'), error);
+    
+    // Implement retry logic for development environment
+    if (process.env.NODE_ENV === 'development') {
+      console.log(chalk.yellow('[REDIS] Development environment detected, attempting recovery...'));
+      
+      try {
+        // Wait a short time and try again
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log(chalk.yellow('[REDIS] Retrying Redis connection...'));
+        return getRedisClient();
+      } catch (retryError) {
+        console.error(chalk.red('[REDIS] Retry failed:'), retryError);
+      }
+    }
+    
     throw error;
   }
 }

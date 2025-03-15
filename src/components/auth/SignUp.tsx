@@ -119,10 +119,10 @@ export function SignUpForm() {
           description: "Welcome to TokenHub (temporary user)"
         });
         
-        // Navigate to dashboard
-        console.log('[SIGNUP] Navigating to dashboard with fallback user...');
+        // Navigate to playground directly
+        console.log('[SIGNUP] Navigating to playground with fallback user...');
         setTimeout(() => {
-          window.location.href = '/dashboard';
+          window.location.href = '/playground';
         }, 1500);
         
         return;

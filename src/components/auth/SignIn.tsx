@@ -228,20 +228,6 @@ export function SignInForm() {
       >
         {isLoading ? "Signing in..." : "Sign in"}
       </Button>
-      
-      <div className="relative flex items-center justify-center">
-        <Separator className="w-full" />
-        <span className="absolute bg-background px-2 text-xs text-muted-foreground">
-          DEMO CREDENTIALS
-        </span>
-      </div>
-      
-      <div className="rounded-lg border border-border bg-muted/30 p-3">
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p><span className="font-medium">Email:</span> demo@tokenhub.com</p>
-          <p><span className="font-medium">Password:</span> password123</p>
-        </div>
-      </div>
     </form>
   );
 }

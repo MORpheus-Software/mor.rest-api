@@ -174,8 +174,33 @@ try {
       }
     }
   } else {
-    // Development path
-    publicPath = path.join(__dirname, '../../../dist');
+    // Development path - Fix for correct directory structure
+    console.log(chalk.blue('[SERVER] Resolving development path in morsaas directory'));
+    
+    // Try multiple potential development paths
+    const devPaths = [
+      path.join(__dirname, '../../dist'),      // /morsaas/dist
+      path.join(__dirname, '../../../dist'),   // /AgentGarage/morsaas/dist
+      path.join(process.cwd(), 'dist'),        // Using current working directory
+    ];
+    
+    // Find the first path that exists
+    let pathFound = false;
+    for (const devPath of devPaths) {
+      console.log(chalk.blue(`[SERVER] Checking dev path: ${devPath}`));
+      if (fs.existsSync(devPath)) {
+        publicPath = devPath;
+        pathFound = true;
+        console.log(chalk.green(`[SERVER] Using existing dev path: ${publicPath}`));
+        break;
+      }
+    }
+    
+    // If no path exists yet, use the most likely one
+    if (!pathFound) {
+      publicPath = path.join(process.cwd(), 'dist');
+      console.log(chalk.yellow(`[SERVER] No existing dev path found, using: ${publicPath}`));
+    }
   }
   
   // Final check
@@ -232,6 +257,13 @@ app.use(express.static(publicPath));
 // Handle all other routes by serving the index.html
 app.get('*', (req, res) => {
   console.log(chalk.blue(`[SERVER] Serving index.html for route: ${req.path}`));
+  
+  // Development mode - redirect to Vite dev server if we can't find the file
+  if (process.env.NODE_ENV === 'development' && (!fs.existsSync(path.join(publicPath, 'index.html')))) {
+    console.log(chalk.yellow(`[SERVER] In development mode, redirecting to Vite dev server at http://localhost:8080${req.path}`));
+    return res.redirect(`http://localhost:8080${req.path}`);
+  }
+  
   res.sendFile(path.join(publicPath, 'index.html'));
 });
 
@@ -255,66 +287,54 @@ async function startServer() {
     console.log(chalk.yellow('Starting MorSaaS API Server'));
     console.log(chalk.yellow('='.repeat(50)));
     
-    let redisAvailable = false;
+    // Verify Redis connection is required
+    try {
+      // Force Redis connection to be established first
+      const redisAvailable = await checkRedisConnection();
+      
+      if (redisAvailable) {
+        console.log(chalk.green('[SERVER] Redis connection verified ✓'));
+        console.log(chalk.green('[SERVER] Redis is available and will be used for data persistence'));
+      } else {
+        // This shouldn't happen as checkRedisConnection throws an error on failure
+        throw new Error('Redis connection test failed');
+      }
+    } catch (redisError) {
+      console.error(chalk.red('[SERVER] Error checking Redis connection:'), redisError);
+      // Don't proceed if Redis is required
+      throw new Error('Redis is required for operation');
+    }
+    
+    // Start the HTTP server
+    const PORT = parseInt(process.env.PORT || '4000', 10);
     
     try {
-      // Check Redis connection with timeout
-      const redisPromise = checkRedisConnection();
-      const timeoutPromise = new Promise<boolean>((resolve) => {
-        setTimeout(() => {
-          console.error(chalk.red('[SERVER] Redis connection check timed out after 10 seconds'));
-          resolve(false);
-        }, 10000);
-      });
-      
-      redisAvailable = await Promise.race([redisPromise, timeoutPromise]);
-    } catch (error) {
-      console.error(chalk.red('[SERVER] Error checking Redis connection:'), error);
-      console.log(chalk.yellow('[SERVER] Continuing without Redis...'));
-    }
-    
-    if (redisAvailable) {
-      console.log(chalk.green('[SERVER] Redis is available and will be used for data persistence'));
-    } else {
-      console.log(chalk.yellow('[SERVER] Redis is not available, falling back to localStorage'));
-      console.log(chalk.yellow('[SERVER] Note: API keys and other data will not persist between server restarts'));
-    }
-    
-    return new Promise<void>((resolve) => {
-      // Add connection timeout handler
-      const startTimeout = setTimeout(() => {
-        console.error(chalk.red('[SERVER] Server start timed out after 30 seconds'));
-        console.log(chalk.yellow('[SERVER] Forcing server start...'));
-        resolve();
-      }, 30000);
-      
       const server = app.listen(PORT, () => {
-        clearTimeout(startTimeout);
         console.log(chalk.green(`[SERVER] Server is running on port ${PORT}`));
         console.log(chalk.green(`[SERVER] API available at http://localhost:${PORT}/api`));
         console.log(chalk.yellow('='.repeat(50)));
-        resolve();
       });
       
       // Handle server errors
       server.on('error', (err: Error) => {
-        clearTimeout(startTimeout);
-        console.error(chalk.red('[SERVER] Server error:'), err);
-        
-        // Check if the port is already in use
+        // Handle EADDRINUSE error by trying alternative port
         if ((err as any).code === 'EADDRINUSE') {
-          console.log(chalk.yellow(`[SERVER] Port ${PORT} is already in use, trying another port...`));
+          console.error(chalk.red(`[SERVER] Port ${PORT} is already in use, trying another port...`));
           
-          // Try another port
-          server.listen(0, () => {
-            const address = server.address();
-            const newPort = typeof address === 'object' && address ? address.port : PORT;
-            console.log(chalk.green(`[SERVER] Server started on alternative port ${newPort}`));
-            resolve();
+          // Get a random available port
+          const altPort = PORT + Math.floor(Math.random() * 10000) + 1000;
+          
+          server.listen(altPort, () => {
+            console.log(chalk.green(`[SERVER] Server started on alternative port ${altPort}`));
           });
+        } else {
+          throw err;
         }
       });
-    });
+    } catch (serverError) {
+      console.error(chalk.red('[SERVER] Failed to start server:'), serverError);
+      throw serverError;
+    }
   } catch (error) {
     console.error(chalk.red('[SERVER] Unexpected error during server startup:'), error);
     console.log(chalk.yellow('[SERVER] Attempting to continue...'));

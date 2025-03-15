@@ -1,7 +1,7 @@
-
 import { Request, Response, NextFunction } from 'express';
 import { createRedisClient } from '../redis-adapter.js';
 import { API_KEY_PREFIX } from './constants.js';
+import { getRedisClient } from '../../server/setupRedis.js';
 
 // Safer environment detection that works in both Node.js and browser environments
 const isBrowser = typeof process === 'undefined' || 
@@ -19,6 +19,66 @@ export interface AuthenticatedRequest extends Request {
 
 // Redis client
 let redisClient: any = null;
+
+/**
+ * Checks if an API key exists in localStorage (fallback when Redis is unavailable)
+ * @param token The API key to check
+ * @returns {valid: boolean, userId: string | null} Result of checking localStorage
+ */
+function checkApiKeyInLocalStorage(token: string): { valid: boolean, userId: string | null } {
+  try {
+    console.log('[LOCAL AUTH] Checking API key in localStorage...');
+    
+    // Access localStorage differently based on environment
+    let apiKeysString: string | null = null;
+    
+    // In Node.js, we need to use a different approach since global.localStorage doesn't exist
+    if (typeof window === 'undefined') {
+      try {
+        // In Node.js environment, try using filesystem if available
+        const fs = require('fs');
+        const path = require('path');
+        const dataFile = path.join(process.cwd(), '.localStorage', 'apiKeys.json');
+        
+        if (fs.existsSync(dataFile)) {
+          apiKeysString = fs.readFileSync(dataFile, 'utf8');
+          console.log('[LOCAL AUTH] Loaded API keys from filesystem');
+        } else {
+          console.log('[LOCAL AUTH] No API keys file found in filesystem');
+        }
+      } catch (fsError) {
+        console.error('[LOCAL AUTH] Error accessing filesystem:', fsError);
+        apiKeysString = null;
+      }
+    } else {
+      // In browser environment, use localStorage directly
+      apiKeysString = localStorage.getItem('apiKeys');
+    }
+    
+    if (!apiKeysString) {
+      console.log('[LOCAL AUTH] No API keys found in storage');
+      return { valid: false, userId: null };
+    }
+    
+    // Parse API keys from storage
+    const apiKeys = JSON.parse(apiKeysString);
+    console.log(`[LOCAL AUTH] Found ${apiKeys.length} API keys in storage`);
+    
+    // Find API key
+    const matchingKey = apiKeys.find((key: any) => key.token === token && key.status === 'active');
+    
+    if (matchingKey) {
+      console.log('[LOCAL AUTH] API key found in storage');
+      return { valid: true, userId: matchingKey.userId || 'local-user' };
+    } else {
+      console.log('[LOCAL AUTH] API key not found in storage');
+      return { valid: false, userId: null };
+    }
+  } catch (error) {
+    console.error('[LOCAL AUTH] Error checking API key in storage:', error);
+    return { valid: false, userId: null };
+  }
+}
 
 /**
  * User authentication middleware (for app backend routes)
@@ -128,10 +188,8 @@ export async function apiKeyAuthMiddleware(req: Request, res: Response, next: Ne
         }
         
         try {
-          // Initialize Redis client if not done already
-          if (!redisClient) {
-            redisClient = await createRedisClient();
-          }
+          // Use the persistent Redis client
+          redisClient = getRedisClient();
           
           // Use Redis client to check the key
           console.log('[API KEY AUTH] Looking up key in Redis:', `${API_KEY_PREFIX}${token}`);
@@ -145,13 +203,34 @@ export async function apiKeyAuthMiddleware(req: Request, res: Response, next: Ne
             authReq.userId = userId;
             return next();
           } else {
-            console.log('[API KEY AUTH] API key not found in Redis');
+            // Check if we should try localStorage as a fallback
+            const allowLocalStorage = process.env.ALLOW_LOCAL_STORAGE === 'true';
+            
+            if (allowLocalStorage) {
+              console.log('[API KEY AUTH] Checking localStorage as fallback');
+              const fallbackResult = checkApiKeyInLocalStorage(token);
+              
+              if (fallbackResult.valid) {
+                console.log('[API KEY AUTH] API key found in localStorage:', fallbackResult.userId);
+                
+                // Store the key in Redis for future use
+                await redisClient.set(`${API_KEY_PREFIX}${token}`, fallbackResult.userId);
+                console.log('[API KEY AUTH] Stored key in Redis for future use');
+                
+                authReq.isAuthenticated = true;
+                authReq.userId = fallbackResult.userId;
+                return next();
+              }
+            }
+            
+            // API key is invalid
+            console.log('[API KEY AUTH] API key is invalid');
             authReq.authError = 'Invalid API key';
             return next();
           }
         } catch (error) {
-          console.error('[API KEY AUTH] Error checking API key:', error);
-          authReq.authError = 'Error validating API key';
+          console.error('[API KEY AUTH] Redis error:', error);
+          authReq.authError = 'Redis connection error';
           return next();
         }
       } catch (error) {

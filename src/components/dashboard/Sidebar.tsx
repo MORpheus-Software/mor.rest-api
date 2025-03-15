@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { LogOut, LayoutDashboard, Key, Play, User, Coins, BookOpen } from 'lucide-react';
+import { LogOut, Key, Play, User, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { logout } from '@/lib/auth';
 
@@ -9,12 +9,6 @@ export function Sidebar() {
   const location = useLocation();
   
   const navItems = [
-    // Dashboard hidden for demo
-    // {
-    //   title: 'Dashboard',
-    //   href: '/dashboard',
-    //   icon: LayoutDashboard,
-    // },
     {
       title: 'API Tokens',
       href: '/tokens',
@@ -25,17 +19,6 @@ export function Sidebar() {
       href: '/playground',
       icon: Play,
     },
-    // Hidden for development
-    // {
-    //   title: 'MOR Staking',
-    //   href: '/staking',
-    //   icon: Coins,
-    // },
-    // {
-    //   title: 'Documentation',
-    //   href: '/docs',
-    //   icon: BookOpen,
-    // },
     {
       title: 'Profile',
       href: '/profile',

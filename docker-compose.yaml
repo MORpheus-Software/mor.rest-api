@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # Redis service for local development
+  redis:
+    image: redis:7-alpine
+    container_name: morsaas-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  # You can add other services here if needed (e.g., the app itself)
+  # app:
+  #   build: .
+  #   ports:
+  #     - "8080:8080"
+  #     - "4000:4000"
+  #   depends_on:
+  #     - redis
+  #   environment:
+  #     - NODE_ENV=development
+  #     - REDIS_URL=redis://redis:6379
+  #     - PORT=4000
+
+volumes:
+  redis-data:
+    driver: local 
