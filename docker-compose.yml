@@ -19,18 +19,13 @@ services:
       - "8080:8080"
     environment:
       - NODE_ENV=development
+      # Using local Redis for development
       - REDIS_URL=redis://redis:6379
       - PORT=8080
-      - DEBUG=true  # Enable debug mode for local development
     depends_on:
       - redis
     networks:
       - app-network
-    # For development only: enable hot reloading by mounting source code
-    # Comment these out when testing the production build
-    # volumes:
-    #   - ./src:/app/src
-    #   - ./dist:/app/dist
 
 volumes:
   redis-data:

@@ -10,13 +10,12 @@
     "lib": ["ES2023", "DOM"],
     "typeRoots": ["./node_modules/@types"],
     "paths": {
-      "@/*": ["./src/*"],
-      "#/*": ["./dist/*"]
+      "@/*": ["./src/*"]
     },
     "outDir": "dist",
     "rootDir": "src",
-    "moduleResolution": "NodeNext",
-    "module": "NodeNext"
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
   },
   "include": ["src/**/*.ts"]
 } 

@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import chalk from 'chalk';
-import * as constants from '../../../lib/api/constants.js';
+import { API_BASE_URL } from '../../../lib/api/constants';
 import { AuthenticatedRequest } from '../../../lib/api/auth-middleware';
 
-const NFA_PROXY_URL = constants.API_BASE_URL;
+const NFA_PROXY_URL = API_BASE_URL;
 
 /**
  * Handler for chat completions requests

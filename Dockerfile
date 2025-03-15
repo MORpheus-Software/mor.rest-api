@@ -23,29 +23,19 @@ COPY src ./src
 # Install TypeScript
 RUN npm install -g typescript
 
-# Create a file extension map to help with imports
-RUN echo "{\n  \"imports\": {\n    \"#/*\": \"./dist/*\"\n  }\n}" > ./package.json.imports
+# Show the source file structure for debugging
+RUN echo "Source files structure:" && find src -type f | grep -v "node_modules" | sort
 
-# Update package.json to include imports field for ESM
-RUN cat package.json.imports package.json > package.json.tmp && \
-    sed -i 's/\(  "type": "module",\)/\1\n  "imports": {\n    "#\/*": ".\/dist\/*"\n  },/' package.json.tmp && \
-    mv package.json.tmp package.json
-
-# Compile TypeScript to JavaScript
-RUN echo "Compiling TypeScript to JavaScript..." && \
+# Compile TypeScript to JavaScript using the build-specific config
+# This config allows compilation to continue despite errors
+RUN echo "Compiling TypeScript to JavaScript (ignoring errors)..." && \
     tsc --project tsconfig.build.json || echo "TypeScript compilation had errors, but we're continuing the build"
 
-# Show compile results for build verification
+# Show compile results
 RUN echo "Compiled files:" && \
     find dist -type f | sort
 
-# Create a helper to fix import paths in compiled JS files
-RUN echo "Fixing import paths in compiled JS files..." && \
-    find dist -type f -name "*.js" -exec sed -i 's|\\.\\.\/\\.\\.\/\\.\\./lib|\\#/lib|g' {} \; && \
-    find dist -type f -name "*.js" -exec sed -i 's|\\.\\.\/\\.\\.\/lib|\\#/lib|g' {} \; && \
-    find dist -type f -name "*.js" -exec sed -i 's|\\.\\.\/lib|\\#/lib|g' {} \;
-
-# Stage 3: Build the final production image
+# Stage 3: Build the final image with compiled code
 FROM node:18-alpine
 
 WORKDIR /app
@@ -56,7 +46,6 @@ RUN npm ci --only=production --no-audit --no-fund
 
 # Copy compiled server files from server-builder
 COPY --from=server-builder /app/dist ./dist
-COPY --from=server-builder /app/package.json ./
 
 # Copy static frontend files from frontend-builder
 COPY --from=frontend-builder /app/dist ./public
@@ -75,16 +64,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
-# Use a single CMD instruction that can handle debug mode
-CMD if [ "$DEBUG" = "true" ]; then \
-      echo "Running in debug mode"; \
-      echo "File structure:"; \
-      find ./dist -type f | sort; \
-      echo "Server JS files:"; \
-      find ./dist -name "server.js"; \
-      echo "Constants JS files:"; \
-      find ./dist -name "constants.js"; \
-      echo "Package.json:"; \
-      cat package.json; \
-    fi && \
+# Debug and run command
+CMD find ./dist -type f | sort && \
+    echo "Server JS files:" && find ./dist -name "server.js" && \
+    echo "Constants JS files:" && find ./dist -name "constants.js" && \
     node --experimental-json-modules --loader ts-node/esm ./dist/server/server.js 
