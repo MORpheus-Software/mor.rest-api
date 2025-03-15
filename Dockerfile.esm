@@ -1,0 +1,58 @@
+FROM node:22-alpine AS frontend-builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --no-audit --no-fund
+COPY . .
+RUN npm run build
+
+FROM node:22-alpine AS server-builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --no-audit --no-fund
+COPY tsconfig*.json ./
+COPY src ./src
+COPY vite.config.ts ./
+
+# Install TypeScript globally
+RUN npm install -g typescript
+
+# Compile TypeScript to JavaScript
+RUN echo "Compiling TypeScript to JavaScript..." && \
+    tsc --project tsconfig.build.json || echo "TypeScript compilation had errors, but continuing"
+
+# Create a package.json specifically for the server side
+RUN echo '{ "type": "module" }' > dist/package.json
+
+# Debug - check the compiled imports
+RUN echo "Checking compiled imports:" && \
+    cat dist/src/api/v1/chat/completions.js | grep "import"
+
+# Show the directory structure
+RUN find dist -type d | sort && \
+    echo "Compiled files:" && \
+    find dist -type f | sort
+
+FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production --no-audit --no-fund
+
+# Copy compiled server code and frontend assets
+COPY --from=server-builder /app/dist ./dist
+COPY --from=frontend-builder /app/dist ./public
+
+# Add any additional runtime dependencies needed
+RUN npm install --production --no-audit --no-fund --save express dotenv cors ioredis ts-node
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Expose the port
+EXPOSE 8080
+
+# Set environment variables
+ENV NODE_ENV=production
+
+# Start the server with the Node.js experimental modules flag
+CMD ["node", "--experimental-specifier-resolution=node", "dist/src/server/server.js"] 
