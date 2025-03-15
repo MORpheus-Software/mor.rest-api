@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run server:dev\" \"vite\"",
+    "dev": "NODE_ENV=development concurrently \"npm run server:dev\" \"vite\"",
     "dev:frontend": "vite",
     "build:dev": "vite build --mode development",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "tsx src/server/server.ts",

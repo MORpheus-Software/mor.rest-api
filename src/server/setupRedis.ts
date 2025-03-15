@@ -33,40 +33,59 @@ const createRedisInstance = (url: string) => {
   const maskedUrl = redisUrl.replace(/\/\/(.+?)@/, '//[credentials-hidden]@');
   console.log(chalk.blue(`[REDIS] Creating Redis instance with URL: ${maskedUrl}`));
   
-  // Configure Redis with more resilient options
-  const options = {
+  // Base Redis options
+  const options: any = {
     connectTimeout: 10000,
-    // Lower the maxRetriesPerRequest to avoid excessive reconnections
     maxRetriesPerRequest: 3,
-    // Avoid hammering the server with reconnection attempts
-    retryStrategy(times: number) {
+  };
+  
+  // Production options
+  if (process.env.NODE_ENV === 'production') {
+    // Default production settings - more conservative
+    options.retryStrategy = (times: number) => {
+      return Math.min(times * 200, 2000); // Less aggressive retries in production
+    };
+  } 
+  // Development options
+  else if (process.env.NODE_ENV === 'development') {
+    console.log(chalk.blue('[REDIS] Using development-specific Redis configuration'));
+    // Development settings - more verbose and resilient
+    options.retryStrategy = (times: number) => {
       const delay = Math.min(times * 500, 5000); // Increase delay between retries
       console.log(chalk.yellow(`[REDIS] Connection attempt ${times}, retrying in ${delay}ms`));
       return delay;
-    },
-    // Better handling of connection issues
-    reconnectOnError(err: Error) {
-      const targetError = 'READONLY';
-      if (err.message.includes(targetError)) {
-        // Only reconnect on specific errors
-        return true;
-      }
-      return false;
-    },
-    // Improve TLS for secure connections
-    tls: redisUrl.startsWith('rediss://') ? { 
-      rejectUnauthorized: false // Helps with self-signed certificates
-    } : undefined,
-    // Keep connections alive
-    keepAlive: 10000,
-    // Disable auto-reconnect in some error scenarios
-    autoResubscribe: false,
-    // Avoid queuing operations when disconnected
-    enableOfflineQueue: false
+    };
+    
+    // CRITICAL: Enable offline queue to fix "Stream isn't writeable" errors in development
+    options.enableOfflineQueue = true;
+    
+    // Auto-reconnect with a max retry time for development
+    options.autoReconnect = true;
+    options.maxReconnectTime = 5000;
+  }
+  
+  // Common options for all environments
+  options.reconnectOnError = (err: Error) => {
+    const targetError = 'READONLY';
+    if (err.message.includes(targetError)) {
+      // Only reconnect on specific errors
+      return true;
+    }
+    return false;
   };
   
+  // Improve TLS for secure connections
+  if (redisUrl.startsWith('rediss://')) {
+    options.tls = { 
+      rejectUnauthorized: false // Helps with self-signed certificates
+    };
+  }
+  
+  // Keep connections alive
+  options.keepAlive = 10000;
+  
   try {
-    // Create Redis client with improved options
+    // Create Redis client with appropriate options
     const redis = new Redis(redisUrl, options);
     
     // Add event listeners for better debugging
@@ -81,6 +100,13 @@ const createRedisInstance = (url: string) => {
     redis.on('end', () => {
       console.log(chalk.yellow('[REDIS] Connection closed'));
     });
+    
+    // Add development-specific listeners
+    if (process.env.NODE_ENV === 'development') {
+      redis.on('reconnecting', () => {
+        console.log(chalk.blue('[REDIS] Attempting to reconnect...'));
+      });
+    }
     
     return redis;
   } catch (error) {
@@ -123,6 +149,17 @@ export async function checkRedisConnection(): Promise<boolean> {
       const redisUrl = process.env.REDIS_URL;
       console.log(chalk.blue(`[REDIS] URL format: ${redisUrl.startsWith('redis://') ? 'Standard Redis' : redisUrl.startsWith('rediss://') ? 'Secure Redis' : 'Unknown format'}`));
       
+      // For Docker development with localhost, verify connectivity
+      if (process.env.NODE_ENV === 'development' && (redisUrl.includes('localhost') || redisUrl.includes('127.0.0.1'))) {
+        console.log(chalk.blue('[REDIS] Detected localhost connection in development environment, applying special handling...'));
+        try {
+          await validateHostname('localhost');
+          console.log(chalk.blue('[REDIS] Hostname verification passed, proceeding with connection...'));
+        } catch (error) {
+          console.error(chalk.red('[REDIS] Hostname verification failed:'), error);
+        }
+      }
+      
       // Create Redis client
       const client = createRedisInstance(redisUrl);
       
@@ -132,6 +169,17 @@ export async function checkRedisConnection(): Promise<boolean> {
         
         const testPromise = new Promise<boolean>(async (resolve, reject) => {
           try {
+            // Wait for connection to be ready - only needed in development
+            if (process.env.NODE_ENV === 'development') {
+              try {
+                await client.connect();
+                console.log(chalk.green('[REDIS] Client connected, testing operations...'));
+              } catch (err) {
+                // If connect fails, we still want to try the operations
+                console.log(chalk.yellow('[REDIS] Client connect method failed, continuing with operations...'));
+              }
+            }
+            
             await client.set('test-connection', 'success');
             const value = await client.get('test-connection');
             
@@ -181,32 +229,37 @@ export async function checkRedisConnection(): Promise<boolean> {
     }
   }
   
-  // Fallback to local Redis (for development)
-  try {
-    console.log(chalk.blue('[REDIS] Checking local Redis connection...'));
-    
-    // Connect to local Redis
-    const redisUrl = 'redis://localhost:6379';
-    
-    // Create Redis client
-    const client = createRedisInstance(redisUrl);
-    
-    // Test connection by setting and getting a key
-    await client.set('test-connection', 'success');
-    const value = await client.get('test-connection');
-    
-    // Verify connection worked
-    if (value === 'success') {
-      console.log(chalk.green('[REDIS] Successfully connected to local Redis!'));
+  // Fallback to local Redis (for development only)
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      console.log(chalk.blue('[REDIS] Development environment detected, trying local Redis fallback...'));
+      
+      // Connect to local Redis
+      const redisUrl = 'redis://localhost:6379';
+      
+      // Create Redis client
+      const client = createRedisInstance(redisUrl);
+      
+      // Test connection by setting and getting a key
+      await client.set('test-connection', 'success');
+      const value = await client.get('test-connection');
+      
+      // Verify connection worked
+      if (value === 'success') {
+        console.log(chalk.green('[REDIS] Successfully connected to local development Redis!'));
+        await client.quit();
+        return true;
+      }
+      
       await client.quit();
-      return true;
+      return false;
+    } catch (error) {
+      console.error(chalk.red('[REDIS] Failed to connect to development Redis:'), error);
+      console.log(chalk.yellow('[REDIS] Development will continue without Redis, using fallback storage.'));
+      return false;
     }
-    
-    await client.quit();
-    return false;
-  } catch (error) {
-    console.error(chalk.red('[REDIS] Failed to connect to Redis:'), error);
-    console.log(chalk.yellow('[REDIS] Application will continue without Redis, using fallback storage.'));
-    return false;
   }
+  
+  console.log(chalk.yellow('[REDIS] No Redis configuration found and not in development mode.'));
+  return false;
 }

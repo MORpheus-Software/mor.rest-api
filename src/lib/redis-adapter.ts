@@ -1,4 +1,3 @@
-
 import { Redis } from 'ioredis';
 import chalk from 'chalk';
 
@@ -24,6 +23,21 @@ async function createRedisClient(): Promise<Redis> {
       },
       maxRetriesPerRequest: 3,
     };
+    
+    // Add development-specific options
+    if (process.env.NODE_ENV === 'development') {
+      console.log(chalk.blue('[REDIS] Using development-specific Redis options'));
+      // Enable offline queue to prevent "Stream isn't writeable" errors in development
+      redisOptions.enableOfflineQueue = true;
+      // Add connection timeout
+      redisOptions.connectTimeout = 10000;
+      // Add retry strategy with exponential backoff
+      redisOptions.retryStrategy = (times: number) => {
+        const delay = Math.min(times * 500, 5000);
+        console.log(chalk.yellow(`[REDIS] Connection attempt ${times}, retrying in ${delay}ms`));
+        return delay;
+      };
+    }
     
     // Add password if available
     if (REDIS_PASSWORD) {
