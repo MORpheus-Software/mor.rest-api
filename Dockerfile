@@ -67,54 +67,16 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
-# Create a startup script that prints diagnostic info before starting
-RUN echo '#!/bin/sh\n\
-echo "Starting server..."\n\
-echo "Node environment: $NODE_ENV"\n\
-echo "Port: $PORT"\n\
-echo "Current directory: $(pwd)"\n\
-echo "Directory contents:"\n\
-ls -la\n\
-echo "Available files in public directory:"\n\
-ls -la public || echo "No public files found"\n\
-echo "Available files in dist/server:"\n\
-ls -la dist/server || echo "No server files found"\n\
-echo "Starting node with server.js"\n\
-# Make sure the server can access the public directory properly\n\
-exec node --experimental-json-modules --loader ts-node/esm dist/server/server.js\n\
-' > /app/start.sh && chmod +x /app/start.sh && ls -la /app/start.sh
+# Create script files with proper permissions
+RUN echo '#!/bin/sh\necho "Starting server..."\necho "Node environment: $NODE_ENV"\necho "Port: $PORT"\necho "Current directory: $(pwd)"\necho "Directory contents:"\nls -la\necho "Available files in public directory:"\nls -la public || echo "No public files found"\necho "Available files in dist/server:"\nls -la dist/server || echo "No server files found"\necho "Starting node with server.js"\nexec node --experimental-json-modules --loader ts-node/esm dist/server/server.js' > /app/start.sh && \
+    chmod +x /app/start.sh
 
-# Add a fallback server in case the start.sh script isn't found
-RUN echo 'console.log("Fallback server starting..."); \
-const express = require("express"); \
-const app = express(); \
-app.get("/api/health", (req, res) => { \
-  res.json({ status: "healthy", message: "Fallback server is running" }); \
-}); \
-app.get("/", (req, res) => { \
-  res.send("Fallback server is running. The main application failed to start correctly."); \
-}); \
-const port = process.env.PORT || 8080; \
-app.listen(port, () => console.log(`Fallback server listening on port ${port}`));' > /app/fallback-server.js
+# Create fallback server script
+RUN echo 'console.log("Fallback server starting..."); const express = require("express"); const app = express(); app.get("/api/health", (req, res) => { res.json({ status: "healthy", message: "Fallback server is running" }); }); app.get("/", (req, res) => { res.send("Fallback server is running. The main application failed to start correctly."); }); const port = process.env.PORT || 8080; app.listen(port, () => console.log(`Fallback server listening on port ${port}`));' > /app/fallback-server.js
 
-# Create a docker-entrypoint.sh script that will be run directly
-RUN echo '#!/bin/sh\n\
-echo "Starting container with entrypoint script"\n\
-echo "Checking for start.sh..."\n\
-if [ -f /app/start.sh ]; then\n\
-  echo "Found start.sh at $(ls -la /app/start.sh)"\n\
-  exec /app/start.sh\n\
-else\n\
-  echo "ERROR: start.sh not found in $(pwd)"\n\
-  echo "Directory contents:"\n\
-  ls -la\n\
-  echo "Using fallback server..."\n\
-  exec node /app/fallback-server.js\n\
-fi\n\
-' > /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
+# Create the entrypoint script
+RUN echo '#!/bin/sh\necho "Starting container with entrypoint script"\necho "Checking for start.sh..."\nif [ -f /app/start.sh ]; then\n  echo "Found start.sh at $(ls -la /app/start.sh)"\n  exec /app/start.sh\nelse\n  echo "ERROR: start.sh not found in $(pwd)"\n  echo "Directory contents:"\n  ls -la\n  echo "Using fallback server..."\n  exec node /app/fallback-server.js\nfi' > /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
 
-# Set the entrypoint script directly using ENTRYPOINT
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-
-# Use an empty CMD which will be ignored in favor of the ENTRYPOINT
-CMD [] 
+# Start directly with the entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"] 
