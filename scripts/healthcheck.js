@@ -6,7 +6,7 @@
  */
 
 // Use built-in Node.js modules only to avoid dependencies
-const http = require('http');
+import http from 'http';
 
 // Configuration (with defaults)
 const HOST = process.env.HOST || 'localhost';
