@@ -14,7 +14,7 @@ spec:
         run.googleapis.com/startup-cpu-boost: 'true'
         autoscaling.knative.dev/maxScale: '10'
         run.googleapis.com/client-name: github-actions
-        run.googleapis.com/client-version: ${{ github.sha }}
+        run.googleapis.com/client-version: GITHUB_SHA
     spec:
       containerConcurrency: 80
       containers:

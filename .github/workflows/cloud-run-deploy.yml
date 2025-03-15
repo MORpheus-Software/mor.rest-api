@@ -38,7 +38,7 @@ jobs:
         install_components: 'gke-gcloud-auth-plugin'
         
     - name: Authorize Docker push
-      run: gcloud auth configure-docker
+      run: gcloud auth configure-docker --quiet
       
     - name: Build and push Docker image
       run: |
@@ -54,7 +54,7 @@ jobs:
         sed -i "s|PROJECT_ID|$PROJECT_ID|g" cloud-run-deploy-config.yaml
         sed -i "s|COMMIT_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
         sed -i "s|YOUR_REDIS_URL|${{ secrets.REDIS_URL }}|g" cloud-run-deploy-config.yaml
-        sed -i "s|\${{ github.sha }}|${{ github.sha }}|g" cloud-run-deploy-config.yaml
+        sed -i "s|GITHUB_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
         
         # Display the configuration (without sensitive data)
         echo "Deploying with the following configuration:"
