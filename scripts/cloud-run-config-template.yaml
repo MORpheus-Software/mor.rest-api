@@ -1,0 +1,47 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: morsaas
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/ingress-status: all
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/cpu-throttling: 'false'
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/startup-cpu-boost: 'true'
+        autoscaling.knative.dev/maxScale: '10'
+        run.googleapis.com/client-name: github-actions
+        run.googleapis.com/client-version: ${{ github.sha }}
+    spec:
+      containerConcurrency: 80
+      containers:
+      - image: gcr.io/PROJECT_ID/morsaas:COMMIT_SHA
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: REDIS_URL
+          value: YOUR_REDIS_URL
+        - name: PORT
+          value: "8080"
+        ports:
+        - containerPort: 8080
+          name: http1
+        resources:
+          limits:
+            cpu: '1'
+            memory: 2Gi
+        startupProbe:
+          # Maximum allowed values for startup probe (total time: 240s)
+          initialDelaySeconds: 0
+          periodSeconds: 240
+          timeoutSeconds: 240
+          failureThreshold: 1
+          tcpSocket:
+            port: 8080
+      timeoutSeconds: 600
+  traffic:
+  - latestRevision: true
+    percent: 100 

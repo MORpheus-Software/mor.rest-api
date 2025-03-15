@@ -22,8 +22,14 @@ CONCURRENCY="80"
 MIN_INSTANCES="1"  # Changed from 0 to 1 to ensure an instance is always ready
 MAX_INSTANCES="10"
 TIMEOUT="600s"
-INITIAL_DELAY="120s"  # Added initial delay for health checks
 UPSTASH_PRODUCTION_URL="redis://global:UPSTASH_SECRET@us1-engaged-cattle-39555.upstash.io:39555"
+
+# NOTE: Cloud Run has a maximum startup probe timeout of 240 seconds (4 minutes).
+# If your container takes longer than that to start, you'll need to:
+# 1. Optimize your container to start faster
+# 2. Create a YAML configuration with startup probe settings
+# 3. Deploy using `gcloud run services replace config.yaml`
+# See: https://cloud.google.com/run/docs/configuring/healthchecks
 
 # Function to display a section header
 section() {
@@ -189,18 +195,48 @@ deploy_to_cloud_run() {
     --min-instances="$MIN_INSTANCES" \
     --max-instances="$MAX_INSTANCES" \
     --timeout="$TIMEOUT" \
-    --initial-delay="$INITIAL_DELAY" \
     --cpu-boost \
     --execution-environment=gen2 \
     --no-cpu-throttling \
-    --port=8080 \
-    --startup-cpu-allocation=1 \
-    --startup-memory-allocation=2Gi \
-    --max-instance-request-concurrency=10 \
-    --min-instance-request-concurrency=1 \
-    --health-checks=readiness \
     --set-env-vars="REDIS_URL=${redis_url},NODE_ENV=production" \
     --allow-unauthenticated
+  
+  # Get the deployed service URL
+  local service_url=$(gcloud run services describe "$SERVICE_NAME" \
+    --platform=managed \
+    --region="$REGION" \
+    --format='value(status.url)')
+  
+  echo -e "${GREEN}✓ Deployment completed successfully!${NC}"
+  echo -e "${GREEN}Your application is now available at: ${service_url}${NC}"
+}
+
+# Deploy to Cloud Run using YAML configuration (for slow-starting containers)
+deploy_to_cloud_run_with_yaml() {
+  section "Deploying to Cloud Run using YAML (Extended Startup Time)"
+  
+  # Get the project ID from gcloud config
+  local project_id=$(gcloud config get-value project)
+  
+  # Configure Upstash Redis
+  local redis_url=$(configure_upstash)
+  
+  echo -e "${YELLOW}Creating YAML configuration for extended startup time...${NC}"
+  
+  # Create a temporary YAML file from the template
+  local yaml_file="cloud-run-deploy-config.yaml"
+  cp "$(dirname "$0")/cloud-run-config-template.yaml" "$yaml_file"
+  
+  # Replace placeholder values
+  sed -i.bak "s|PROJECT_ID|$project_id|g" "$yaml_file"
+  sed -i.bak "s|COMMIT_SHA|latest|g" "$yaml_file"
+  sed -i.bak "s|YOUR_REDIS_URL|$redis_url|g" "$yaml_file"
+  
+  echo -e "${YELLOW}Deploying to Cloud Run using YAML configuration...${NC}"
+  gcloud run services replace "$yaml_file"
+  
+  # Clean up temporary files
+  rm -f "$yaml_file" "$yaml_file.bak"
   
   # Get the deployed service URL
   local service_url=$(gcloud run services describe "$SERVICE_NAME" \
@@ -242,7 +278,27 @@ main() {
   initialize_gcloud
   build_image
   push_image
-  deploy_to_cloud_run
+  
+  # Ask which deployment method to use
+  echo -e "${YELLOW}Choose deployment method:${NC}"
+  echo -e "1. Standard deployment (for containers that start within 60 seconds)"
+  echo -e "2. Extended startup time deployment (for containers that take longer to start)"
+  echo -ne "${YELLOW}Enter your choice (1-2): ${NC}"
+  read -r deploy_choice
+  
+  case $deploy_choice in
+    1)
+      deploy_to_cloud_run
+      ;;
+    2)
+      deploy_to_cloud_run_with_yaml
+      ;;
+    *)
+      echo -e "${RED}Invalid choice. Using standard deployment.${NC}"
+      deploy_to_cloud_run
+      ;;
+  esac
+  
   setup_upstash_guidance
   
   section "Next Steps"

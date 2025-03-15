@@ -45,34 +45,47 @@ jobs:
         docker build -t gcr.io/$PROJECT_ID/$SERVICE_NAME:${{ github.sha }} .
         docker push gcr.io/$PROJECT_ID/$SERVICE_NAME:${{ github.sha }}
         
-    - name: Deploy to Cloud Run
+    - name: Create Cloud Run YAML configuration
+      run: |
+        # Create a copy of the template YAML file
+        cp ./scripts/cloud-run-config-template.yaml cloud-run-deploy-config.yaml
+        
+        # Replace placeholder values
+        sed -i "s|PROJECT_ID|$PROJECT_ID|g" cloud-run-deploy-config.yaml
+        sed -i "s|COMMIT_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
+        sed -i "s|YOUR_REDIS_URL|${{ secrets.REDIS_URL }}|g" cloud-run-deploy-config.yaml
+        sed -i "s|\${{ github.sha }}|${{ github.sha }}|g" cloud-run-deploy-config.yaml
+        
+        # Display the configuration (without sensitive data)
+        echo "Deploying with the following configuration:"
+        grep -v "REDIS_URL" cloud-run-deploy-config.yaml
+        
+    - name: Deploy to Cloud Run using YAML
       id: deploy
       run: |
-        gcloud run deploy ${{ env.SERVICE_NAME }} \
-          --image gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-          --platform managed \
-          --region ${{ env.REGION }} \
-          --memory 2Gi \
-          --cpu 1 \
-          --concurrency 80 \
-          --min-instances 1 \
-          --max-instances 10 \
-          --timeout 600s \
-          --cpu-boost \
-          --execution-environment gen2 \
-          --no-cpu-throttling \
-          --set-env-vars "NODE_ENV=production,REDIS_URL=${{ secrets.REDIS_URL }}" \
-          --allow-unauthenticated \
-          --port 8080 \
-          --startup-cpu-allocation 1 \
-          --startup-memory-allocation 2Gi \
-          --max-instance-request-concurrency 10 \
-          --min-instance-request-concurrency 1 \
-          --health-checks readiness \
-          --initial-delay 120s
+        # Deploy using the YAML configuration for extended startup timeout
+        echo "Starting deployment with extended startup timeout (240s)..."
+        
+        if gcloud run services replace cloud-run-deploy-config.yaml --region=${{ env.REGION }}; then
+          echo "✅ Deployment successful!"
           
-        SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.url)')
-        echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          # Get the deployed service URL
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.url)')
+          echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          
+          echo "Deployed with extended startup probe timeout (240 seconds)"
+        else
+          echo "❌ Deployment failed!"
+          
+          # Get the logs from the failed revision for debugging
+          echo "Fetching logs from the failed revision..."
+          LATEST_REVISION=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format='value(status.latestCreatedRevisionName)')
+          
+          echo "Latest revision: $LATEST_REVISION"
+          gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=${{ env.SERVICE_NAME }} AND resource.labels.revision_name=$LATEST_REVISION" --limit=50
+          
+          exit 1
+        fi
         
     - name: Show Output
       run: echo ${{ steps.deploy.outputs.url }}

@@ -6,7 +6,7 @@ A SaaS application with API key management, authentication, and chat completions
 
 - API Key Management (create, list, delete)
 - Chat completions API endpoint
-- Redis-backed data persistence with localStorage fallback
+- Redis-backed data persistence with Upstash Redis support
 - React frontend with modern UI components
 
 ## Getting Started
@@ -14,7 +14,7 @@ A SaaS application with API key management, authentication, and chat completions
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Redis (optional, for data persistence)
+- Redis (optional, for local development if not using Upstash)
 
 ### Installation
 
@@ -29,21 +29,32 @@ npm install
 
 ```
 # Server Configuration
-PORT=3001
+PORT=4000
 NODE_ENV=development
 
-# Redis Configuration
-REDIS_URL=redis://localhost:6379
+# Frontend API base URL 
+VITE_API_BASE_URL=http://127.0.0.1:4000
 
-# API Configuration
-API_BASE_URL=https://token-auth-saas-1081887913409.us-west1.run.app
-
-# JWT Secret for user authentication
-JWT_SECRET=your-jwt-secret-change-this-in-production
-
-# Proxy configuration
-BASEIMAGE_PROXY_URL=https://token-auth-saas-1081887913409.us-west1.run.app
+# Redis Configuration - Use Upstash Redis URL for both dev and production
+REDIS_URL=redis://global:your-password@your-hostname.upstash.io:port
 ```
+
+### Configuring Upstash Redis
+
+For consistent development and production environments, we recommend using Upstash Redis in development. 
+
+Run the configuration script:
+
+```bash
+# From the project root
+chmod +x scripts/configure-upstash.sh
+./scripts/configure-upstash.sh
+```
+
+This script will:
+- Read the production Upstash URL from the deployment script
+- Update your .env file and docker-compose.yml with the correct Upstash Redis URL
+- Ensure your local development environment uses the same Redis instance as production
 
 ### Running the Application
 
