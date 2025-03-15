@@ -53,12 +53,16 @@ jobs:
         # Debug Redis URL format (without exposing secrets)
         echo "Redis URL format check:"
         if [[ "${{ secrets.REDIS_URL }}" == redis://* ]]; then
-          echo "Standard Redis format detected"
+          echo "WARNING: Standard Redis format detected (redis://). For Upstash connections, secure protocol (rediss://) is required."
+          echo "Consider updating your REDIS_URL secret to use rediss:// instead of redis://"
+          
+          # The setupRedis.ts will auto-upgrade to rediss:// when connecting, but it's better to fix it in the secret
         elif [[ "${{ secrets.REDIS_URL }}" == rediss://* ]]; then
-          echo "Secure Redis format detected (Upstash preferred format)"
+          echo "Secure Redis format detected (rediss://). This is the correct format for Upstash connections."
         else
           echo "Unknown Redis format, please verify the URL"
-          echo "IMPORTANT: For Upstash, the URL must be in this format: rediss://default:TOKEN@HOSTNAME.upstash.io:6379"
+          echo "REQUIRED FORMAT: rediss://default:TOKEN@HOSTNAME.upstash.io:6379"
+          echo "Always use rediss:// (secure) for Upstash connections."
         fi
         
         # Verify the Redis URL is properly formatted for Upstash

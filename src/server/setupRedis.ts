@@ -20,15 +20,54 @@ async function validateHostname(hostname: string): Promise<boolean> {
   }
 }
 
-// Helper function to create a Redis instance - keeping it simple for Upstash
+// Helper function to create a Redis instance with better stability
 const createRedisInstance = (url: string) => {
+  // Ensure we're using rediss:// for Upstash connections
+  let redisUrl = url;
+  if (url.includes('upstash.io') && !url.startsWith('rediss://')) {
+    redisUrl = url.replace('redis://', 'rediss://');
+    console.log(chalk.yellow('[REDIS] Upgraded connection to use SSL (rediss://)'));
+  }
+  
   // Mask credentials in log output
-  const maskedUrl = url.replace(/\/\/(.+?)@/, '//[credentials-hidden]@');
+  const maskedUrl = redisUrl.replace(/\/\/(.+?)@/, '//[credentials-hidden]@');
   console.log(chalk.blue(`[REDIS] Creating Redis instance with URL: ${maskedUrl}`));
   
+  // Configure Redis with more resilient options
+  const options = {
+    connectTimeout: 10000,
+    // Lower the maxRetriesPerRequest to avoid excessive reconnections
+    maxRetriesPerRequest: 3,
+    // Avoid hammering the server with reconnection attempts
+    retryStrategy(times: number) {
+      const delay = Math.min(times * 500, 5000); // Increase delay between retries
+      console.log(chalk.yellow(`[REDIS] Connection attempt ${times}, retrying in ${delay}ms`));
+      return delay;
+    },
+    // Better handling of connection issues
+    reconnectOnError(err: Error) {
+      const targetError = 'READONLY';
+      if (err.message.includes(targetError)) {
+        // Only reconnect on specific errors
+        return true;
+      }
+      return false;
+    },
+    // Improve TLS for secure connections
+    tls: redisUrl.startsWith('rediss://') ? { 
+      rejectUnauthorized: false // Helps with self-signed certificates
+    } : undefined,
+    // Keep connections alive
+    keepAlive: 10000,
+    // Disable auto-reconnect in some error scenarios
+    autoResubscribe: false,
+    // Avoid queuing operations when disconnected
+    enableOfflineQueue: false
+  };
+  
   try {
-    // Simple direct connection - just like the working example
-    const redis = new Redis(url);
+    // Create Redis client with improved options
+    const redis = new Redis(redisUrl, options);
     
     // Add event listeners for better debugging
     redis.on('connect', () => {
@@ -37,6 +76,10 @@ const createRedisInstance = (url: string) => {
     
     redis.on('error', (err: Error) => {
       console.error(chalk.red(`[REDIS] Connection error: ${err.message}`));
+    });
+    
+    redis.on('end', () => {
+      console.log(chalk.yellow('[REDIS] Connection closed'));
     });
     
     return redis;
@@ -80,25 +123,48 @@ export async function checkRedisConnection(): Promise<boolean> {
       const redisUrl = process.env.REDIS_URL;
       console.log(chalk.blue(`[REDIS] URL format: ${redisUrl.startsWith('redis://') ? 'Standard Redis' : redisUrl.startsWith('rediss://') ? 'Secure Redis' : 'Unknown format'}`));
       
-      // Create Redis client with simple approach (like the working example)
+      // Create Redis client
       const client = createRedisInstance(redisUrl);
       
       try {
-        // Test connection by setting and getting a key
+        // Test connection by setting and getting a key with timeout
         console.log(chalk.blue('[REDIS] Testing connection...'));
-        await client.set('test-connection', 'success');
-        const value = await client.get('test-connection');
         
-        // Verify connection worked
-        if (value === 'success') {
-          console.log(chalk.green('[REDIS] Successfully connected to Redis!'));
-          await client.quit();
-          return true;
-        } else {
-          console.error(chalk.red('[REDIS] Test key returned unexpected value'));
-          await client.quit();
-          return false;
-        }
+        const testPromise = new Promise<boolean>(async (resolve, reject) => {
+          try {
+            await client.set('test-connection', 'success');
+            const value = await client.get('test-connection');
+            
+            // Verify connection worked
+            if (value === 'success') {
+              console.log(chalk.green('[REDIS] Successfully connected to Redis!'));
+              await client.quit();
+              resolve(true);
+            } else {
+              console.error(chalk.red('[REDIS] Test key returned unexpected value'));
+              await client.quit();
+              resolve(false);
+            }
+          } catch (error) {
+            console.error(chalk.red('[REDIS] Operation error:'), error);
+            try {
+              await client.quit();
+            } catch (e) {
+              // Ignore errors during client quit
+            }
+            reject(error);
+          }
+        });
+        
+        // Add timeout to avoid hanging if Redis is unresponsive
+        const timeoutPromise = new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            console.error(chalk.red('[REDIS] Connection test timed out after 5 seconds'));
+            resolve(false);
+          }, 5000);
+        });
+        
+        return Promise.race([testPromise, timeoutPromise]);
       } catch (opError) {
         console.error(chalk.red('[REDIS] Operation error:'), opError);
         try {
@@ -110,36 +176,12 @@ export async function checkRedisConnection(): Promise<boolean> {
       }
     } catch (error) {
       console.error(chalk.red('[REDIS] Failed to connect to Redis:'), error);
+      console.log(chalk.yellow('[REDIS] Application will continue without Redis, using fallback storage.'));
+      return false;
     }
   }
   
-  // Try known working Upstash URL if no REDIS_URL is set
-  try {
-    // Using the exact format that works
-    console.log(chalk.blue('[REDIS] Trying connection with known working format...'));
-    const upstashUrl = process.env.UPSTASH_REDIS_URL || 'rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379';
-    
-    // Create client with the simple working approach
-    const client = createRedisInstance(upstashUrl);
-    
-    // Test connection
-    await client.set('test-connection', 'success');
-    const value = await client.get('test-connection');
-    
-    if (value === 'success') {
-      console.log(chalk.green('[REDIS] Successfully connected to Upstash Redis!'));
-      // Save the working URL for future use
-      process.env.REDIS_URL = upstashUrl;
-      await client.quit();
-      return true;
-    }
-    
-    await client.quit();
-  } catch (error) {
-    console.error(chalk.yellow('[REDIS] Failed to connect to Upstash Redis:'), error);
-  }
-  
-  // Then try local Redis (for development)
+  // Fallback to local Redis (for development)
   try {
     console.log(chalk.blue('[REDIS] Checking local Redis connection...'));
     

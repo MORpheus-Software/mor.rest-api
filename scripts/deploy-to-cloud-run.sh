@@ -22,7 +22,7 @@ CONCURRENCY="80"
 MIN_INSTANCES="1"  # Changed from 0 to 1 to ensure an instance is always ready
 MAX_INSTANCES="10"
 TIMEOUT="600s"
-UPSTASH_PRODUCTION_URL=rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
+UPSTASH_PRODUCTION_URL=redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
 
 # NOTE: Cloud Run has a maximum startup probe timeout of 240 seconds (4 minutes).
 # If your container takes longer than that to start, you'll need to:

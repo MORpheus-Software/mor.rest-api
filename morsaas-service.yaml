@@ -29,7 +29,7 @@ spec:
         - name: NODE_ENV
           value: production
         - name: REDIS_URL
-          value: rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
+          value: redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
         image: gcr.io/graphical-bus-433219-g5/morsaas:6fc5026623ee01df79f4f92b35eb8950ae8a621b
         ports:
         - containerPort: 8080
