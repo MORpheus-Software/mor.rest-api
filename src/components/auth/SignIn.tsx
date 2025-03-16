@@ -84,6 +84,7 @@ export function SignInForm() {
           id: `temp-${Date.now()}`,
           name: formData.email.split('@')[0], // Use part of email as name
           email: formData.email,
+          company: '', // Initialize empty company
           createdAt: new Date().toISOString()
         };
         

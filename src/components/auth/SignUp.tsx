@@ -18,6 +18,7 @@ export function SignUpForm() {
     name: '',
     email: '',
     password: '',
+    company: '',
     acceptTerms: false
   });
 
@@ -64,7 +65,8 @@ export function SignUpForm() {
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
-          password: formData.password
+          password: formData.password,
+          company: formData.company
         })
       });
       
@@ -99,6 +101,7 @@ export function SignUpForm() {
           id: `temp-${Date.now()}`,
           name: formData.name,
           email: formData.email,
+          company: formData.company,
           createdAt: new Date().toISOString()
         };
         
@@ -253,6 +256,25 @@ export function SignUpForm() {
         <p className="text-xs text-muted-foreground">
           Password must be at least 8 characters long
         </p>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="company">Company</Label>
+        <div className="relative">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+            {/* Placeholder for company icon */}
+          </div>
+          <Input
+            id="company"
+            name="company"
+            type="text"
+            placeholder="Your Company"
+            className="pl-10"
+            value={formData.company}
+            onChange={handleChange}
+            disabled={isLoading}
+          />
+        </div>
       </div>
       
       <div className="flex items-start space-x-2 pt-2">

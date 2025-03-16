@@ -15,7 +15,7 @@ export const register = async (req: Request, res: Response) => {
   try {
     console.log('[AUTH] Processing registration request');
     
-    const { name, email, password } = req.body;
+    const { name, email, password, company } = req.body;
     
     // Validate required fields
     if (!name || !email || !password) {
@@ -74,7 +74,8 @@ export const register = async (req: Request, res: Response) => {
         user = await createUser({
           name,
           email,
-          passwordHash
+          passwordHash,
+          company
         });
         break; // If successful, exit the retry loop
       } catch (redisError) {

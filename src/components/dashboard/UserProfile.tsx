@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +12,7 @@ type UserData = {
   name: string;
   email: string;
   avatar: string | null;
+  company: string;
 };
 
 export function UserProfile() {
@@ -25,6 +25,7 @@ export function UserProfile() {
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
+    company: '',
   });
 
   useEffect(() => {
@@ -35,8 +36,9 @@ export function UserProfile() {
       setUser(parsedUser);
       setFormData(prev => ({
         ...prev,
-        name: parsedUser.name,
-        email: parsedUser.email,
+        name: parsedUser.name || '',
+        email: parsedUser.email || '',
+        company: parsedUser.company || '',
       }));
     }
   }, []);
@@ -57,6 +59,7 @@ export function UserProfile() {
         ...user!,
         name: formData.name,
         email: formData.email,
+        company: formData.company,
       };
       
       localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -143,6 +146,16 @@ export function UserProfile() {
                   name="email"
                   type="email"
                   value={formData.email}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="company">Company</Label>
+                <Input
+                  id="company"
+                  name="company"
+                  value={formData.company}
                   onChange={handleChange}
                   disabled={isLoading}
                 />

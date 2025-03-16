@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -26,20 +25,33 @@ const ProfilePage = () => {
   });
 
   useEffect(() => {
-    // In a real app, this would fetch from an API
+    // Get user data from localStorage
     const userJson = localStorage.getItem('user');
     const user = userJson ? JSON.parse(userJson) : null;
     
-    // Mock profile data
-    const mockProfile: UserProfile = {
-      email: user?.email || 'user@example.com',
-      name: 'John Doe',
-      company: 'Acme Inc.',
-      joinedDate: new Date().toISOString().split('T')[0],
-    };
-    
-    setProfile(mockProfile);
-    setFormData(mockProfile);
+    if (user) {
+      // Use actual user data from localStorage
+      const userProfile: UserProfile = {
+        email: user.email || '',
+        name: user.name || '',
+        company: user.company || '',
+        joinedDate: user.createdAt || new Date().toISOString().split('T')[0],
+      };
+      
+      setProfile(userProfile);
+      setFormData(userProfile);
+    } else {
+      // Fallback to mock data if no user found
+      const mockProfile: UserProfile = {
+        email: 'user@example.com',
+        name: 'John Doe',
+        company: 'Acme Inc.',
+        joinedDate: new Date().toISOString().split('T')[0],
+      };
+      
+      setProfile(mockProfile);
+      setFormData(mockProfile);
+    }
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,9 +60,27 @@ const ProfilePage = () => {
   };
 
   const handleSave = () => {
-    // In a real app, this would call an API
+    // Save to profile state
     setProfile(formData);
     setIsEditing(false);
+    
+    // Get current user data
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      const user = JSON.parse(userJson);
+      
+      // Update with new profile data
+      const updatedUser = {
+        ...user,
+        name: formData.name,
+        email: formData.email,
+        company: formData.company
+      };
+      
+      // Save back to localStorage
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+    
     toast.success('Profile updated successfully');
   };
 

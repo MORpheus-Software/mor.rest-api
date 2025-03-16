@@ -21,6 +21,7 @@ export interface User {
   createdAt: string;
   updatedAt?: string;
   avatar?: string | null;
+  company?: string;
 }
 
 /**
