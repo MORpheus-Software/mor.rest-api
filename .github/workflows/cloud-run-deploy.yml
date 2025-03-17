@@ -2,18 +2,27 @@ name: Deploy to Cloud Run
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ dev, staging ]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: 'choice'
+        options:
+          - dev
+          - staging
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  SERVICE_NAME: morsaas
   REGION: us-west1
   SCRIPT_PATH: ./scripts/deploy-to-cloud-run.sh
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || github.ref_name }}
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -21,6 +30,17 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+      
+    - name: Set environment variables
+      run: |
+        # Set service name based on branch/environment
+        if [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
+          echo "SERVICE_NAME=morsaas-staging" >> $GITHUB_ENV
+          echo "Deploying to staging environment: morsaas-staging"
+        else
+          echo "SERVICE_NAME=morsaas-dev" >> $GITHUB_ENV
+          echo "Deploying to development environment: morsaas-dev"
+        fi
       
     - name: Make deploy script executable
       run: chmod +x ${{ env.SCRIPT_PATH }}
@@ -49,6 +69,9 @@ jobs:
       run: |
         # Create a copy of the template YAML file
         cp ./scripts/cloud-run-config-template.yaml cloud-run-deploy-config.yaml
+        
+        # Update service name in the YAML
+        sed -i "s|morsaas|${{ env.SERVICE_NAME }}|g" cloud-run-deploy-config.yaml
         
         # Debug Redis URL format (without exposing secrets)
         echo "Redis URL format check:"
@@ -167,6 +190,6 @@ jobs:
         SLACK_CHANNEL: deployments
         SLACK_COLOR: good
         SLACK_ICON: https://github.com/google-github-actions.png?size=48
-        SLACK_MESSAGE: "MorSaaS deployed to Cloud Run! :rocket: \n${{ steps.deploy.outputs.url }}"
-        SLACK_TITLE: "Deployment Successful - Using Upstash Redis for persistence"
+        SLACK_MESSAGE: "MorSaaS (${{ env.SERVICE_NAME }}) deployed to Cloud Run! :rocket: \n${{ steps.deploy.outputs.url }}"
+        SLACK_TITLE: "Deployment Successful - ${{ github.ref_name }} environment"
         SLACK_USERNAME: GitHub Actions 

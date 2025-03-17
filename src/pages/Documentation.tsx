@@ -1,10 +1,10 @@
-
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Book, Code, Coffee, FileText, Lightbulb, Play, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Documentation = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,12 +28,12 @@ const Documentation = () => {
           />
         </div>
         
-        <Tabs defaultValue="guides">
+        <Tabs defaultValue="api">
           <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="guides">Guides</TabsTrigger>
+            {/* <TabsTrigger value="guides">Guides</TabsTrigger> */}
             <TabsTrigger value="api">API Reference</TabsTrigger>
             <TabsTrigger value="examples">Examples</TabsTrigger>
-            <TabsTrigger value="faq">FAQ</TabsTrigger>
+            {/* <TabsTrigger value="faq">FAQ</TabsTrigger> */}
           </TabsList>
           
           <TabsContent value="guides" className="mt-6">
@@ -51,28 +51,28 @@ const Documentation = () => {
                 <CardContent>
                   <ul className="space-y-2">
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
-                        Introduction to TokenHub
-                      </a>
+                      <Link to="/docs/guides/introduction" className="text-primary hover:underline">
+                        Introduction to MOR.rest API
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/creating-first-token" className="text-primary hover:underline">
                         Creating your first API token
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/token-permissions" className="text-primary hover:underline">
                         Understanding token permissions
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/securing-tokens" className="text-primary hover:underline">
                         Securing your API tokens
-                      </a>
+                      </Link>
                     </li>
                   </ul>
-                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start">
-                    View all getting started guides
+                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start" asChild>
+                    <Link to="/docs/guides">View all getting started guides</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -90,28 +90,28 @@ const Documentation = () => {
                 <CardContent>
                   <ul className="space-y-2">
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/managing-api-tokens" className="text-primary hover:underline">
                         Managing API tokens
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/api-playground" className="text-primary hover:underline">
                         Using the API playground
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/mor-token-staking" className="text-primary hover:underline">
                         MOR token staking guide
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/account-management" className="text-primary hover:underline">
                         Account management
-                      </a>
+                      </Link>
                     </li>
                   </ul>
-                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start">
-                    View all user guides
+                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start" asChild>
+                    <Link to="/docs/guides">View all user guides</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -129,28 +129,28 @@ const Documentation = () => {
                 <CardContent>
                   <ul className="space-y-2">
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/best-practices/token-security" className="text-primary hover:underline">
                         Token security best practices
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/best-practices/rate-limiting" className="text-primary hover:underline">
                         Rate limiting strategies
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/best-practices/optimizing-requests" className="text-primary hover:underline">
                         Optimizing API requests
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/best-practices/monitoring-analytics" className="text-primary hover:underline">
                         Monitoring and analytics
-                      </a>
+                      </Link>
                     </li>
                   </ul>
-                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start">
-                    View all best practices
+                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start" asChild>
+                    <Link to="/docs/best-practices">View all best practices</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -168,28 +168,28 @@ const Documentation = () => {
                 <CardContent>
                   <ul className="space-y-2">
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/tutorials/building-chatbot" className="text-primary hover:underline">
                         Building a chatbot with our API
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/tutorials/token-authentication" className="text-primary hover:underline">
                         Implementing token authentication
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/tutorials/streaming-response-ui" className="text-primary hover:underline">
                         Creating a streaming response UI
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/tutorials/advanced-prompt-engineering" className="text-primary hover:underline">
                         Advanced prompt engineering
-                      </a>
+                      </Link>
                     </li>
                   </ul>
-                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start">
-                    View all tutorials
+                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start" asChild>
+                    <Link to="/docs/tutorials">View all tutorials</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -264,9 +264,12 @@ const Documentation = () => {
                     </div>
                   </div>
                   
-                  <Button className="mt-2">
+                  <Button variant="ghost" size="sm" className="mt-2">
                     <Play className="mr-2 h-4 w-4" />
                     Try this endpoint in Playground
+                  </Button>
+                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start" asChild>
+                    <Link to="/docs/api">View full API reference</Link>
                   </Button>
                 </div>
               </CardContent>
@@ -275,37 +278,25 @@ const Documentation = () => {
           
           <TabsContent value="examples" className="mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/*
               <Card>
                 <CardHeader>
                   <CardTitle>Example: Web Chat Interface</CardTitle>
                   <CardDescription>Create a simple chat interface using our API</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <pre className="bg-slate-50 dark:bg-slate-900 p-3 rounded-md text-sm overflow-x-auto">
-                    {`// Example JavaScript code
-async function sendMessage(message) {
-  const response = await fetch('/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + API_KEY
-    },
-    body: JSON.stringify({
-      model: 'LMR-Hermes-3-Llama-3.1-8B',
-      messages: [{ role: 'user', content: message }],
-      stream: false
-    })
-  });
-  
-  const result = await response.json();
-  return result.choices[0].message.content;
-}`}
-                  </pre>
-                  <Button variant="outline" className="mt-4 w-full">View full example</Button>
+                  <div className="example-section">
+                    <div className="web-chat-example" style={{ display: 'none' }}>
+                      This example is hidden because it is not functional in the current implementation.
+                    </div>
+                    <Link to="/docs/examples/web-chat" className="btn-primary">
+                      View full example
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
-              
-              <Card>
+              */}
+              <Card className="md:col-span-2">
                 <CardHeader>
                   <CardTitle>Example: Streaming Responses</CardTitle>
                   <CardDescription>Implement streaming responses for a better UX</CardDescription>
@@ -331,7 +322,9 @@ async function streamResponse(message) {
   // Process the stream...
 }`}
                   </pre>
-                  <Button variant="outline" className="mt-4 w-full">View full example</Button>
+                  <Button variant="outline" className="mt-4 w-full" asChild>
+                    <Link to="/docs/examples/streaming-responses">View full example</Link>
+                  </Button>
                 </CardContent>
               </Card>
             </div>

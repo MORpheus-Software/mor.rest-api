@@ -102,7 +102,7 @@ export function SignInForm() {
         
         toast({
           title: "Signed in with fallback data",
-          description: "Welcome back to TokenHub (temporary user)"
+          description: "Welcome back to MOR.rest API (temporary user)"
         });
         
         // Navigate to playground using both approaches to ensure it works
@@ -137,7 +137,7 @@ export function SignInForm() {
       
       toast({
         title: "Successfully signed in",
-        description: "Welcome back to TokenHub",
+        description: "Welcome back to MOR.rest API",
       });
       
       // Use both React Router navigate and window.location for maximum reliability

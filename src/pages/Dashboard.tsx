@@ -161,7 +161,7 @@ const Dashboard = () => {
         </div>
         <Button asChild>
           <Link to="/tokens">
-            Manage Tokens
+            Manage API Keys
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>
@@ -172,7 +172,7 @@ const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Active Tokens</p>
+                <p className="text-sm font-medium text-muted-foreground">Active API Keys</p>
                 {isLoading ? (
                   <div className="h-9 w-20 bg-muted animate-pulse rounded mt-1"></div>
                 ) : (

@@ -51,7 +51,7 @@ const Index = () => {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 font-medium">
             <div className="rounded-lg bg-primary p-1.5 text-white">API</div>
-            <span>TokenHub</span>
+            <span>MOR.rest API</span>
           </div>
           
           <nav className="hidden md:flex items-center space-x-6">
@@ -156,7 +156,7 @@ const Index = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-2 font-medium">
                 <div className="rounded-lg bg-primary p-1.5 text-white">API</div>
-                <span>TokenHub</span>
+                <span>MOR.rest API</span>
               </div>
               <p className="text-sm text-muted-foreground">
                 Secure and scalable API token management for developers and businesses.
@@ -229,7 +229,7 @@ const Index = () => {
           
           <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
             <div className="text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} TokenHub. All rights reserved.
+              &copy; {new Date().getFullYear()} MOR.rest API. All rights reserved.
             </div>
             
             <div className="flex space-x-4 mt-4 md:mt-0">

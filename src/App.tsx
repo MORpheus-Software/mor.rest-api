@@ -14,6 +14,7 @@ import Tokens from "./pages/Tokens";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AuthCheck from "./components/auth/AuthCheck";
 import DebugPage from "./pages/Debug";
+import StreamingResponsesExample from "./pages/docs/examples/streaming-responses";
 import { isAuthenticated } from "./lib/auth";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/staking" element={<Navigate to="/playground" replace />} />
             <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            <Route path="/docs/examples/streaming-responses" element={<ProtectedRoute><StreamingResponsesExample /></ProtectedRoute>} />
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

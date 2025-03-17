@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -22,7 +21,7 @@ export function AuthLayout({
     <div className="flex min-h-screen w-full flex-col items-center justify-center animate-blur-in py-10 px-4 md:px-8">
       <Link to="/" className="absolute top-8 left-8 flex items-center gap-2 text-lg font-medium hover:opacity-80 transition-opacity">
         <div className="rounded-lg bg-primary p-1.5 text-white">API</div>
-        <span>TokenHub</span>
+        <span>MOR.rest API</span>
       </Link>
       
       <div className={cn(

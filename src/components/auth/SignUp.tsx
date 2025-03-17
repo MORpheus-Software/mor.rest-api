@@ -119,7 +119,7 @@ export function SignUpForm() {
         
         toast({
           title: "Account created with fallback data",
-          description: "Welcome to TokenHub (temporary user)"
+          description: "Welcome to MOR.rest API (temporary user)"
         });
         
         // Navigate to playground using both approaches to ensure it works
@@ -155,7 +155,7 @@ export function SignUpForm() {
       
       toast({
         title: "Account created successfully",
-        description: "Welcome to TokenHub",
+        description: "Welcome to MOR.rest API",
       });
       
       // Use both React Router navigate and window.location for maximum reliability

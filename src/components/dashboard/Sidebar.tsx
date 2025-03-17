@@ -10,7 +10,7 @@ export function Sidebar() {
   
   const navItems = [
     {
-      title: 'API Tokens',
+      title: 'API Keys',
       href: '/tokens',
       icon: Key,
     },
@@ -18,6 +18,11 @@ export function Sidebar() {
       title: 'API Playground',
       href: '/playground',
       icon: Play,
+    },
+    {
+      title: 'Documents',
+      href: '/docs',
+      icon: BookOpen,
     },
     {
       title: 'Profile',
@@ -36,7 +41,7 @@ export function Sidebar() {
       <div className="flex h-14 items-center border-b border-border px-4">
         <Link to="/playground" className="flex items-center gap-2 font-semibold">
           <div className="rounded-lg bg-primary p-1.5 text-white">API</div>
-          <span>TokenHub</span>
+          <span>MOR.rest API</span>
         </Link>
       </div>
       <div className="flex flex-col gap-1 p-4">
