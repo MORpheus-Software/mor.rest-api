@@ -5,10 +5,9 @@ metadata:
   annotations:
     run.googleapis.com/ingress: all
     run.googleapis.com/ingress-status: all
-    # Add labels for environment tracking
-    labels:
-      app: morsaas
-      environment: ENVIRONMENT_NAME
+  labels:
+    app: morsaas
+    environment: ENVIRONMENT_NAME
 spec:
   template:
     metadata:
@@ -19,10 +18,9 @@ spec:
         autoscaling.knative.dev/maxScale: '10'
         run.googleapis.com/client-name: github-actions
         run.googleapis.com/client-version: GITHUB_SHA
-        # Add labels for environment tracking
-        labels:
-          app: morsaas
-          environment: ENVIRONMENT_NAME
+      labels:
+        app: morsaas
+        environment: ENVIRONMENT_NAME
     spec:
       containerConcurrency: 80
       containers:

@@ -73,6 +73,13 @@ jobs:
         # Update service name in the YAML
         sed -i "s|morsaas|${{ env.SERVICE_NAME }}|g" cloud-run-deploy-config.yaml
         
+        # Update environment labels with actual environment name
+        if [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
+          sed -i "s|ENVIRONMENT_NAME|staging|g" cloud-run-deploy-config.yaml
+        else
+          sed -i "s|ENVIRONMENT_NAME|dev|g" cloud-run-deploy-config.yaml
+        fi
+        
         # Debug Redis URL format (without exposing secrets)
         echo "Redis URL format check:"
         if [[ "${{ secrets.REDIS_URL }}" == redis://* ]]; then

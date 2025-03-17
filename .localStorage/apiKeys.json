@@ -310,5 +310,41 @@
     "permissions": [
       "all"
     ]
+  },
+  {
+    "id": "7fe220ac2b73d9be",
+    "token": "sk-9e9aad60ebd8ece27a5aabc463aef3f9",
+    "name": "Test API Key",
+    "status": "active",
+    "userId": "local-user",
+    "created": "2025-03-17T04:16:24.532Z",
+    "lastUpdated": "2025-03-17T04:16:24.533Z",
+    "permissions": [
+      "all"
+    ]
+  },
+  {
+    "id": "4fa8c291fae68fc7",
+    "token": "sk-9f518d10bc008630ea57ee33b194cfd6",
+    "name": "Test API Key",
+    "status": "active",
+    "userId": "local-user",
+    "created": "2025-03-17T04:19:31.282Z",
+    "lastUpdated": "2025-03-17T04:19:31.283Z",
+    "permissions": [
+      "all"
+    ]
+  },
+  {
+    "id": "a7b6db6752007848",
+    "token": "sk-252bdd8253fd968f4fda0a3c50abf9f8",
+    "name": "Test API Key",
+    "status": "active",
+    "userId": "local-user",
+    "created": "2025-03-17T04:20:03.302Z",
+    "lastUpdated": "2025-03-17T04:20:03.303Z",
+    "permissions": [
+      "all"
+    ]
   }
 ]
