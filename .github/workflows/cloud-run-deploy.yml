@@ -115,7 +115,7 @@ jobs:
         
         # If production deployment, update the image to use staging image
         if [[ "${{ env.IS_PROD }}" == "true" ]]; then
-          sed -i "s|gcr.io/PROJECT_ID/morsaas-prod:COMMIT_SHA|${{ env.STAGING_IMAGE }}|g" cloud-run-deploy-config.yaml
+          sed -i "s|gcr.io/PROJECT_ID/morsaas:COMMIT_SHA|${{ env.STAGING_IMAGE }}|g" cloud-run-deploy-config.yaml
         else
           sed -i "s|PROJECT_ID|${{ env.PROJECT_ID }}|g" cloud-run-deploy-config.yaml
           sed -i "s|COMMIT_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
