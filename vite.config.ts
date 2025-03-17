@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
   const isDevelopment = mode === 'development';
   
   // Set proxy target based on environment
-  const proxyTarget = isDevelopment 
+  const proxyTarget = isDevelopment
     ? 'http://localhost:4000'  // Use local server in development
     : 'https://nfa-proxy-1081887913409.us-west1.run.app'; // Use production server otherwise
   
