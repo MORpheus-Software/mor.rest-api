@@ -40,7 +40,7 @@ export function Sidebar() {
     <div className="min-h-screen w-64 border-r border-border bg-card">
       <div className="flex h-14 items-center border-b border-border px-4">
         <Link to="/playground" className="flex items-center gap-2 font-semibold">
-          <div className="rounded-lg bg-primary p-1.5 text-white">API</div>
+          <img src="https://www.mor.software/logo.svg" alt="MOR.rest" className="h-8 w-8" />
           <span>MOR.rest API</span>
         </Link>
       </div>
