@@ -2,7 +2,7 @@ name: Deploy to Cloud Run
 
 on:
   push:
-    branches: [ dev, staging ]
+    branches: [ dev, staging, master ]
   workflow_dispatch:
     inputs:
       environment:
@@ -13,6 +13,7 @@ on:
         options:
           - dev
           - staging
+          - prod
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -34,12 +35,18 @@ jobs:
     - name: Set environment variables
       run: |
         # Set service name based on branch/environment
-        if [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
+        if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
+          echo "SERVICE_NAME=morsaas" >> $GITHUB_ENV
+          echo "Deploying to production environment: morsaas"
+          echo "IS_PROD=true" >> $GITHUB_ENV
+        elif [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
           echo "SERVICE_NAME=morsaas-staging" >> $GITHUB_ENV
           echo "Deploying to staging environment: morsaas-staging"
+          echo "IS_PROD=false" >> $GITHUB_ENV
         else
           echo "SERVICE_NAME=morsaas-dev" >> $GITHUB_ENV
           echo "Deploying to development environment: morsaas-dev"
+          echo "IS_PROD=false" >> $GITHUB_ENV
         fi
       
     - name: Make deploy script executable
@@ -60,7 +67,31 @@ jobs:
     - name: Authorize Docker push
       run: gcloud auth configure-docker --quiet
       
+    - name: Get latest staging image for production
+      if: ${{ env.IS_PROD == 'true' }}
+      run: |
+        echo "Finding the latest staging image..."
+        # Get the latest revision of the staging service
+        LATEST_REVISION=$(gcloud run revisions list --service=morsaas-staging --region=${{ env.REGION }} --sort-by=~createTime --limit=1 --format="value(metadata.name)")
+        
+        if [[ -z "$LATEST_REVISION" ]]; then
+          echo "❌ No staging revision found. Cannot proceed with production deployment."
+          exit 1
+        fi
+        
+        # Get the image URL from the latest revision
+        STAGING_IMAGE=$(gcloud run revisions describe $LATEST_REVISION --region=${{ env.REGION }} --format="value(spec.containers[0].image)")
+        
+        if [[ -z "$STAGING_IMAGE" ]]; then
+          echo "❌ Could not determine the image URL from the latest staging revision."
+          exit 1
+        fi
+        
+        echo "Found latest staging image: $STAGING_IMAGE"
+        echo "STAGING_IMAGE=$STAGING_IMAGE" >> $GITHUB_ENV
+      
     - name: Build and push Docker image
+      if: ${{ env.IS_PROD != 'true' }}
       run: |
         docker build -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
         docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
@@ -74,10 +105,20 @@ jobs:
         sed -i "s|morsaas|${{ env.SERVICE_NAME }}|g" cloud-run-deploy-config.yaml
         
         # Update environment labels with actual environment name
-        if [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
+        if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
+          sed -i "s|ENVIRONMENT_NAME|prod|g" cloud-run-deploy-config.yaml
+        elif [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
           sed -i "s|ENVIRONMENT_NAME|staging|g" cloud-run-deploy-config.yaml
         else
           sed -i "s|ENVIRONMENT_NAME|dev|g" cloud-run-deploy-config.yaml
+        fi
+        
+        # If production deployment, update the image to use staging image
+        if [[ "${{ env.IS_PROD }}" == "true" ]]; then
+          sed -i "s|gcr.io/PROJECT_ID/morsaas-prod:COMMIT_SHA|${{ env.STAGING_IMAGE }}|g" cloud-run-deploy-config.yaml
+        else
+          sed -i "s|PROJECT_ID|${{ env.PROJECT_ID }}|g" cloud-run-deploy-config.yaml
+          sed -i "s|COMMIT_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
         fi
         
         # Debug Redis URL format (without exposing secrets)
@@ -118,9 +159,6 @@ jobs:
           echo "Extracted Redis password: (hidden for security)"
         fi
         
-        # Replace placeholder values
-        sed -i "s|PROJECT_ID|${{ env.PROJECT_ID }}|g" cloud-run-deploy-config.yaml
-        sed -i "s|COMMIT_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
         sed -i "s|YOUR_REDIS_URL|${{ secrets.REDIS_URL }}|g" cloud-run-deploy-config.yaml
         
         # Update alternative Redis credentials if available
