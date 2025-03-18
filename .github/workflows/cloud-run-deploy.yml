@@ -209,7 +209,7 @@ jobs:
         # Deploy using the YAML configuration for extended startup timeout
         echo "Starting deployment with extended startup timeout (240s)..."
         
-        if gcloud run services replace cloud-run-deploy-config.yaml --region=${{ env.REGION }} --allow-unauthenticated; then
+        if gcloud run services replace cloud-run-deploy-config.yaml --region=${{ env.REGION }}; then
           echo "✅ Deployment successful!"
           
           # Get the deployed service URL
