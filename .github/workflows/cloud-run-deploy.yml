@@ -71,6 +71,16 @@ jobs:
       if: ${{ env.IS_PROD == 'true' }}
       run: |
         echo "Finding the latest staging image..."
+        
+        # Check if index.html has been modified in this commit
+        INDEX_HTML_MODIFIED=$(git diff --name-only HEAD^ HEAD | grep -q "index.html" && echo "true" || echo "false")
+        if [[ "$INDEX_HTML_MODIFIED" == "true" ]]; then
+          echo "⚠️ index.html has been modified in this commit."
+          echo "Will force a fresh build for production to include metatag changes."
+          echo "FORCE_FRESH_BUILD=true" >> $GITHUB_ENV
+          exit 0
+        fi
+        
         # Get the latest revision of the staging service
         LATEST_REVISION=$(gcloud run revisions list --service=morsaas-staging --region=${{ env.REGION }} --sort-by=~createTime --limit=1 --format="value(metadata.name)")
         
@@ -91,9 +101,28 @@ jobs:
         echo "STAGING_IMAGE=$STAGING_IMAGE" >> $GITHUB_ENV
       
     - name: Build and push Docker image
-      if: ${{ env.IS_PROD != 'true' }}
+      if: ${{ env.IS_PROD != 'true' || env.FORCE_FRESH_BUILD == 'true' }}
       run: |
-        docker build -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
+        # Verify index.html exists and will be included in the build
+        echo "Verifying index.html for build..."
+        if [ ! -f "index.html" ]; then
+          echo "❌ ERROR: index.html not found in the root directory!"
+          exit 1
+        fi
+        
+        echo "✅ Found index.html, contents:"
+        grep -n "<meta" index.html || echo "No meta tags found in index.html"
+        
+        # Clear any build cache that might interfere with new meta tags
+        echo "Cleaning build cache..."
+        rm -rf dist node_modules/.vite
+        
+        # Generate unique build ID (timestamp + git short hash)
+        BUILD_ID="$(date +%s)-$(git rev-parse --short HEAD)"
+        echo "Using BUILD_ID: $BUILD_ID for cache control"
+        
+        # Build and push the Docker image with BUILD_ID
+        docker build --build-arg BUILD_ID="$BUILD_ID" -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
         docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
         
     - name: Create Cloud Run YAML configuration
@@ -231,6 +260,18 @@ jobs:
         else
           echo "⚠️ Service base URL is not responding with a 2xx or 3xx status code."
           echo "Status code: $(curl -s --head -o /dev/null -w "%{http_code}" "${SERVICE_URL}")"
+        fi
+        
+        # Check the HTML response for metatags
+        echo "Verifying metatags are present in the deployed HTML..."
+        HTML_CONTENT=$(curl -s "${SERVICE_URL}")
+        if echo "${HTML_CONTENT}" | grep -q "<meta"; then
+          echo "✅ Metatags found in the deployed HTML"
+          echo "Found metatags:"
+          echo "${HTML_CONTENT}" | grep -n "<meta" | head -5
+        else
+          echo "⚠️ Warning: No metatags found in the deployed HTML!"
+          echo "This indicates the index.html may not have been properly included in the build."
         fi
         
         # Check if API endpoints are accessible (without requiring authentication)

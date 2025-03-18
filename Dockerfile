@@ -6,11 +6,23 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
 
+# Copy index.html first to ensure it's not missed
+COPY index.html ./
+RUN echo "Verifying index.html exists:" && \
+    cat index.html | grep -n "<meta" || echo "No meta tags found in index.html"
+
 # Copy source files
 COPY . .
 
+# Disable Vite's transform cache for HTML files to ensure fresh builds
+ENV VITE_DISABLE_TRANSFORM_CACHE=true
+
 # Build the frontend (Vite handles the frontend environment)
 RUN npm run build
+
+# Verify the built index.html contains expected meta tags
+RUN echo "Verifying built index.html:" && \
+    cat dist/index.html | grep -n "<meta" || echo "No meta tags found in built index.html"
 
 # Stage 2: Build the TypeScript server
 FROM node:22-alpine AS server-builder
@@ -45,6 +57,11 @@ RUN echo "Compiled files in dist:" && \
 # Stage 3: Final production image
 FROM node:22-alpine
 WORKDIR /app
+
+# Generate a unique build ID for cache control
+ARG BUILD_ID
+ENV DEPLOY_VERSION="${BUILD_ID:-$(date +%s)}"
+RUN echo "Building with DEPLOY_VERSION: $DEPLOY_VERSION"
 
 # Copy package.json files
 COPY package*.json ./
