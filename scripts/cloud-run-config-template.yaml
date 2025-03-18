@@ -6,7 +6,6 @@ metadata:
     run.googleapis.com/ingress: all
     run.googleapis.com/ingress-status: all
     iam.gcp.io/allowed: "allUsers"
-    run.googleapis.com/invoker-iam-disabled: "true"
   labels:
     app: morsaas
     environment: ENVIRONMENT_NAME
