@@ -1,5 +1,5 @@
 # Stage 1: Build the React frontend
-FROM node:22-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
 # Copy package files and install dependencies first (for better layer caching)
@@ -25,7 +25,7 @@ RUN echo "Verifying built index.html:" && \
     cat dist/index.html | grep -n "<meta" || echo "No meta tags found in built index.html"
 
 # Stage 2: Build the TypeScript server
-FROM node:22-alpine AS server-builder
+FROM node:20-alpine AS server-builder
 WORKDIR /app
 
 # Copy package files and install dependencies
@@ -55,7 +55,7 @@ RUN echo "Compiled files in dist:" && \
     find dist -type f | sort
 
 # Stage 3: Final production image
-FROM node:22-alpine
+FROM node:20-alpine
 WORKDIR /app
 
 # Generate a unique build ID for cache control
