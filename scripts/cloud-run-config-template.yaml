@@ -6,7 +6,7 @@ metadata:
     run.googleapis.com/ingress: all
     run.googleapis.com/ingress-status: all
     iam.gcp.io/allowed: "allUsers"
-    run.googleapis.com/invoker-iam-disabled: true
+    run.googleapis.com/invoker-iam-disabled: "true"
   labels:
     app: morsaas
     environment: ENVIRONMENT_NAME
@@ -14,10 +14,10 @@ spec:
   template:
     metadata:
       annotations:
-        run.googleapis.com/cpu-throttling: 'false'
+        run.googleapis.com/cpu-throttling: "false"
         run.googleapis.com/execution-environment: gen2
-        run.googleapis.com/startup-cpu-boost: 'true'
-        autoscaling.knative.dev/maxScale: '10'
+        run.googleapis.com/startup-cpu-boost: "true"
+        autoscaling.knative.dev/maxScale: "10"
         run.googleapis.com/client-name: github-actions
         run.googleapis.com/client-version: GITHUB_SHA
       labels:
@@ -44,7 +44,7 @@ spec:
           name: http1
         resources:
           limits:
-            cpu: '1'
+            cpu: "1"
             memory: 2Gi
         startupProbe:
           # Maximum allowed values for startup probe (total time: 240s)
