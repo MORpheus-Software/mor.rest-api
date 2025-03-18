@@ -363,6 +363,7 @@ const ApiPlayground = () => {
             <CardTitle>API Testing</CardTitle>
             <CardDescription>
               Click "Make Request" below to test the API. Look for the response in the box below.
+              For testing purposes, each request opens a new session.  This takes about 30 seconds and will not be the case when you use the API in your apps.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
