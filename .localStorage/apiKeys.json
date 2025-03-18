@@ -382,5 +382,17 @@
     "permissions": [
       "all"
     ]
+  },
+  {
+    "id": "8db19b0933e05289",
+    "token": "sk-517a0f0e49069b0f96c4aeaa83d7f04c",
+    "name": "Test API Key",
+    "status": "active",
+    "userId": "local-user",
+    "created": "2025-03-18T02:19:03.936Z",
+    "lastUpdated": "2025-03-18T02:19:03.937Z",
+    "permissions": [
+      "all"
+    ]
   }
 ]
