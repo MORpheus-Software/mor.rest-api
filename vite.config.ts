@@ -45,6 +45,19 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    build: {
+      // Enable cache busting by adding timestamp hash to filenames
+      rollupOptions: {
+        output: {
+          // Generate unique filenames with hash for proper cache busting
+          entryFileNames: `assets/[name].[hash].js`,
+          chunkFileNames: `assets/[name].[hash].js`,
+          assetFileNames: `assets/[name].[hash].[ext]`
+        }
+      },
+      // Force clean the dist directory before each build
+      emptyOutDir: true,
+    },
     define: {
       // Fix for "process is not defined" error
       // Properly handle environment variables in both development and production

@@ -1,0 +1,61 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  annotations:
+    run.googleapis.com/invoker-iam-disabled: true
+    iam.gcp.io/allowed: allUsers
+    run.googleapis.com/ingress: all
+    run.googleapis.com/ingress-status: all
+    run.googleapis.com/urls: '["https://morsaas-dev-101868473812.us-west1.run.app","https://morsaas-dev-jgdgcenc7q-uw.a.run.app"]'
+  labels:
+    app: morsaas-dev
+    cloud.googleapis.com/location: us-west1
+    environment: dev
+  name: morsaas-dev
+  namespace: '101868473812'
+spec:
+  template:
+    metadata:
+      annotations:
+    run.googleapis.com/invoker-iam-disabled: true
+        autoscaling.knative.dev/maxScale: '10'
+        run.googleapis.com/client-name: github-actions
+        run.googleapis.com/client-version: GITHUB_SHA
+        run.googleapis.com/cpu-throttling: 'false'
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/startup-cpu-boost: 'true'
+      labels:
+        app: morsaas-dev
+        environment: dev
+        run.googleapis.com/startupProbeType: Default
+    spec:
+      containerConcurrency: 80
+      containers:
+      - env:
+        - name: DEPLOY_ENVIRONMENT
+          value: dev
+        - name: NODE_ENV
+          value: production
+        - name: REDIS_URL
+          value: rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
+        - name: VITE_API_BASE_URL
+          value: https://nfa-proxy-1081887913409.us-west1.run.app
+        image: gcr.io/graphical-bus-433219-g5/morsaas-dev:ba3183ac45f10f3016cdf2bcf75959f5d2c42f57
+        ports:
+        - containerPort: 8080
+          name: http1
+        resources:
+          limits:
+            cpu: '1'
+            memory: 2Gi
+        startupProbe:
+          failureThreshold: 1
+          periodSeconds: 240
+          tcpSocket:
+            port: 8080
+          timeoutSeconds: 240
+      serviceAccountName: 101868473812-compute@developer.gserviceaccount.com
+      timeoutSeconds: 600
+  traffic:
+  - latestRevision: true
+    percent: 100
