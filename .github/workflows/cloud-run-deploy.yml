@@ -209,7 +209,7 @@ jobs:
         # Deploy using the YAML configuration for extended startup timeout
         echo "Starting deployment with extended startup timeout (240s)..."
         
-        if gcloud run services replace cloud-run-deploy-config.yaml --region=${{ env.REGION }}; then
+        if gcloud run services replace cloud-run-deploy-config.yaml --region=${{ env.REGION }} --allow-unauthenticated; then
           echo "✅ Deployment successful!"
           
           # Get the deployed service URL
@@ -240,6 +240,23 @@ jobs:
         
     - name: Show Output
       run: echo ${{ steps.deploy.outputs.url }}
+      
+    - name: Ensure public access is enabled
+      if: success()
+      run: |
+        echo "Setting IAM policy to allow unauthenticated access..."
+        # Create a temporary policy file
+        cat > policy.yaml << EOF
+        bindings:
+        - members:
+          - allUsers
+          role: roles/run.invoker
+        EOF
+        
+        # Apply the policy to allow unauthenticated access
+        gcloud run services set-iam-policy ${{ env.SERVICE_NAME }} policy.yaml --region=${{ env.REGION }} --quiet || true
+        
+        echo "✅ IAM policy updated to allow public access"
       
     - name: Check Deployment Health
       if: success()
