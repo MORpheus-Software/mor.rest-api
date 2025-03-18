@@ -66,8 +66,11 @@ RUN echo "Building with DEPLOY_VERSION: $DEPLOY_VERSION"
 # Copy package.json files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production --no-audit --no-fund
+# Install only production dependencies - with more verbose output and fallback approach
+RUN echo "Installing production dependencies..." && \
+    npm install --production --no-audit --no-fund --loglevel verbose || \
+    (echo "Retrying with standard npm install..." && \
+     npm install --omit=dev --no-audit --no-fund)
 
 # Copy compiled server files from server-builder
 COPY --from=server-builder /app/dist ./dist
@@ -76,7 +79,8 @@ COPY --from=server-builder /app/dist ./dist
 COPY --from=frontend-builder /app/dist ./public
 
 # Add any required runtime dependencies
-RUN npm install --production --no-audit --no-fund --save express dotenv cors ioredis
+RUN echo "Installing runtime dependencies..." && \
+    npm install --no-audit --no-fund --omit=dev express dotenv cors ioredis
 
 # Create a .env file with safe defaults for production
 RUN echo "NODE_ENV=production\n\
