@@ -1,23 +1,31 @@
 # Stage 1: Build the React frontend
-FROM node:22-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
 # Copy package files and install dependencies first (for better layer caching)
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
 
-# Copy source files and .env
+# Copy index.html first to ensure it's not missed
+COPY index.html ./
+RUN echo "Verifying index.html exists:" && \
+    cat index.html | grep -n "<meta" || echo "No meta tags found in index.html"
+
+# Copy source files
 COPY . .
 
-# Set React environment variables for build time
-ENV REACT_APP_DEFAULT_MODEL_NAME=LMR-Hermes-3-Llama-3.1-8B
-ENV REACT_APP_DEFAULT_MODEL_ID=llama-3.1
+# Disable Vite's transform cache for HTML files to ensure fresh builds
+ENV VITE_DISABLE_TRANSFORM_CACHE=true
 
 # Build the frontend (Vite handles the frontend environment)
 RUN npm run build
 
+# Verify the built index.html contains expected meta tags
+RUN echo "Verifying built index.html:" && \
+    cat dist/index.html | grep -n "<meta" || echo "No meta tags found in built index.html"
+
 # Stage 2: Build the TypeScript server
-FROM node:22-alpine AS server-builder
+FROM node:20-alpine AS server-builder
 WORKDIR /app
 
 # Copy package files and install dependencies
@@ -47,14 +55,22 @@ RUN echo "Compiled files in dist:" && \
     find dist -type f | sort
 
 # Stage 3: Final production image
-FROM node:22-alpine
+FROM node:20-alpine
 WORKDIR /app
+
+# Generate a unique build ID for cache control
+ARG BUILD_ID
+ENV DEPLOY_VERSION="${BUILD_ID:-$(date +%s)}"
+RUN echo "Building with DEPLOY_VERSION: $DEPLOY_VERSION"
 
 # Copy package.json files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production --no-audit --no-fund
+# Install only production dependencies - with more verbose output and fallback approach
+RUN echo "Installing production dependencies..." && \
+    npm install --production --no-audit --no-fund --loglevel verbose || \
+    (echo "Retrying with standard npm install..." && \
+     npm install --omit=dev --no-audit --no-fund)
 
 # Copy compiled server files from server-builder
 COPY --from=server-builder /app/dist ./dist
@@ -63,7 +79,8 @@ COPY --from=server-builder /app/dist ./dist
 COPY --from=frontend-builder /app/dist ./public
 
 # Add any required runtime dependencies
-RUN npm install --production --no-audit --no-fund --save express dotenv cors ioredis
+RUN echo "Installing runtime dependencies..." && \
+    npm install --no-audit --no-fund --omit=dev express dotenv cors ioredis
 
 # Copy .env file for runtime environment variables
 COPY .env .env

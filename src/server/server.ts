@@ -43,7 +43,31 @@ console.log(chalk.blue(`[SERVER] Parent directory: ${path.resolve(__dirname, '..
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
+
+// Generate a deployment-specific ETag based on build time
+const DEPLOY_VERSION = Date.now().toString();
+console.log(`Server starting with deployment version: ${DEPLOY_VERSION}`);
+
+// Smart caching strategy for index.html
+app.use((req, res, next) => {
+  // Only apply to root path or index.html requests
+  if (req.path === '/' || req.path === '/index.html') {
+    // Set Cache-Control to allow caching but require revalidation
+    res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+    
+    // Set ETag based on deployment version
+    res.setHeader('ETag', `"${DEPLOY_VERSION}"`);
+    
+    // Check If-None-Match header to see if client has current version
+    const clientETag = req.headers['if-none-match'];
+    if (clientETag === `"${DEPLOY_VERSION}"`) {
+      // Client has current version, return 304 Not Modified
+      return res.status(304).end();
+    }
+  }
+  next();
+});
 
 // Logging middleware
 app.use((req, res, next) => {

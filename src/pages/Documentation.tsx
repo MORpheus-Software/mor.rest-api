@@ -1,10 +1,11 @@
-
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Book, Code, Coffee, FileText, Lightbulb, Play, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { StreamingDemo } from '@/components/StreamingDemo';
 
 const Documentation = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,12 +29,12 @@ const Documentation = () => {
           />
         </div>
         
-        <Tabs defaultValue="guides">
+        <Tabs defaultValue="examples">
           <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="guides">Guides</TabsTrigger>
-            <TabsTrigger value="api">API Reference</TabsTrigger>
+            {/* <TabsTrigger value="guides">Guides</TabsTrigger> */}
             <TabsTrigger value="examples">Examples</TabsTrigger>
-            <TabsTrigger value="faq">FAQ</TabsTrigger>
+            <TabsTrigger value="api">API Reference</TabsTrigger>
+            {/* <TabsTrigger value="faq">FAQ</TabsTrigger> */}
           </TabsList>
           
           <TabsContent value="guides" className="mt-6">
@@ -51,28 +52,28 @@ const Documentation = () => {
                 <CardContent>
                   <ul className="space-y-2">
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
-                        Introduction to TokenHub
-                      </a>
+                      <Link to="/docs/guides/introduction" className="text-primary hover:underline">
+                        Introduction to MOR.rest API
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/creating-first-token" className="text-primary hover:underline">
                         Creating your first API token
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/token-permissions" className="text-primary hover:underline">
                         Understanding token permissions
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/securing-tokens" className="text-primary hover:underline">
                         Securing your API tokens
-                      </a>
+                      </Link>
                     </li>
                   </ul>
-                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start">
-                    View all getting started guides
+                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start" asChild>
+                    <Link to="/docs/guides">View all getting started guides</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -90,28 +91,28 @@ const Documentation = () => {
                 <CardContent>
                   <ul className="space-y-2">
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/managing-api-tokens" className="text-primary hover:underline">
                         Managing API tokens
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/api-playground" className="text-primary hover:underline">
                         Using the API playground
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/mor-token-staking" className="text-primary hover:underline">
                         MOR token staking guide
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/guides/account-management" className="text-primary hover:underline">
                         Account management
-                      </a>
+                      </Link>
                     </li>
                   </ul>
-                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start">
-                    View all user guides
+                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start" asChild>
+                    <Link to="/docs/guides">View all user guides</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -129,28 +130,28 @@ const Documentation = () => {
                 <CardContent>
                   <ul className="space-y-2">
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/best-practices/token-security" className="text-primary hover:underline">
                         Token security best practices
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/best-practices/rate-limiting" className="text-primary hover:underline">
                         Rate limiting strategies
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/best-practices/optimizing-requests" className="text-primary hover:underline">
                         Optimizing API requests
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/best-practices/monitoring-analytics" className="text-primary hover:underline">
                         Monitoring and analytics
-                      </a>
+                      </Link>
                     </li>
                   </ul>
-                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start">
-                    View all best practices
+                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start" asChild>
+                    <Link to="/docs/best-practices">View all best practices</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -168,28 +169,28 @@ const Documentation = () => {
                 <CardContent>
                   <ul className="space-y-2">
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/tutorials/building-chatbot" className="text-primary hover:underline">
                         Building a chatbot with our API
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/tutorials/token-authentication" className="text-primary hover:underline">
                         Implementing token authentication
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/tutorials/streaming-response-ui" className="text-primary hover:underline">
                         Creating a streaming response UI
-                      </a>
+                      </Link>
                     </li>
                     <li className="text-sm">
-                      <a href="#" className="text-primary hover:underline">
+                      <Link to="/docs/tutorials/advanced-prompt-engineering" className="text-primary hover:underline">
                         Advanced prompt engineering
-                      </a>
+                      </Link>
                     </li>
                   </ul>
-                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start">
-                    View all tutorials
+                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start" asChild>
+                    <Link to="/docs/tutorials">View all tutorials</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -264,9 +265,12 @@ const Documentation = () => {
                     </div>
                   </div>
                   
-                  <Button className="mt-2">
+                  <Button variant="ghost" size="sm" className="mt-2">
                     <Play className="mr-2 h-4 w-4" />
                     Try this endpoint in Playground
+                  </Button>
+                  <Button variant="ghost" size="sm" className="mt-4 w-full justify-start" asChild>
+                    <Link to="/docs/api">View full API reference</Link>
                   </Button>
                 </div>
               </CardContent>
@@ -275,63 +279,561 @@ const Documentation = () => {
           
           <TabsContent value="examples" className="mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/*
               <Card>
                 <CardHeader>
                   <CardTitle>Example: Web Chat Interface</CardTitle>
                   <CardDescription>Create a simple chat interface using our API</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <pre className="bg-slate-50 dark:bg-slate-900 p-3 rounded-md text-sm overflow-x-auto">
-                    {`// Example JavaScript code
-async function sendMessage(message) {
-  const response = await fetch('/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + API_KEY
-    },
-    body: JSON.stringify({
-      model: 'LMR-Hermes-3-Llama-3.1-8B',
-      messages: [{ role: 'user', content: message }],
-      stream: false
-    })
-  });
-  
-  const result = await response.json();
-  return result.choices[0].message.content;
-}`}
-                  </pre>
-                  <Button variant="outline" className="mt-4 w-full">View full example</Button>
+                  <div className="example-section">
+                    <div className="web-chat-example" style={{ display: 'none' }}>
+                      This example is hidden because it is not functional in the current implementation.
+                    </div>
+                    <Link to="/docs/examples/web-chat" className="btn-primary">
+                      View full example
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
-              
-              <Card>
+              */}
+              <Card className="md:col-span-2">
                 <CardHeader>
                   <CardTitle>Example: Streaming Responses</CardTitle>
                   <CardDescription>Implement streaming responses for a better UX</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <pre className="bg-slate-50 dark:bg-slate-900 p-3 rounded-md text-sm overflow-x-auto">
-                    {`// Example JavaScript code
-async function streamResponse(message) {
-  const response = await fetch('/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + API_KEY
-    },
-    body: JSON.stringify({
-      model: 'LMR-Hermes-3-Llama-3.1-8B',
-      messages: [{ role: 'user', content: message }],
-      stream: true
-    })
-  });
+                  <Tabs defaultValue="demo">
+                    <TabsList>
+                      <TabsTrigger value="demo">Live Demo</TabsTrigger>
+                      <TabsTrigger value="code">Code Example</TabsTrigger>
+                      <TabsTrigger value="explanation">How It Works</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="demo" className="space-y-4 mt-4">
+                      <StreamingDemo />
+                    </TabsContent>
+                    
+                    <TabsContent value="code" className="space-y-4 mt-4">
+                      <div className="relative">
+                        <button 
+                          className="absolute right-2 top-2 bg-primary text-primary-foreground hover:bg-primary/90 py-1 px-3 text-xs rounded-md z-10"
+                          onClick={(event) => {
+                            const btn = event.currentTarget;
+                            const codeContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MOR.rest Streaming Example</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .chat-container {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .messages {
+      min-height: 300px;
+      max-height: 500px;
+      overflow-y: auto;
+      padding: 16px;
+      background-color: #f8fafc;
+    }
+    .input-container {
+      display: flex;
+      padding: 12px;
+      border-top: 1px solid #e2e8f0;
+    }
+    input {
+      flex-grow: 1;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      margin-right: 8px;
+    }
+    button {
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #94a3b8;
+      cursor: not-allowed;
+    }
+    .status {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 8px;
+    }
+    .user-message {
+      background-color: #dbeafe;
+      border-radius: 16px 16px 0 16px;
+      padding: 8px 16px;
+      margin-bottom: 12px;
+      align-self: flex-end;
+      max-width: 80%;
+      margin-left: auto;
+    }
+    .assistant-message {
+      background-color: #e2e8f0;
+      border-radius: 16px 16px 16px 0;
+      padding: 8px 16px;
+      margin-bottom: 12px;
+      align-self: flex-start;
+      max-width: 80%;
+    }
+    .messages-container {
+      display: flex;
+      flex-direction: column;
+    }
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 14px;
+      background-color: #000;
+      animation: blink 1s infinite;
+      margin-left: 2px;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <h1>MOR.rest API Streaming Example</h1>
+  <p>This example demonstrates how to use streaming responses with the MOR.rest API.</p>
   
-  const reader = response.body.getReader();
-  // Process the stream...
-}`}
-                  </pre>
-                  <Button variant="outline" className="mt-4 w-full">View full example</Button>
+  <div class="chat-container">
+    <div class="messages" id="messages">
+      <div class="messages-container" id="messages-container"></div>
+    </div>
+    <div class="input-container">
+      <input type="text" id="user-input" placeholder="Type your message here..." />
+      <button id="send-button">Send</button>
+    </div>
+  </div>
+  <div class="status" id="status"></div>
+  
+  <script>
+    const API_KEY = 'your_mor_rest_api_key'; // Replace with your API key
+    let isStreaming = false;
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      const userInput = document.getElementById('user-input');
+      const sendButton = document.getElementById('send-button');
+      const messagesContainer = document.getElementById('messages-container');
+      const statusElement = document.getElementById('status');
+    
+      // Function to add a user message to the chat
+      function addUserMessage(text) {
+        const messageElement = document.createElement('div');
+        messageElement.className = 'user-message';
+        messageElement.textContent = text;
+        messagesContainer.appendChild(messageElement);
+        messagesContainer.parentElement.scrollTop = messagesContainer.parentElement.scrollHeight;
+      }
+    
+      // Function to add or update an assistant message
+      function addAssistantMessage(id, text) {
+        let messageElement = document.getElementById(id);
+        
+        if (!messageElement) {
+          messageElement = document.createElement('div');
+          messageElement.id = id;
+          messageElement.className = 'assistant-message';
+          messagesContainer.appendChild(messageElement);
+        }
+        
+        messageElement.textContent = text;
+        
+        // Auto-scroll
+        messagesContainer.parentElement.scrollTop = messagesContainer.parentElement.scrollHeight;
+        return messageElement;
+      }
+    
+      // Handle send button click
+      sendButton.addEventListener('click', () => {
+        const message = userInput.value.trim();
+        if (message && !isStreaming) {
+          // Clear input
+          userInput.value = '';
+          
+          // Add user message to chat
+          addUserMessage(message);
+          
+          // Start streaming response
+          streamChatCompletion(message);
+        }
+      });
+    
+      // Handle Enter key press
+      userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !isStreaming) {
+          sendButton.click();
+        }
+      });
+    
+      // Main stream handling function
+      async function streamChatCompletion(userMessage) {
+        // Guard against multiple simultaneous requests
+        if (isStreaming) return;
+        
+        isStreaming = true;
+        sendButton.disabled = true;
+        
+        const responseId = 'response-' + Date.now();
+        const messageElement = addAssistantMessage(responseId, '');
+        
+        // Add blinking cursor
+        const cursor = document.createElement('span');
+        cursor.className = 'cursor';
+        messageElement.appendChild(cursor);
+        
+        statusElement.textContent = 'Streaming...';
+        
+        try {
+          const response = await fetch('https://api.mor.rest/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + API_KEY
+            },
+            body: JSON.stringify({
+              model: 'LMR-Hermes-3-Llama-3.1-8B',
+              messages: [{ role: 'user', content: userMessage }],
+              stream: true
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error(\`HTTP error! status: \${response.status}\`);
+          }
+          
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let accumulatedText = '';
+          
+          while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) {
+              // Remove cursor on completion
+              if (cursor.parentNode) {
+                cursor.parentNode.removeChild(cursor);
+              }
+              break;
+            }
+            
+            // Decode the chunk and process it
+            const chunk = decoder.decode(value, { stream: true });
+            
+            // For SSE data in 'data: {...}' format
+            const lines = chunk
+              .split('\\n')
+              .filter(line => line.startsWith('data: '))
+              .map(line => line.replace('data: ', ''));
+              
+            for (const line of lines) {
+              if (line === '[DONE]') continue;
+              
+              try {
+                const parsedLine = JSON.parse(line);
+                const content = parsedLine.choices[0]?.delta?.content || '';
+                if (content) {
+                  accumulatedText += content;
+                  messageElement.textContent = accumulatedText;
+                  messageElement.appendChild(cursor);
+                }
+              } catch (e) {
+                console.error('Error parsing stream chunk:', e);
+              }
+            }
+          }
+          
+          statusElement.textContent = 'Stream completed';
+          
+        } catch (error) {
+          statusElement.textContent = \`Error: \${error.message}\`;
+          console.error('Stream error:', error);
+          // Remove cursor on error
+          if (cursor.parentNode) {
+            cursor.parentNode.removeChild(cursor);
+          }
+        } finally {
+          isStreaming = false;
+          sendButton.disabled = false;
+        }
+      }
+    });
+  </script>
+</body>
+</html>`;
+                            navigator.clipboard.writeText(codeContent)
+                              .then(() => {
+                                const btn = event.currentTarget;
+                                btn.textContent = "Copied!";
+                                setTimeout(() => {
+                                  btn.textContent = "Copy";
+                                }, 2000);
+                              })
+                              .catch(err => {
+                                console.error('Failed to copy: ', err);
+                              });
+                          }}
+                        >
+                          Copy
+                        </button>
+                        <pre className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md overflow-x-auto text-sm pt-10">
+                          {`// Complete implementation with stream handling
+
+// HTML Structure
+/*
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MOR.rest Streaming Example</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .chat-container {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .messages {
+      min-height: 300px;
+      max-height: 500px;
+      overflow-y: auto;
+      padding: 16px;
+      background-color: #f8fafc;
+    }
+    .input-container {
+      display: flex;
+      padding: 12px;
+      border-top: 1px solid #e2e8f0;
+    }
+    input {
+      flex-grow: 1;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      margin-right: 8px;
+    }
+    button {
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #94a3b8;
+      cursor: not-allowed;
+    }
+    .status {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 8px;
+    }
+    .user-message {
+      background-color: #dbeafe;
+      border-radius: 16px 16px 0 16px;
+      padding: 8px 16px;
+      margin-bottom: 12px;
+      align-self: flex-end;
+      max-width: 80%;
+      margin-left: auto;
+    }
+    .assistant-message {
+      background-color: #e2e8f0;
+      border-radius: 16px 16px 16px 0;
+      padding: 8px 16px;
+      margin-bottom: 12px;
+      align-self: flex-start;
+      max-width: 80%;
+    }
+    .messages-container {
+      display: flex;
+      flex-direction: column;
+    }
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 14px;
+      background-color: #000;
+      animation: blink 1s infinite;
+      margin-left: 2px;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+*/
+
+// JavaScript implementation
+/*
+  const API_KEY = 'your_mor_rest_api_key'; // Replace with your API key
+  let isStreaming = false;
+  
+  document.addEventListener('DOMContentLoaded', () => {
+    const userInput = document.getElementById('user-input');
+    const sendButton = document.getElementById('send-button');
+    const messagesContainer = document.getElementById('messages-container');
+    const statusElement = document.getElementById('status');
+  
+    // Main stream handling function
+    async function streamChatCompletion(userMessage) {
+      // Guard against multiple simultaneous requests
+      if (isStreaming) return;
+      
+      isStreaming = true;
+      sendButton.disabled = true;
+      
+      const responseId = 'response-' + Date.now();
+      const messageElement = addAssistantMessage(responseId, '');
+      
+      // Add blinking cursor
+      const cursor = document.createElement('span');
+      cursor.className = 'cursor';
+      messageElement.appendChild(cursor);
+      
+      statusElement.textContent = 'Streaming...';
+      
+      try {
+        const response = await fetch('https://api.mor.rest/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + API_KEY
+          },
+          body: JSON.stringify({
+            model: 'LMR-Hermes-3-Llama-3.1-8B',
+            messages: [{ role: 'user', content: userMessage }],
+            stream: true
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(\`HTTP error! status: \${response.status}\`);
+        }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let accumulatedText = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            // Remove cursor on completion
+            if (cursor.parentNode) {
+              cursor.parentNode.removeChild(cursor);
+            }
+            break;
+          }
+          
+          // Decode the chunk and process it
+          const chunk = decoder.decode(value, { stream: true });
+          
+          // Process SSE data format
+          const lines = chunk
+            .split('\\n')
+            .filter(line => line.startsWith('data: '))
+            .map(line => line.replace('data: ', ''));
+            
+          for (const line of lines) {
+            if (line === '[DONE]') continue;
+            
+            try {
+              const parsedLine = JSON.parse(line);
+              const content = parsedLine.choices[0]?.delta?.content || '';
+              if (content) {
+                accumulatedText += content;
+                messageElement.textContent = accumulatedText;
+                messageElement.appendChild(cursor);
+              }
+            } catch (e) {
+              console.error('Error parsing stream chunk:', e);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Stream error:', error);
+      } finally {
+        isStreaming = false;
+        sendButton.disabled = false;
+      }
+    }
+  });
+*/`}
+                        </pre>
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="explanation" className="space-y-4 mt-4">
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">What are Streaming Responses?</h3>
+                        <p className="text-muted-foreground">
+                          Streaming responses allow content to be delivered to the client incrementally as it's generated, 
+                          rather than waiting for the entire response to be completed. This creates a more responsive and 
+                          engaging user experience, especially for longer AI-generated content.
+                        </p>
+                        
+                        <h3 className="text-lg font-semibold">Key Components</h3>
+                        <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
+                          <li>
+                            <strong>Stream Parameter</strong>: Set <code>stream: true</code> in your API request to enable streaming.
+                          </li>
+                          <li>
+                            <strong>ReadableStream</strong>: The response body is a readable stream that can be processed incrementally.
+                          </li>
+                          <li>
+                            <strong>Server-Sent Events (SSE)</strong>: Data is sent as text/event-stream with each chunk prefixed by "data: ".
+                          </li>
+                          <li>
+                            <strong>Chunk Processing</strong>: Each chunk contains part of the response that must be parsed and handled.
+                          </li>
+                        </ul>
+                        
+                        <h3 className="text-lg font-semibold">Implementation Steps</h3>
+                        <ol className="list-decimal pl-5 space-y-2 text-muted-foreground">
+                          <li>Get a reader from the response body stream: <code>const reader = response.body.getReader();</code></li>
+                          <li>Create a text decoder: <code>const decoder = new TextDecoder();</code></li>
+                          <li>Read chunks in a loop until done: <code>const {`{done, value}`} = await reader.read();</code></li>
+                          <li>Decode each chunk and parse the SSE data format.</li>
+                          <li>Extract and accumulate the content from each delta.</li>
+                          <li>Update the UI as new content arrives.</li>
+                        </ol>
+                        
+                        <h3 className="text-lg font-semibold">Benefits</h3>
+                        <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
+                          <li>Improved perceived performance and responsiveness</li>
+                          <li>More engaging user experience as content appears progressively</li>
+                          <li>Ability to start processing or displaying content before the full response is received</li>
+                          <li>Better user feedback with typing-like effects</li>
+                        </ul>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </Card>
             </div>

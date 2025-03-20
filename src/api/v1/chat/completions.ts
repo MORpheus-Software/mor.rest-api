@@ -12,6 +12,16 @@ const NFA_PROXY_URL = API_BASE_URL;
 export async function postChatCompletion(req: Request, res: Response) {
   try {
     console.log(chalk.blue(`[API] Chat completion request received`));
+    console.log(chalk.blue(`[API] Request headers: ${JSON.stringify(req.headers, null, 2)}`));
+    console.log(chalk.blue(`[API] Request body: ${JSON.stringify(req.body, null, 2)}`));
+    
+    // Check authentication status from middleware
+    const authReq = req as AuthenticatedRequest;
+    console.log(chalk.blue(`[API] Authentication status: ${authReq.isAuthenticated ? 'Authenticated' : 'Not authenticated'}`));
+    if (authReq.authError) {
+      console.log(chalk.red(`[API] Auth error: ${authReq.authError}`));
+    }
+    
     console.log(chalk.blue(`[API] Forwarding to external service: ${NFA_PROXY_URL}/v1/chat/completions`));
     
     // Check if the request includes streaming

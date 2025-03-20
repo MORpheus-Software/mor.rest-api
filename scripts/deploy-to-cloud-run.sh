@@ -211,8 +211,24 @@ deploy_to_cloud_run() {
     --region="$REGION" \
     --format='value(status.url)')
   
-  echo -e "${GREEN}✓ Deployment completed successfully!${NC}"
-  echo -e "${GREEN}Your application is now available at: ${service_url}${NC}"
+  # Set IAM policy to allow public access
+  echo -e "${YELLOW}Setting IAM policy to allow unauthenticated access...${NC}"
+  # Create a temporary policy file
+  cat > policy.yaml << EOF
+bindings:
+- members:
+  - allUsers
+  role: roles/run.invoker
+EOF
+  
+  # Apply the policy to allow unauthenticated access
+  gcloud run services set-iam-policy "$SERVICE_NAME" policy.yaml --region="$REGION" --quiet || \
+    echo -e "${YELLOW}Warning: Could not set IAM policy. You may need to set it manually.${NC}"
+  
+  # Clean up temporary policy file
+  rm -f policy.yaml
+  
+  echo -e "${GREEN}Service deployed successfully at: ${service_url}${NC}"
 }
 
 # Deploy to Cloud Run using YAML configuration (for slow-starting containers)
@@ -247,6 +263,23 @@ deploy_to_cloud_run_with_yaml() {
     --platform=managed \
     --region="$REGION" \
     --format='value(status.url)')
+  
+  # Set IAM policy to allow public access
+  echo -e "${YELLOW}Setting IAM policy to allow unauthenticated access...${NC}"
+  # Create a temporary policy file
+  cat > policy.yaml << EOF
+bindings:
+- members:
+  - allUsers
+  role: roles/run.invoker
+EOF
+  
+  # Apply the policy to allow unauthenticated access
+  gcloud run services set-iam-policy "$SERVICE_NAME" policy.yaml --region="$REGION" --quiet || \
+    echo -e "${YELLOW}Warning: Could not set IAM policy. You may need to set it manually.${NC}"
+  
+  # Clean up temporary policy file
+  rm -f policy.yaml
   
   echo -e "${GREEN}✓ Deployment completed successfully!${NC}"
   echo -e "${GREEN}Your application is now available at: ${service_url}${NC}"

@@ -11,6 +11,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'react-router-dom';
 import { Token } from '@/components/dashboard/TokensTable';
 import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants';
+import { 
+  fetchApiKeys, 
+  updateApiKeyLastUsed,
+  subscribeToApiKeyChanges
+} from '@/lib/api/apiKeyService';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface ApiKey {
   id: string;
@@ -38,6 +44,19 @@ const ApiPlayground = () => {
   
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [selectedApiKey, setSelectedApiKey] = useState<string>('');
+  const [requestStatus, setRequestStatus] = useState<string>('');
+
+  // Helper function to format API keys with full token value
+  const formatApiKeys = (tokens: Token[]): ApiKey[] => {
+    return tokens
+      .filter(token => token.status === 'active')
+      .map(token => ({
+        id: token.id,
+        value: token.token,
+        label: `${token.token} (${token.name})`,
+        isActive: true
+      }));
+  };
 
   // Define updateRequestCode with useCallback before it's used
   const updateRequestCode = useCallback((model: string, promptText: string, streaming: boolean, apiKey: string) => {
@@ -58,22 +77,14 @@ const ApiPlayground = () => {
     setRequestCode(code);
   }, []);
 
-  useEffect(() => {
-    const storedApiKeys = localStorage.getItem('apiKeys');
-    if (storedApiKeys) {
-      const parsedTokens: Token[] = JSON.parse(storedApiKeys);
-      const formattedApiKeys: ApiKey[] = parsedTokens
-        .filter(token => token.status === 'active')
-        .map(token => ({
-          id: token.id,
-          value: token.token,
-          label: `${token.token.substring(0, 8)}...${token.token.substring(token.token.length - 4)} (${token.name})`,
-          isActive: true
-        }));
+  const loadApiKeys = async () => {
+    try {
+      const tokens = await fetchApiKeys();
+      const formattedApiKeys = formatApiKeys(tokens);
       
       setApiKeys(formattedApiKeys);
       
-      if (formattedApiKeys.length > 0) {
+      if (formattedApiKeys.length > 0 && !selectedApiKey) {
         setSelectedApiKey(formattedApiKeys[0].id);
         updateRequestCode(
           selectedModel, 
@@ -82,27 +93,47 @@ const ApiPlayground = () => {
           formattedApiKeys[0].value
         );
       }
-    }
-    
-    const params = new URLSearchParams(location.search);
-    const apiKeyParam = params.get('apiKey');
-    
-    if (apiKeyParam && storedApiKeys) {
-      const parsedTokens: Token[] = JSON.parse(storedApiKeys);
-      const matchingToken = parsedTokens.find(token => token.token === apiKeyParam && token.status === 'active');
       
-      if (matchingToken) {
-        const matchingKey = {
-          id: matchingToken.id,
-          value: matchingToken.token,
-          label: `${matchingToken.token.substring(0, 8)}...${matchingToken.token.substring(matchingToken.token.length - 4)} (${matchingToken.name})`,
-          isActive: true
-        };
+      // Check if there's an apiKey parameter in the URL
+      const params = new URLSearchParams(location.search);
+      const apiKeyParam = params.get('apiKey');
+      
+      if (apiKeyParam) {
+        const matchingToken = tokens.find(token => token.token === apiKeyParam && token.status === 'active');
         
-        setSelectedApiKey(matchingKey.id);
-        updateRequestCode(selectedModel, prompt, isStreaming, matchingKey.value);
+        if (matchingToken) {
+          const matchingKey = {
+            id: matchingToken.id,
+            value: matchingToken.token,
+            label: `${matchingToken.token} (${matchingToken.name})`,
+            isActive: true
+          };
+          
+          setSelectedApiKey(matchingKey.id);
+          updateRequestCode(selectedModel, prompt, isStreaming, matchingKey.value);
+        }
       }
+    } catch (error) {
+      console.error('Error loading API keys:', error);
+      toast({
+        title: "Failed to load API keys",
+        description: "Please try again later",
+        variant: "destructive"
+      });
     }
+  };
+
+  useEffect(() => {
+    // Load API keys initially
+    loadApiKeys();
+    
+    // Subscribe to API key changes
+    const unsubscribe = subscribeToApiKeyChanges(loadApiKeys);
+    
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribe();
+    };
   }, [location.search, isStreaming, prompt, selectedModel, updateRequestCode]);
 
   const handleModelChange = (value: string) => {
@@ -167,6 +198,12 @@ const ApiPlayground = () => {
     setIsLoading(true);
     setResponse(null);
     setStreamingOutput('');
+    setRequestStatus('Sending Request...');
+    
+    // Set a timeout to change the status label after 3 seconds
+    const statusTimeout = setTimeout(() => {
+      setRequestStatus('Opening Session...');
+    }, 3000);
     
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -196,6 +233,7 @@ const ApiPlayground = () => {
         });
         
         if (!response.ok) {
+          clearTimeout(statusTimeout);
           const errorData = await response.text();
           throw new Error(`API request failed: ${response.status} ${errorData}`);
         }
@@ -203,11 +241,18 @@ const ApiPlayground = () => {
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         let streamText = '';
+        let firstChunkReceived = false;
         
         if (reader) {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
+            
+            if (!firstChunkReceived) {
+              clearTimeout(statusTimeout);
+              setRequestStatus('Streaming Response...');
+              firstChunkReceived = true;
+            }
             
             const chunk = decoder.decode(value, { stream: true });
             
@@ -253,27 +298,23 @@ const ApiPlayground = () => {
         });
         
         if (!response.ok) {
+          clearTimeout(statusTimeout);
           const errorData = await response.text();
           throw new Error(`API request failed: ${response.status} ${errorData}`);
         }
         
+        clearTimeout(statusTimeout);
         const data = await response.json();
         const content = data.choices[0]?.message?.content || '';
         setResponse(content);
       }
       
       // Update last used time for the token
-      const storedApiKeys = localStorage.getItem('apiKeys');
-      if (storedApiKeys && selectedApiKey) {
-        const parsedTokens: Token[] = JSON.parse(storedApiKeys);
-        const updatedTokens = parsedTokens.map(token => 
-          token.id === selectedApiKey 
-            ? { ...token, lastUsed: new Date().toISOString() } 
-            : token
-        );
-        localStorage.setItem('apiKeys', JSON.stringify(updatedTokens));
+      if (selectedApiKey) {
+        updateApiKeyLastUsed(selectedApiKey);
       }
     } catch (error) {
+      clearTimeout(statusTimeout);
       console.error('Error making request:', error);
       if ((error as Error).name !== 'AbortError') {
         toast({
@@ -283,6 +324,7 @@ const ApiPlayground = () => {
         });
       }
     } finally {
+      clearTimeout(statusTimeout);
       setIsLoading(false);
       abortControllerRef.current = null;
     }
@@ -293,6 +335,7 @@ const ApiPlayground = () => {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
       setIsLoading(false);
+      setRequestStatus('');
       toast({
         title: "Request Cancelled",
         description: "The API request was cancelled",
@@ -317,6 +360,7 @@ const ApiPlayground = () => {
             <CardTitle>API Testing</CardTitle>
             <CardDescription>
               Click "Make Request" below to test the API. Look for the response in the box below.
+              For testing purposes, each request opens a new session.  This takes about 30 seconds and will not be the case when you use the API in your apps.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -347,6 +391,14 @@ const ApiPlayground = () => {
                   />
                   <Label htmlFor="streaming">Enable streaming</Label>
                 </div>
+                
+                <div className="flex items-center space-x-2 mt-2">
+                  <Label htmlFor="network">Network:</Label>
+                  <ToggleGroup type="single" value="testnet" disabled>
+                    <ToggleGroupItem value="mainnet" disabled>Mainnet</ToggleGroupItem>
+                    <ToggleGroupItem value="testnet" disabled>Testnet</ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
               </div>
               
               <div className="space-y-2">
@@ -356,12 +408,12 @@ const ApiPlayground = () => {
                     value={selectedApiKey} 
                     onValueChange={handleApiKeyChange}
                   >
-                    <SelectTrigger id="api-key">
+                    <SelectTrigger id="api-key" className="truncate max-w-full">
                       <SelectValue placeholder="Select an API key" />
                     </SelectTrigger>
                     <SelectContent>
                       {apiKeys.map(key => (
-                        <SelectItem key={key.id} value={key.id}>
+                        <SelectItem key={key.id} value={key.id} className="break-all">
                           {key.label}
                         </SelectItem>
                       ))}
@@ -431,7 +483,7 @@ const ApiPlayground = () => {
           <CardHeader>
             <CardTitle>Response</CardTitle>
             <CardDescription>
-              {isLoading ? 'Loading response...' : 'Result from the API'}
+              {isLoading ? requestStatus || 'Loading response...' : 'Result from the API'}
             </CardDescription>
           </CardHeader>
           <CardContent>

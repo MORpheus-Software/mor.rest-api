@@ -1,0 +1,26 @@
+{
+  "name": "MOR.rest API",
+  "short_name": "MOR API",
+  "description": "API access to Morpheus Compute",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/logo_256.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo_512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo_1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ]
+} 

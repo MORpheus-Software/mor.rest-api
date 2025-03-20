@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { ApiPlayground } from '@/components/dashboard/ApiPlayground';
@@ -26,7 +25,7 @@ const PlaygroundPage = () => {
     <DashboardLayout>
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight">API Playground</h1>
-        <p className="text-muted-foreground">Test your API tokens and endpoints interactively</p>
+        <p className="text-muted-foreground">Test your API keys and endpoints interactively</p>
       </div>
       
       <ApiPlayground />

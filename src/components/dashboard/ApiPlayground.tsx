@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Code, Play, FileJson, Copy } from 'lucide-react';
 import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants';
+import { fetchApiKeys, updateApiKeyLastUsed, subscribeToApiKeyChanges } from '@/lib/api/apiKeyService';
 
 export function ApiPlayground() {
   const { toast } = useToast();
@@ -19,13 +20,43 @@ export function ApiPlayground() {
   const [response, setResponse] = useState<any>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [requestBody, setRequestBody] = useState('{\n  "name": "John Doe"\n}');
+  const [availableApiKeys, setAvailableApiKeys] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Load API keys
+    const loadApiKeys = async () => {
+      try {
+        const keys = await fetchApiKeys();
+        const activeKeys = keys.filter(key => key.status === 'active').map(key => key.token);
+        setAvailableApiKeys(activeKeys);
+        
+        // Set the first key as the default if we don't have a token yet
+        if (activeKeys.length > 0 && !token) {
+          setToken(activeKeys[0]);
+        }
+      } catch (error) {
+        console.error('Error loading API keys:', error);
+      }
+    };
+    
+    // Load keys initially
+    loadApiKeys();
+    
+    // Subscribe to API key changes
+    const unsubscribe = subscribeToApiKeyChanges(loadApiKeys);
+    
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribe();
+    };
+  }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
       toast({
-        title: "API token required",
-        description: "Please enter an API token to make a request",
+        title: "API key required",
+        description: "Please enter an API key to make a request",
         variant: "destructive",
       });
       return;
@@ -90,6 +121,13 @@ export function ApiPlayground() {
         status: response.status,
         data
       });
+      
+      // Update last used time for the token
+      const keys = await fetchApiKeys();
+      const matchingKey = keys.find(key => key.token === token);
+      if (matchingKey) {
+        updateApiKeyLastUsed(matchingKey.id);
+      }
     } catch (error) {
       console.error('Error making request:', error);
       toast({
@@ -236,20 +274,47 @@ export function ApiPlayground() {
             <Code className="h-5 w-5 text-primary" />
             <CardTitle>API Playground</CardTitle>
           </div>
-          <CardDescription>Test your API tokens with different endpoints and methods</CardDescription>
+          <CardDescription>Test your API keys with different endpoints and methods</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="token">API Token</Label>
-              <Input
-                id="token"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Enter your API token"
-                className="font-mono text-sm"
-                disabled={isLoading}
-              />
+              <Label htmlFor="token">API Key</Label>
+              {availableApiKeys.length > 0 ? (
+                <Select 
+                  value={token} 
+                  onValueChange={setToken}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger id="token" className="font-mono text-sm truncate">
+                    <SelectValue placeholder="Select an API key" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableApiKeys.map(key => (
+                      <SelectItem key={key} value={key} className="font-mono text-sm break-all">
+                        {key}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Input
+                    id="token"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    placeholder="Enter your API key"
+                    className="font-mono text-sm"
+                    disabled={isLoading}
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={() => window.location.href = '/tokens'}
+                  >
+                    Create Key
+                  </Button>
+                </div>
+              )}
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
