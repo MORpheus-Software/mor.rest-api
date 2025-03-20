@@ -38,10 +38,12 @@ spec:
         - name: VITE_API_BASE_URL
           # This is used by both frontend (through import.meta.env) and backend (through process.env)
           value: https://nfa-proxy-1081887913409.us-west1.run.app
+        # Environment variables for model configuration, set via Google Cloud Run
+        # These can be overridden directly in the Cloud Run console
         - name: REACT_APP_DEFAULT_MODEL_NAME
-          value: REACT_APP_DEFAULT_MODEL_NAME_VALUE
+          value: "Hermes-3-Llama-3.1-8B"
         - name: REACT_APP_DEFAULT_MODEL_ID
-          value: REACT_APP_DEFAULT_MODEL_ID_VALUE
+          value: "llama-3.1-8b-instant"
         ports:
         - containerPort: 8080
           name: http1

@@ -157,9 +157,8 @@ jobs:
           sed -i "s|ENVIRONMENT_NAME|dev|g" cloud-run-deploy-config.yaml
         fi
         
-        # Update model environment variables
-        sed -i "s|REACT_APP_DEFAULT_MODEL_NAME_VALUE|${{ env.REACT_APP_DEFAULT_MODEL_NAME }}|g" cloud-run-deploy-config.yaml
-        sed -i "s|REACT_APP_DEFAULT_MODEL_ID_VALUE|${{ env.REACT_APP_DEFAULT_MODEL_ID }}|g" cloud-run-deploy-config.yaml
+        # Note: No longer replacing model variables since they have default values in the template
+        # and can be overridden in the Cloud Run console
         
         # If production deployment, update the image to use staging image
         if [[ "${{ env.IS_PROD }}" == "true" ]]; then

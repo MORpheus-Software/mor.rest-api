@@ -102,6 +102,27 @@ RUN echo "Installing runtime dependencies..." && \
 # Copy .env file for runtime environment variables
 COPY --from=frontend-builder /app/.env ./.env
 
+# Create runtime configuration script
+RUN echo '#!/bin/sh\n\
+echo "Starting server with runtime environment..."\n\
+# Create runtime environment file\n\
+touch /app/.env.runtime\n\
+# Copy existing environment\n\
+cat /app/.env > /app/.env.runtime\n\
+# Override with runtime values if provided\n\
+if [ ! -z "$REACT_APP_DEFAULT_MODEL_NAME" ]; then\n\
+  echo "REACT_APP_DEFAULT_MODEL_NAME=$REACT_APP_DEFAULT_MODEL_NAME" >> /app/.env.runtime\n\
+  echo "Using runtime model name: $REACT_APP_DEFAULT_MODEL_NAME"\n\
+fi\n\
+if [ ! -z "$REACT_APP_DEFAULT_MODEL_ID" ]; then\n\
+  echo "REACT_APP_DEFAULT_MODEL_ID=$REACT_APP_DEFAULT_MODEL_ID" >> /app/.env.runtime\n\
+  echo "Using runtime model ID: $REACT_APP_DEFAULT_MODEL_ID"\n\
+fi\n\
+# Start the server with the runtime environment\n\
+export $(grep -v "^#" /app/.env.runtime | xargs)\n\
+exec node dist/src/server/server.js\n\
+' > /app/start.sh && chmod +x /app/start.sh
+
 # Make the app more robust in production
 COPY scripts/healthcheck.js ./scripts/
 
@@ -116,5 +137,5 @@ EXPOSE 8080
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Start the server
-CMD ["node", "dist/src/server/server.js"] 
+# Start the server with the runtime environment script
+CMD ["/app/start.sh"] 

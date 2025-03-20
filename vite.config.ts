@@ -1,24 +1,33 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+  // Load environment variables from process.env and .env files
+  // This allows overriding values via runtime environment variables
+  const env = loadEnv(mode, process.cwd(), '');
+  
   // Determine if we're in development mode
   const isDevelopment = mode === 'development';
   
   // Set proxy target based on environment
-  const proxyTarget = isDevelopment
+  const proxyTarget = isDevelopment 
     ? 'http://localhost:4000'  // Use local server in development
     : 'https://nfa-proxy-1081887913409.us-west1.run.app'; // Use production server otherwise
   
   console.log(`[VITE] Environment: ${mode}`);
   console.log(`[VITE] Proxy target: ${proxyTarget}`);
   
-  // Get the model environment variables
-  const modelName = process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Hermes-3-Llama-3.1-8B';
-  const modelId = process.env.REACT_APP_DEFAULT_MODEL_ID || 'llama-3.1-8b-instant';
+  // Get the model environment variables, giving precedence to process.env over .env file
+  const modelName = process.env.REACT_APP_DEFAULT_MODEL_NAME || 
+                    env.REACT_APP_DEFAULT_MODEL_NAME || 
+                    'Hermes-3-Llama-3.1-8B';
+                    
+  const modelId = process.env.REACT_APP_DEFAULT_MODEL_ID || 
+                  env.REACT_APP_DEFAULT_MODEL_ID || 
+                  'llama-3.1-8b-instant';
   
   console.log(`[VITE] Using model: ${modelName} (${modelId})`);
   
@@ -69,7 +78,7 @@ export default defineConfig(({ mode }) => {
       // Properly handle environment variables in both development and production
       'process.env': {
         NODE_ENV: JSON.stringify(mode),
-        VITE_API_BASE_URL: JSON.stringify(process.env.VITE_API_BASE_URL || 'https://nfa-proxy-1081887913409.us-west1.run.app'),
+        VITE_API_BASE_URL: JSON.stringify(process.env.VITE_API_BASE_URL || env.VITE_API_BASE_URL || 'https://nfa-proxy-1081887913409.us-west1.run.app'),
         // Add React App environment variables to make them available in client code
         REACT_APP_DEFAULT_MODEL_NAME: JSON.stringify(modelName),
         REACT_APP_DEFAULT_MODEL_ID: JSON.stringify(modelId),
