@@ -40,21 +40,21 @@ jobs:
           echo "Deploying to production environment: morsaas"
           echo "IS_PROD=true" >> $GITHUB_ENV
           # Production model config
-          echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.PROD_MODEL_NAME || 'LMR-Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
+          echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.PROD_MODEL_NAME || 'Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
           echo "REACT_APP_DEFAULT_MODEL_ID=${{ secrets.PROD_MODEL_ID || 'llama-3.1' }}" >> $GITHUB_ENV
         elif [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
           echo "SERVICE_NAME=morsaas-staging" >> $GITHUB_ENV
           echo "Deploying to staging environment: morsaas-staging"
           echo "IS_PROD=false" >> $GITHUB_ENV
           # Staging model config
-          echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.STAGING_MODEL_NAME || 'LMR-Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
+          echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.STAGING_MODEL_NAME || 'Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
           echo "REACT_APP_DEFAULT_MODEL_ID=${{ secrets.STAGING_MODEL_ID || 'llama-3.1' }}" >> $GITHUB_ENV
         else
           echo "SERVICE_NAME=morsaas-dev" >> $GITHUB_ENV
           echo "Deploying to development environment: morsaas-dev"
           echo "IS_PROD=false" >> $GITHUB_ENV
           # Development model config
-          echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.DEV_MODEL_NAME || 'LMR-Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
+          echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.DEV_MODEL_NAME || 'Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
           echo "REACT_APP_DEFAULT_MODEL_ID=${{ secrets.DEV_MODEL_ID || 'llama-3.1' }}" >> $GITHUB_ENV
         fi
       

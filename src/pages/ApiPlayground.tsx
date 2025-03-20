@@ -17,6 +17,9 @@ import {
   subscribeToApiKeyChanges
 } from '@/lib/api/apiKeyService';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { getModelId, getModelName, logConfigSource } from '@/lib/config/runtime-config';
+import { Helmet } from 'react-helmet';
+import axios from 'axios';
 
 interface ApiKey {
   id: string;
@@ -25,12 +28,13 @@ interface ApiKey {
   isActive: boolean;
 }
 
-// Get model configuration from environment variables with fallbacks
-const DEFAULT_MODEL_ID = process.env.REACT_APP_DEFAULT_MODEL_ID || 'llama-3.1-8b-instant';
-const DEFAULT_MODEL_NAME = process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Hermes-3-Llama-3.1-8B';
+// Get model configuration using the runtime-config helper
+const DEFAULT_MODEL_ID = getModelId();
+const DEFAULT_MODEL_NAME = getModelName();
 
 // Log the model configuration for debugging
 console.log(`[API_PLAYGROUND] Using model: ${DEFAULT_MODEL_NAME} (${DEFAULT_MODEL_ID})`);
+logConfigSource();
 
 const models = [
   { id: DEFAULT_MODEL_ID, name: DEFAULT_MODEL_NAME },
@@ -356,6 +360,9 @@ const ApiPlayground = () => {
 
   return (
     <DashboardLayout>
+      <Helmet>
+        <title>API Playground</title>
+      </Helmet>
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight">API Playground</h1>
         <p className="text-muted-foreground">Test your API keys and interact with AI models</p>

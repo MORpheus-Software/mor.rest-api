@@ -288,6 +288,42 @@ app.get('*', (req, res) => {
     return res.redirect(`http://localhost:8080${req.path}`);
   }
   
+  // Get model env variables for runtime injection
+  const modelName = process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Hermes-3-Llama-3.1-8B';
+  const modelId = process.env.REACT_APP_DEFAULT_MODEL_ID || 'llama-3.1-8b-instant';
+  
+  console.log(chalk.yellow(`[SERVER] Using runtime model config: ${modelName} (${modelId})`));
+  
+  // Check if we need to inject runtime model variables
+  if (fs.existsSync(path.join(publicPath, 'index.html'))) {
+    try {
+      // Read the index.html file
+      const htmlContent = fs.readFileSync(path.join(publicPath, 'index.html'), 'utf-8');
+      
+      // Create the runtime config script
+      const runtimeConfigScript = `
+        <script>
+          // Runtime model configuration from server environment
+          window.RUNTIME_CONFIG = {
+            modelName: ${JSON.stringify(modelName)},
+            modelId: ${JSON.stringify(modelId)}
+          };
+          console.log("[RUNTIME] Injected runtime model config:", window.RUNTIME_CONFIG);
+        </script>
+      `;
+      
+      // Insert the runtime config script right before the closing </head> tag
+      const modifiedHtml = htmlContent.replace('</head>', `${runtimeConfigScript}</head>`);
+      
+      // Send the modified HTML with the runtime config
+      return res.send(modifiedHtml);
+    } catch (error) {
+      console.error(chalk.red(`[SERVER] Error injecting runtime config:`), error);
+      // Fall back to sending the original file
+    }
+  }
+  
+  // If we failed to modify or the file doesn't exist, send the original
   res.sendFile(path.join(publicPath, 'index.html'));
 });
 

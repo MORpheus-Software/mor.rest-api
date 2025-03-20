@@ -860,12 +860,12 @@ const Documentation = () => {
                   </p>
                 </div>
                 
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <h3 className="font-semibold">What models are available?</h3>
                   <p className="text-sm text-muted-foreground">
-                    We offer a range of models including LMR-Hermes-3-Llama-3.1-8B, Llama-3.1-Sonar-Large-70B, and Llama-3.1-Sonar-Huge-405B. Different models have different capabilities and pricing.
+                    LMR-Hermes-3-Llama-3.1-8B on testnet. Different models have different capabilities and pricing.
                   </p>
-                </div>
+                </div> */}
                 
                 <div className="space-y-2">
                   <h3 className="font-semibold">What are the rate limits?</h3>
