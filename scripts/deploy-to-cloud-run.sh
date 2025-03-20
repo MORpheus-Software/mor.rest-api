@@ -24,6 +24,10 @@ MAX_INSTANCES="10"
 TIMEOUT="600s"
 UPSTASH_PRODUCTION_URL=redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
 
+# React Environment Variables
+REACT_APP_DEFAULT_MODEL_NAME="LMR-Hermes-3-Llama-3.1-8B"
+REACT_APP_DEFAULT_MODEL_ID="llama-3.1"
+
 # NOTE: Cloud Run has a maximum startup probe timeout of 240 seconds (4 minutes).
 # If your container takes longer than that to start, you'll need to:
 # 1. Optimize your container to start faster
@@ -198,7 +202,7 @@ deploy_to_cloud_run() {
     --cpu-boost \
     --execution-environment=gen2 \
     --no-cpu-throttling \
-    --set-env-vars="REDIS_URL=${redis_url},NODE_ENV=production" \
+    --set-env-vars="REDIS_URL=${redis_url},NODE_ENV=production,REACT_APP_DEFAULT_MODEL_NAME=${REACT_APP_DEFAULT_MODEL_NAME},REACT_APP_DEFAULT_MODEL_ID=${REACT_APP_DEFAULT_MODEL_ID}" \
     --allow-unauthenticated
   
   # Get the deployed service URL

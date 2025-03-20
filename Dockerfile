@@ -6,8 +6,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
 
-# Copy source files
+# Copy source files and .env
 COPY . .
+
+# Set React environment variables for build time
+ENV REACT_APP_DEFAULT_MODEL_NAME=LMR-Hermes-3-Llama-3.1-8B
+ENV REACT_APP_DEFAULT_MODEL_ID=llama-3.1
 
 # Build the frontend (Vite handles the frontend environment)
 RUN npm run build
@@ -61,12 +65,8 @@ COPY --from=frontend-builder /app/dist ./public
 # Add any required runtime dependencies
 RUN npm install --production --no-audit --no-fund --save express dotenv cors ioredis
 
-# Create a .env file with safe defaults for production
-RUN echo "NODE_ENV=production\n\
-PORT=8080\n\
-# Default API URL if not provided at runtime\n\
-VITE_API_BASE_URL=https://nfa-proxy-1081887913409.us-west1.run.app\n\
-" > .env
+# Copy .env file for runtime environment variables
+COPY .env .env
 
 # Make the app more robust in production
 COPY scripts/healthcheck.js ./scripts/

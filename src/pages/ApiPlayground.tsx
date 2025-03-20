@@ -20,10 +20,7 @@ interface ApiKey {
 }
 
 const models = [
-  { id: 'gpt-4o', name: 'GPT-4o' },
-  { id: 'llama-3.1-sonar-small-128k-online', name: 'LMR-Hermes-3-Llama-3.1-8B' },
-  { id: 'llama-3.1-sonar-large-128k-online', name: 'Llama-3.1-Sonar-Large-70B' },
-  { id: 'llama-3.1-sonar-huge-128k-online', name: 'Llama-3.1-Sonar-Huge-405B' },
+  { id: process.env.REACT_APP_DEFAULT_MODEL_ID || 'llama-3.1', name: process.env.REACT_APP_DEFAULT_MODEL_NAME || 'LMR-Hermes-3-Llama-3.1-8B' },
 ];
 
 const ApiPlayground = () => {
