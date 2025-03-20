@@ -6,6 +6,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
 
+# Copy .env file first to make environment variables available during build
+COPY .env ./
+RUN echo "Loaded environment variables:" && cat .env | grep -v "#" | grep -v "^$" | sort
+
 # Copy index.html first to ensure it's not missed
 COPY index.html ./
 RUN echo "Verifying index.html exists:" && \
@@ -17,8 +21,18 @@ COPY . .
 # Disable Vite's transform cache for HTML files to ensure fresh builds
 ENV VITE_DISABLE_TRANSFORM_CACHE=true
 
+# Define arguments for the React app environment variables
+ARG REACT_APP_DEFAULT_MODEL_NAME
+ARG REACT_APP_DEFAULT_MODEL_ID
+
+# Load values from .env file
+RUN export $(grep -v '^#' .env | xargs) && \
+    echo "REACT_APP_DEFAULT_MODEL_NAME=$REACT_APP_DEFAULT_MODEL_NAME" && \
+    echo "REACT_APP_DEFAULT_MODEL_ID=$REACT_APP_DEFAULT_MODEL_ID"
+
 # Build the frontend (Vite handles the frontend environment)
-RUN npm run build
+RUN echo "Building with model config..." && \
+    npm run build
 
 # Verify the built index.html contains expected meta tags
 RUN echo "Verifying built index.html:" && \
@@ -31,6 +45,9 @@ WORKDIR /app
 # Copy package files and install dependencies
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
+
+# Copy .env file for environment variables
+COPY .env ./
 
 # Copy TypeScript configuration files
 COPY tsconfig*.json ./
@@ -99,5 +116,9 @@ EXPOSE 8080
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Start the server
-CMD ["node", "dist/src/server/server.js"] 
+# Load React app environment variables at runtime
+RUN echo "Loading environment variables at runtime" && \
+    grep "REACT_APP_" .env >> /app/.env.production
+
+# Start the server with environment variables from .env
+CMD ["/bin/sh", "-c", "source /app/.env.production && node dist/src/server/server.js"] 

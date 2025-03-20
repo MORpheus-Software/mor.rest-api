@@ -16,6 +16,12 @@ export default defineConfig(({ mode }) => {
   console.log(`[VITE] Environment: ${mode}`);
   console.log(`[VITE] Proxy target: ${proxyTarget}`);
   
+  // Get the model environment variables
+  const modelName = process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Hermes-3-Llama-3.1-8B';
+  const modelId = process.env.REACT_APP_DEFAULT_MODEL_ID || 'llama-3.1-8b-instant';
+  
+  console.log(`[VITE] Using model: ${modelName} (${modelId})`);
+  
   return {
     server: {
       host: "::",
@@ -64,6 +70,9 @@ export default defineConfig(({ mode }) => {
       'process.env': {
         NODE_ENV: JSON.stringify(mode),
         VITE_API_BASE_URL: JSON.stringify(process.env.VITE_API_BASE_URL || 'https://nfa-proxy-1081887913409.us-west1.run.app'),
+        // Add React App environment variables to make them available in client code
+        REACT_APP_DEFAULT_MODEL_NAME: JSON.stringify(modelName),
+        REACT_APP_DEFAULT_MODEL_ID: JSON.stringify(modelId),
       },
     },
   };

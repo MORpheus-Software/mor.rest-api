@@ -25,12 +25,19 @@ interface ApiKey {
   isActive: boolean;
 }
 
+// Get model configuration from environment variables with fallbacks
+const DEFAULT_MODEL_ID = process.env.REACT_APP_DEFAULT_MODEL_ID || 'llama-3.1-8b-instant';
+const DEFAULT_MODEL_NAME = process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Hermes-3-Llama-3.1-8B';
+
+// Log the model configuration for debugging
+console.log(`[API_PLAYGROUND] Using model: ${DEFAULT_MODEL_NAME} (${DEFAULT_MODEL_ID})`);
+
 const models = [
-  { id: process.env.REACT_APP_DEFAULT_MODEL_ID || 'llama-3.1', name: process.env.REACT_APP_DEFAULT_MODEL_NAME || 'LMR-Hermes-3-Llama-3.1-8B' },
+  { id: DEFAULT_MODEL_ID, name: DEFAULT_MODEL_NAME },
 ];
 
 const ApiPlayground = () => {
-  const [selectedModel, setSelectedModel] = useState('llama-3.1-sonar-small-128k-online');
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
   const [prompt, setPrompt] = useState('');
   const [isStreaming, setIsStreaming] = useState(true);
   const [response, setResponse] = useState<string | null>(null);
