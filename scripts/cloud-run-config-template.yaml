@@ -38,6 +38,10 @@ spec:
         - name: VITE_API_BASE_URL
           # This is used by both frontend (through import.meta.env) and backend (through process.env)
           value: https://nfa-proxy-1081887913409.us-west1.run.app
+        - name: REACT_APP_DEFAULT_MODEL_NAME
+          value: REACT_APP_DEFAULT_MODEL_NAME_VALUE
+        - name: REACT_APP_DEFAULT_MODEL_ID
+          value: REACT_APP_DEFAULT_MODEL_ID_VALUE
         ports:
         - containerPort: 8080
           name: http1

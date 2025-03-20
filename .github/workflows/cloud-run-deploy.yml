@@ -39,14 +39,23 @@ jobs:
           echo "SERVICE_NAME=morsaas" >> $GITHUB_ENV
           echo "Deploying to production environment: morsaas"
           echo "IS_PROD=true" >> $GITHUB_ENV
+          # Production model config
+          echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.PROD_MODEL_NAME || 'LMR-Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
+          echo "REACT_APP_DEFAULT_MODEL_ID=${{ secrets.PROD_MODEL_ID || 'llama-3.1' }}" >> $GITHUB_ENV
         elif [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
           echo "SERVICE_NAME=morsaas-staging" >> $GITHUB_ENV
           echo "Deploying to staging environment: morsaas-staging"
           echo "IS_PROD=false" >> $GITHUB_ENV
+          # Staging model config
+          echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.STAGING_MODEL_NAME || 'LMR-Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
+          echo "REACT_APP_DEFAULT_MODEL_ID=${{ secrets.STAGING_MODEL_ID || 'llama-3.1' }}" >> $GITHUB_ENV
         else
           echo "SERVICE_NAME=morsaas-dev" >> $GITHUB_ENV
           echo "Deploying to development environment: morsaas-dev"
           echo "IS_PROD=false" >> $GITHUB_ENV
+          # Development model config
+          echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.DEV_MODEL_NAME || 'LMR-Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
+          echo "REACT_APP_DEFAULT_MODEL_ID=${{ secrets.DEV_MODEL_ID || 'llama-3.1' }}" >> $GITHUB_ENV
         fi
       
     - name: Make deploy script executable
@@ -121,8 +130,14 @@ jobs:
         BUILD_ID="$(date +%s)-$(git rev-parse --short HEAD)"
         echo "Using BUILD_ID: $BUILD_ID for cache control"
         
-        # Build and push the Docker image with BUILD_ID
-        docker build --build-arg BUILD_ID="$BUILD_ID" -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
+        # Build and push the Docker image with BUILD_ID and environment variables
+        docker build \
+          --build-arg BUILD_ID="$BUILD_ID" \
+          --build-arg REACT_APP_DEFAULT_MODEL_NAME="${{ env.REACT_APP_DEFAULT_MODEL_NAME }}" \
+          --build-arg REACT_APP_DEFAULT_MODEL_ID="${{ env.REACT_APP_DEFAULT_MODEL_ID }}" \
+          --build-arg VITE_API_BASE_URL="${{ secrets.VITE_API_BASE_URL }}" \
+          -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
+        
         docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
         
     - name: Create Cloud Run YAML configuration
@@ -141,6 +156,10 @@ jobs:
         else
           sed -i "s|ENVIRONMENT_NAME|dev|g" cloud-run-deploy-config.yaml
         fi
+        
+        # Update model environment variables
+        sed -i "s|REACT_APP_DEFAULT_MODEL_NAME_VALUE|${{ env.REACT_APP_DEFAULT_MODEL_NAME }}|g" cloud-run-deploy-config.yaml
+        sed -i "s|REACT_APP_DEFAULT_MODEL_ID_VALUE|${{ env.REACT_APP_DEFAULT_MODEL_ID }}|g" cloud-run-deploy-config.yaml
         
         # If production deployment, update the image to use staging image
         if [[ "${{ env.IS_PROD }}" == "true" ]]; then

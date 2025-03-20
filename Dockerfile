@@ -6,9 +6,18 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
 
-# Copy .env file first to make environment variables available during build
-COPY .env ./
-RUN echo "Loaded environment variables:" && cat .env | grep -v "#" | grep -v "^$" | sort
+# Create .env file from environment variables if it doesn't exist
+RUN touch .env
+# Set model environment variables (passed from GitHub Actions)
+ARG REACT_APP_DEFAULT_MODEL_NAME
+ARG REACT_APP_DEFAULT_MODEL_ID
+ARG VITE_API_BASE_URL
+RUN echo "REACT_APP_DEFAULT_MODEL_NAME=${REACT_APP_DEFAULT_MODEL_NAME:-LMR-Hermes-3-Llama-3.1-8B}" >> .env
+RUN echo "REACT_APP_DEFAULT_MODEL_ID=${REACT_APP_DEFAULT_MODEL_ID:-llama-3.1-8b-instant}" >> .env
+RUN echo "VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://nfa-proxy-1081887913409.us-west1.run.app}" >> .env
+
+# Log environment variables for build
+RUN echo "Generated .env file:" && cat .env | sort
 
 # Copy index.html first to ensure it's not missed
 COPY index.html ./
@@ -20,15 +29,6 @@ COPY . .
 
 # Disable Vite's transform cache for HTML files to ensure fresh builds
 ENV VITE_DISABLE_TRANSFORM_CACHE=true
-
-# Define arguments for the React app environment variables
-ARG REACT_APP_DEFAULT_MODEL_NAME
-ARG REACT_APP_DEFAULT_MODEL_ID
-
-# Load values from .env file
-RUN export $(grep -v '^#' .env | xargs) && \
-    echo "REACT_APP_DEFAULT_MODEL_NAME=$REACT_APP_DEFAULT_MODEL_NAME" && \
-    echo "REACT_APP_DEFAULT_MODEL_ID=$REACT_APP_DEFAULT_MODEL_ID"
 
 # Build the frontend (Vite handles the frontend environment)
 RUN echo "Building with model config..." && \
@@ -46,8 +46,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
 
-# Copy .env file for environment variables
-COPY .env ./
+# Copy environment configuration
+COPY --from=frontend-builder /app/.env ./
 
 # Copy TypeScript configuration files
 COPY tsconfig*.json ./
@@ -100,7 +100,7 @@ RUN echo "Installing runtime dependencies..." && \
     npm install --no-audit --no-fund --omit=dev express dotenv cors ioredis
 
 # Copy .env file for runtime environment variables
-COPY .env .env
+COPY --from=frontend-builder /app/.env ./.env
 
 # Make the app more robust in production
 COPY scripts/healthcheck.js ./scripts/
@@ -116,9 +116,5 @@ EXPOSE 8080
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Load React app environment variables at runtime
-RUN echo "Loading environment variables at runtime" && \
-    grep "REACT_APP_" .env >> /app/.env.production
-
-# Start the server with environment variables from .env
-CMD ["/bin/sh", "-c", "source /app/.env.production && node dist/src/server/server.js"] 
+# Start the server
+CMD ["node", "dist/src/server/server.js"] 
