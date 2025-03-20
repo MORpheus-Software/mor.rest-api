@@ -227,6 +227,14 @@ jobs:
         # Deploy using the YAML configuration for extended startup timeout
         echo "Starting deployment with extended startup timeout (240s)..."
         
+        # Pass environment variables to the deployment script
+        export REACT_APP_DEFAULT_MODEL_NAME="${{ env.REACT_APP_DEFAULT_MODEL_NAME }}"
+        export REACT_APP_DEFAULT_MODEL_ID="${{ env.REACT_APP_DEFAULT_MODEL_ID }}"
+        
+        echo "Using model configuration:"
+        echo "- Model Name: $REACT_APP_DEFAULT_MODEL_NAME"
+        echo "- Model ID: $REACT_APP_DEFAULT_MODEL_ID"
+        
         if gcloud run services replace cloud-run-deploy-config.yaml --region=${{ env.REGION }}; then
           echo "✅ Deployment successful!"
           

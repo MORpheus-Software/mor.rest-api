@@ -24,9 +24,15 @@ MAX_INSTANCES="10"
 TIMEOUT="600s"
 UPSTASH_PRODUCTION_URL=redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
 
-# React Environment Variables
-REACT_APP_DEFAULT_MODEL_NAME="LMR-Hermes-3-Llama-3.1-8B"
-REACT_APP_DEFAULT_MODEL_ID="llama-3.1"
+# React Environment Variables - Get from environment variables or use defaults
+# This allows GitHub Actions to pass model configuration to the deployment script
+REACT_APP_DEFAULT_MODEL_NAME="${REACT_APP_DEFAULT_MODEL_NAME:-Hermes-3-Llama-3.1-8B}"
+REACT_APP_DEFAULT_MODEL_ID="${REACT_APP_DEFAULT_MODEL_ID:-llama-3.1-8b-instant}"
+
+# Print the model configuration
+echo "Using model configuration:"
+echo "- Model Name: $REACT_APP_DEFAULT_MODEL_NAME"
+echo "- Model ID: $REACT_APP_DEFAULT_MODEL_ID"
 
 # NOTE: Cloud Run has a maximum startup probe timeout of 240 seconds (4 minutes).
 # If your container takes longer than that to start, you'll need to:
@@ -119,10 +125,13 @@ build_image() {
   # Get the project ID from gcloud config
   local project_id=$(gcloud config get-value project)
   
-  echo -e "${YELLOW}Building Docker image...${NC}"
-  docker build -t "gcr.io/${project_id}/${IMAGE_NAME}:latest" .
+  echo -e "${YELLOW}Building Docker image with model configuration...${NC}"
+  docker build \
+    --build-arg REACT_APP_DEFAULT_MODEL_NAME="$REACT_APP_DEFAULT_MODEL_NAME" \
+    --build-arg REACT_APP_DEFAULT_MODEL_ID="$REACT_APP_DEFAULT_MODEL_ID" \
+    -t "gcr.io/${project_id}/${IMAGE_NAME}:latest" .
   
-  echo -e "${GREEN}✓ Docker image built successfully${NC}"
+  echo -e "${GREEN}✓ Docker image built successfully with model: $REACT_APP_DEFAULT_MODEL_NAME${NC}"
 }
 
 # Push the Docker image to Google Container Registry
@@ -188,7 +197,9 @@ deploy_to_cloud_run() {
   # Configure Upstash Redis
   local redis_url=$(configure_upstash)
   
-  echo -e "${YELLOW}Deploying to Cloud Run using Upstash Redis...${NC}"
+  echo -e "${YELLOW}Deploying to Cloud Run using Upstash Redis and model configuration...${NC}"
+  echo -e "${YELLOW}Model: $REACT_APP_DEFAULT_MODEL_NAME ($REACT_APP_DEFAULT_MODEL_ID)${NC}"
+  
   gcloud run deploy "$SERVICE_NAME" \
     --image="gcr.io/${project_id}/${IMAGE_NAME}:latest" \
     --platform=managed \
@@ -251,8 +262,11 @@ deploy_to_cloud_run_with_yaml() {
   sed -i.bak "s|PROJECT_ID|$project_id|g" "$yaml_file"
   sed -i.bak "s|COMMIT_SHA|latest|g" "$yaml_file"
   sed -i.bak "s|YOUR_REDIS_URL|$redis_url|g" "$yaml_file"
+  sed -i.bak "s|REACT_APP_DEFAULT_MODEL_NAME_VALUE|$REACT_APP_DEFAULT_MODEL_NAME|g" "$yaml_file"
+  sed -i.bak "s|REACT_APP_DEFAULT_MODEL_ID_VALUE|$REACT_APP_DEFAULT_MODEL_ID|g" "$yaml_file"
   
   echo -e "${YELLOW}Deploying to Cloud Run using YAML configuration...${NC}"
+  echo -e "${YELLOW}Model: $REACT_APP_DEFAULT_MODEL_NAME ($REACT_APP_DEFAULT_MODEL_ID)${NC}"
   gcloud run services replace "$yaml_file"
   
   # Clean up temporary files
@@ -303,6 +317,11 @@ setup_upstash_guidance() {
   echo -e "gcloud run services update $SERVICE_NAME \\"
   echo -e "  --region=$REGION \\"
   echo -e "  --set-env-vars=REDIS_URL=your-upstash-redis-url"
+  echo -e ""
+  echo -e "${YELLOW}To update the model configuration for your Cloud Run service:${NC}"
+  echo -e "gcloud run services update $SERVICE_NAME \\"
+  echo -e "  --region=$REGION \\"
+  echo -e "  --set-env-vars=REACT_APP_DEFAULT_MODEL_NAME=your-model-name,REACT_APP_DEFAULT_MODEL_ID=your-model-id"
 }
 
 # Main execution
