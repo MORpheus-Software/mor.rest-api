@@ -44,6 +44,19 @@ spec:
           value: "Hermes-3-Llama-3.1-8B"
         - name: REACT_APP_DEFAULT_MODEL_ID
           value: "llama-3.1-8b-instant"
+        # Fallback endpoint configuration
+        - name: SECONDARY_ENDPOINT_URL
+          value: SECONDARY_ENDPOINT_URL_VALUE
+        - name: SECONDARY_ENDPOINT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: SECONDARY_ENDPOINT_TOKEN_KEY
+              name: morsaas-secrets
+        - name: USE_FALLBACK_AS_PRIMARY
+          value: "USE_FALLBACK_AS_PRIMARY_VALUE"
+        # Consumer API configuration for session management
+        - name: CONSUMER_API_URL
+          value: CONSUMER_API_URL_VALUE
         ports:
         - containerPort: 8080
           name: http1

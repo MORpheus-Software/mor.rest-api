@@ -8,6 +8,8 @@ A SaaS application with API key management, authentication, and chat completions
 - Chat completions API endpoint
 - Redis-backed data persistence with Upstash Redis support
 - React frontend with modern UI components
+- Fallback to secondary OpenAI-compatible endpoint if primary endpoint fails
+- Session reuse to prevent creating new sessions unnecessarily
 
 ## Getting Started
 
@@ -37,6 +39,13 @@ VITE_API_BASE_URL=http://127.0.0.1:4000
 
 # Redis Configuration - Use Upstash Redis URL for both dev and production
 REDIS_URL=redis://global:your-password@your-hostname.upstash.io:port
+
+# Secondary Endpoint (Fallback) Configuration
+SECONDARY_ENDPOINT_URL=https://api.openai.com/v1/chat/completions
+SECONDARY_ENDPOINT_TOKEN=your_openai_api_key_here
+
+# Consumer API Configuration
+CONSUMER_API_URL=https://consumer-node-url.run.app
 ```
 
 ### Configuring Upstash Redis
@@ -163,3 +172,82 @@ This will:
 - Start the Redis container using Docker Compose
 - Set the correct environment variables
 - Start the application in development mode
+
+## Deploying with Fallback Functionality
+
+The application supports fallback to a secondary model API when the primary model is unavailable. To deploy with this functionality, follow these steps:
+
+### 1. Set up Required Secrets in Google Cloud Secret Manager
+
+First, set up the OpenAI API key and secondary endpoint token in Google Cloud Secret Manager:
+
+```bash
+# Set up OpenAI API key
+./scripts/setup-openai-key.sh YOUR_OPENAI_API_KEY
+
+# Set up secondary endpoint token (if different from OpenAI key)
+./scripts/setup-secondary-token.sh YOUR_SECONDARY_ENDPOINT_TOKEN
+```
+
+### 2. Update GitHub Repository Variables
+
+Set the GitHub repository variables for your production, staging, and development environments:
+
+```bash
+# Run the script to set GitHub repository variables
+./scripts/set-github-vars.sh
+```
+
+This script sets the following variables in your GitHub repository:
+- `MODEL_NAME`: The name of the primary model
+- `MODEL_ID`: The ID of the primary model
+- `SECONDARY_URL`: The URL for the secondary endpoint
+- `CONSUMER_URL`: The URL for the consumer API
+
+### 3. Update Cloud Run Configuration Files
+
+Before deploying, update your Cloud Run configuration files with the correct environment variables:
+
+```bash
+# Run from the root directory of the project
+./scripts/update-cloud-run-configs.sh
+```
+
+This script updates both the production (`morsaas-service.yaml`) and development (`morsaas-dev-config.yaml`) configuration files with the correct environment variables and secret references.
+
+### 4. Deploy to Cloud Run
+
+Deploy the service using GitHub Actions or manually with gcloud:
+
+```bash
+# Using gcloud (manually)
+gcloud run services replace morsaas-service.yaml --region=us-west1
+gcloud run services replace morsaas-dev-config.yaml --region=us-west1
+```
+
+Or push changes to your repository to trigger the GitHub Actions workflow.
+
+### Environment Variables for Fallback Functionality
+
+The following environment variables are required for fallback functionality:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `SECONDARY_ENDPOINT_URL` | URL for the secondary model API | `https://api.openai.com/v1/chat/completions` |
+| `SECONDARY_ENDPOINT_TOKEN` | Authentication token for the secondary API | (Stored in Secret Manager) |
+| `CONSUMER_API_URL` | URL for the consumer API | `https://consumer-node-1081887913409.us-west1.run.app` |
+| `USE_FALLBACK_AS_PRIMARY` | When set to "true", the service will use the fallback endpoint as the primary chat endpoint | `false` (default) |
+
+When deploying, ensure these variables are properly set in your Cloud Run configuration files.
+
+#### Fallback Behavior
+
+By default (`USE_FALLBACK_AS_PRIMARY=false`), the service will:
+1. First attempt to use the primary endpoint (NFA Proxy URL)
+2. If the primary endpoint fails, it will fall back to the secondary endpoint
+
+When `USE_FALLBACK_AS_PRIMARY` is set to `true`, the service will:
+1. Use the secondary endpoint as the primary endpoint
+2. The original primary endpoint will not be used at all
+
+Each chat request will be logged with information about which endpoint was used and which model processed the request.
