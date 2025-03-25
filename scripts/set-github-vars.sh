@@ -85,6 +85,11 @@ done
 # Set the Secret Key Reference names for each environment
 # These are the references to the actual secrets in Google Cloud Secret Manager
 for ENV in DEV STAGING PROD; do
+    # Set OpenRouter endpoint URL for all environments
+    gh variable set "${ENV}_SECONDARY_ENDPOINT_URL" -b "https://openrouter.ai/api/" -R "$REPO"
+    echo "✅ Set ${ENV}_SECONDARY_ENDPOINT_URL to 'https://openrouter.ai/api/'"
+    
+    # Set the token key reference
     gh variable set "${ENV}_SECONDARY_ENDPOINT_TOKEN_KEY" -b "openai-api-key" -R "$REPO"
     echo "✅ Set ${ENV}_SECONDARY_ENDPOINT_TOKEN_KEY to 'openai-api-key'"
 done

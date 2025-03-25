@@ -39,13 +39,13 @@ fi
 
 # Get the appropriate endpoint URL based on environment
 # All environments use OpenRouter with the required path
-SECONDARY_ENDPOINT_URL="${SECONDARY_ENDPOINT_URL:-https://openrouter.ai/v1/chat/completions}"
+SECONDARY_ENDPOINT_URL="${SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
 if [[ "$ENVIRONMENT" == "dev" ]]; then
-  SECONDARY_ENDPOINT_URL="${DEV_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/v1/chat/completions}"
+  SECONDARY_ENDPOINT_URL="${DEV_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
 elif [[ "$ENVIRONMENT" == "staging" ]]; then
-  SECONDARY_ENDPOINT_URL="${STAGING_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/v1/chat/completions}"
+  SECONDARY_ENDPOINT_URL="${STAGING_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
 elif [[ "$ENVIRONMENT" == "prod" ]]; then
-  SECONDARY_ENDPOINT_URL="${PROD_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/v1/chat/completions}"
+  SECONDARY_ENDPOINT_URL="${PROD_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
 fi
 
 # Print the configuration
