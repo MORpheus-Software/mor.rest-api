@@ -52,8 +52,17 @@ spec:
             secretKeyRef:
               key: latest
               name: openrouter-api-key
+        - name: SECONDARY_ENDPOINT_MODEL
+          value: "SECONDARY_ENDPOINT_MODEL_VALUE"
         - name: USE_FALLBACK_AS_PRIMARY
           value: "USE_FALLBACK_AS_PRIMARY_VALUE"
+        # OpenRouter configuration
+        - name: OPENROUTER_HTTP_REFERER
+          value: "https://morsaas.com"
+        - name: OPENROUTER_APP_TITLE
+          value: "MorSaaS"
+        - name: OPENROUTER_APP_VERSION
+          value: "1.0.0"
         # Consumer API configuration for session management
         - name: CONSUMER_API_URL
           value: CONSUMER_API_URL_VALUE

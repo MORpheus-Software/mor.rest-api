@@ -11,12 +11,19 @@ dotenv.config();
 const NFA_PROXY_URL = API_BASE_URL;
 const SECONDARY_ENDPOINT_URL = process.env.SECONDARY_ENDPOINT_URL;
 const SECONDARY_ENDPOINT_TOKEN = process.env.SECONDARY_ENDPOINT_TOKEN;
+const SECONDARY_ENDPOINT_MODEL = process.env.SECONDARY_ENDPOINT_MODEL || 'openrouter/auto';
 const CONSUMER_API_URL = process.env.CONSUMER_API_URL;
 const USE_FALLBACK_AS_PRIMARY = process.env.USE_FALLBACK_AS_PRIMARY === 'true';
+
+// OpenRouter configuration
+const OPENROUTER_HTTP_REFERER = process.env.OPENROUTER_HTTP_REFERER || 'https://morsaas.com';
+const OPENROUTER_APP_TITLE = process.env.OPENROUTER_APP_TITLE || 'MorSaaS';
+const OPENROUTER_APP_VERSION = process.env.OPENROUTER_APP_VERSION || '1.0.0';
 
 // Initialize these values at startup
 console.log(chalk.cyan(`[API] Primary endpoint URL: ${USE_FALLBACK_AS_PRIMARY ? SECONDARY_ENDPOINT_URL : NFA_PROXY_URL}`));
 console.log(chalk.cyan(`[API] Secondary endpoint URL: ${USE_FALLBACK_AS_PRIMARY ? NFA_PROXY_URL : SECONDARY_ENDPOINT_URL || 'Not configured'}`));
+console.log(chalk.cyan(`[API] Secondary endpoint model: ${SECONDARY_ENDPOINT_MODEL}`));
 console.log(chalk.cyan(`[API] Consumer API URL: ${CONSUMER_API_URL || 'Not configured'}`));
 console.log(chalk.cyan(`[API] Using fallback as primary: ${USE_FALLBACK_AS_PRIMARY ? 'YES' : 'NO'}`));
 
@@ -296,10 +303,19 @@ async function fallbackToSecondaryEndpoint(requestBody: any, isStreaming: boolea
   
   console.log(chalk.blue(`[API] Using secondary endpoint: ${SECONDARY_ENDPOINT_URL}`));
   
-  // Create headers for OpenAI-compatible API
+  // Create a copy of the request body and modify for OpenRouter
+  const openRouterBody = {
+    ...requestBody,
+    model: SECONDARY_ENDPOINT_MODEL // Use configured model or default to openrouter/auto
+  };
+  
+  // Create headers for OpenRouter API
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${SECONDARY_ENDPOINT_TOKEN}`,
+    'HTTP-Referer': OPENROUTER_HTTP_REFERER,
+    'X-Title': OPENROUTER_APP_TITLE,
+    'User-Agent': `${OPENROUTER_APP_TITLE}/${OPENROUTER_APP_VERSION}`
   };
   
   // Set Accept header based on streaming
@@ -309,11 +325,13 @@ async function fallbackToSecondaryEndpoint(requestBody: any, isStreaming: boolea
     headers['Accept'] = 'application/json';
   }
   
-  // Make the request to the secondary endpoint
+  console.log(chalk.blue(`[API] Using secondary endpoint model: ${SECONDARY_ENDPOINT_MODEL}`));
+  
+  // Make the request to OpenRouter
   return fetch(SECONDARY_ENDPOINT_URL, {
     method: 'POST',
     headers,
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify(openRouterBody),
   });
 }
 
