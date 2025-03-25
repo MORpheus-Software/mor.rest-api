@@ -230,6 +230,9 @@ jobs:
         sed -i "s|CONSUMER_API_URL_VALUE|${{ env.CONSUMER_API_URL }}|g" cloud-run-deploy-config.yaml
         sed -i "s|USE_FALLBACK_AS_PRIMARY_VALUE|${{ env.USE_FALLBACK_AS_PRIMARY }}|g" cloud-run-deploy-config.yaml
         
+        # Update the secret name with the appropriate environment name
+        sed -i "s|SECRETS_NAME|${{ env.SERVICE_NAME }}|g" cloud-run-deploy-config.yaml
+        
         # Update alternative Redis credentials if available
         if [[ -n "${REDIS_PASSWORD}" ]]; then
           sed -i "s|REDIS_PASSWORD_ONLY|${REDIS_PASSWORD}|g" cloud-run-deploy-config.yaml

@@ -50,8 +50,8 @@ spec:
         - name: SECONDARY_ENDPOINT_TOKEN
           valueFrom:
             secretKeyRef:
-              key: SECONDARY_ENDPOINT_TOKEN_KEY
-              name: morsaas-secrets
+              key: latest
+              name: openrouter-api-key
         - name: USE_FALLBACK_AS_PRIMARY
           value: "USE_FALLBACK_AS_PRIMARY_VALUE"
         # Consumer API configuration for session management
