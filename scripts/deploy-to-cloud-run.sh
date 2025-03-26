@@ -29,10 +29,31 @@ UPSTASH_PRODUCTION_URL=redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0N
 REACT_APP_DEFAULT_MODEL_NAME="${REACT_APP_DEFAULT_MODEL_NAME:-Hermes-3-Llama-3.1-8B}"
 REACT_APP_DEFAULT_MODEL_ID="${REACT_APP_DEFAULT_MODEL_ID:-llama-3.1-8b-instant}"
 
-# Print the model configuration
-echo "Using model configuration:"
+# Get the environment from the branch name or environment variable
+ENVIRONMENT="${DEPLOY_ENVIRONMENT:-dev}"
+if [[ "$ENVIRONMENT" == "master" ]]; then
+  ENVIRONMENT="prod"
+elif [[ "$ENVIRONMENT" == "staging" ]]; then
+  ENVIRONMENT="staging"
+fi
+
+# Get the appropriate endpoint URL based on environment
+# All environments use OpenRouter with the required path
+SECONDARY_ENDPOINT_URL="${SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
+if [[ "$ENVIRONMENT" == "dev" ]]; then
+  SECONDARY_ENDPOINT_URL="${DEV_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
+elif [[ "$ENVIRONMENT" == "staging" ]]; then
+  SECONDARY_ENDPOINT_URL="${STAGING_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
+elif [[ "$ENVIRONMENT" == "prod" ]]; then
+  SECONDARY_ENDPOINT_URL="${PROD_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
+fi
+
+# Print the configuration
+echo "Using configuration:"
+echo "- Environment: $ENVIRONMENT"
 echo "- Model Name: $REACT_APP_DEFAULT_MODEL_NAME"
 echo "- Model ID: $REACT_APP_DEFAULT_MODEL_ID"
+echo "- Secondary Endpoint URL: $SECONDARY_ENDPOINT_URL"
 
 # NOTE: Cloud Run has a maximum startup probe timeout of 240 seconds (4 minutes).
 # If your container takes longer than that to start, you'll need to:
@@ -199,6 +220,7 @@ deploy_to_cloud_run() {
   
   echo -e "${YELLOW}Deploying to Cloud Run using Upstash Redis and model configuration...${NC}"
   echo -e "${YELLOW}Model: $REACT_APP_DEFAULT_MODEL_NAME ($REACT_APP_DEFAULT_MODEL_ID)${NC}"
+  echo -e "${YELLOW}Secondary Endpoint URL: $SECONDARY_ENDPOINT_URL${NC}"
   
   gcloud run deploy "$SERVICE_NAME" \
     --image="gcr.io/${project_id}/${IMAGE_NAME}:latest" \
@@ -213,7 +235,7 @@ deploy_to_cloud_run() {
     --cpu-boost \
     --execution-environment=gen2 \
     --no-cpu-throttling \
-    --set-env-vars="REDIS_URL=${redis_url},NODE_ENV=production,REACT_APP_DEFAULT_MODEL_NAME=${REACT_APP_DEFAULT_MODEL_NAME},REACT_APP_DEFAULT_MODEL_ID=${REACT_APP_DEFAULT_MODEL_ID}" \
+    --set-env-vars="REDIS_URL=${redis_url},NODE_ENV=production,REACT_APP_DEFAULT_MODEL_NAME=${REACT_APP_DEFAULT_MODEL_NAME},REACT_APP_DEFAULT_MODEL_ID=${REACT_APP_DEFAULT_MODEL_ID},SECONDARY_ENDPOINT_URL=${SECONDARY_ENDPOINT_URL}" \
     --allow-unauthenticated
   
   # Get the deployed service URL
@@ -264,9 +286,11 @@ deploy_to_cloud_run_with_yaml() {
   sed -i.bak "s|YOUR_REDIS_URL|$redis_url|g" "$yaml_file"
   sed -i.bak "s|REACT_APP_DEFAULT_MODEL_NAME_VALUE|$REACT_APP_DEFAULT_MODEL_NAME|g" "$yaml_file"
   sed -i.bak "s|REACT_APP_DEFAULT_MODEL_ID_VALUE|$REACT_APP_DEFAULT_MODEL_ID|g" "$yaml_file"
+  sed -i.bak "s|SECONDARY_ENDPOINT_URL_VALUE|$SECONDARY_ENDPOINT_URL|g" "$yaml_file"
   
   echo -e "${YELLOW}Deploying to Cloud Run using YAML configuration...${NC}"
   echo -e "${YELLOW}Model: $REACT_APP_DEFAULT_MODEL_NAME ($REACT_APP_DEFAULT_MODEL_ID)${NC}"
+  echo -e "${YELLOW}Secondary Endpoint URL: $SECONDARY_ENDPOINT_URL${NC}"
   gcloud run services replace "$yaml_file"
   
   # Clean up temporary files

@@ -30,6 +30,15 @@ spec:
           value: production
         - name: REDIS_URL
           value: redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
+        - name: SECONDARY_ENDPOINT_URL
+          value: https://api.openai.com/v1/chat/completions
+        - name: SECONDARY_ENDPOINT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: openai-api-key
+              name: morsaas-secrets
+        - name: CONSUMER_API_URL
+          value: https://consumer-node-1081887913409.us-west1.run.app
         image: gcr.io/graphical-bus-433219-g5/morsaas:6fc5026623ee01df79f4f92b35eb8950ae8a621b
         ports:
         - containerPort: 8080

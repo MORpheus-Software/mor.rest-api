@@ -44,6 +44,28 @@ spec:
           value: "Hermes-3-Llama-3.1-8B"
         - name: REACT_APP_DEFAULT_MODEL_ID
           value: "llama-3.1-8b-instant"
+        # Fallback endpoint configuration
+        - name: SECONDARY_ENDPOINT_URL
+          value: SECONDARY_ENDPOINT_URL_VALUE
+        - name: SECONDARY_ENDPOINT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: latest
+              name: openrouter-api-key
+        - name: SECONDARY_ENDPOINT_MODEL
+          value: "SECONDARY_ENDPOINT_MODEL_VALUE"
+        - name: USE_FALLBACK_AS_PRIMARY
+          value: "USE_FALLBACK_AS_PRIMARY_VALUE"
+        # OpenRouter configuration
+        - name: OPENROUTER_HTTP_REFERER
+          value: "https://morsaas.com"
+        - name: OPENROUTER_APP_TITLE
+          value: "MorSaaS"
+        - name: OPENROUTER_APP_VERSION
+          value: "1.0.0"
+        # Consumer API configuration for session management
+        - name: CONSUMER_API_URL
+          value: CONSUMER_API_URL_VALUE
         ports:
         - containerPort: 8080
           name: http1

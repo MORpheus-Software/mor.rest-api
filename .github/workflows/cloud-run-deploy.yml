@@ -42,6 +42,12 @@ jobs:
           # Production model config
           echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.PROD_MODEL_NAME || 'Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
           echo "REACT_APP_DEFAULT_MODEL_ID=${{ secrets.PROD_MODEL_ID || 'llama-3.1' }}" >> $GITHUB_ENV
+          # Production fallback endpoints
+          echo "SECONDARY_ENDPOINT_URL=${{ secrets.PROD_SECONDARY_ENDPOINT_URL || 'https://api.openai.com/v1/chat/completions' }}" >> $GITHUB_ENV
+          echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ secrets.PROD_SECONDARY_ENDPOINT_TOKEN_KEY || 'openai-api-key' }}" >> $GITHUB_ENV
+          echo "SECONDARY_ENDPOINT_MODEL=${{ secrets.PROD_SECONDARY_ENDPOINT_MODEL || 'openrouter/auto' }}" >> $GITHUB_ENV
+          echo "CONSUMER_API_URL=${{ secrets.PROD_CONSUMER_API_URL || 'https://consumer-node-1081887913409.us-west1.run.app' }}" >> $GITHUB_ENV
+          echo "USE_FALLBACK_AS_PRIMARY=${{ secrets.PROD_USE_FALLBACK_AS_PRIMARY || 'false' }}" >> $GITHUB_ENV
         elif [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
           echo "SERVICE_NAME=morsaas-staging" >> $GITHUB_ENV
           echo "Deploying to staging environment: morsaas-staging"
@@ -49,13 +55,26 @@ jobs:
           # Staging model config
           echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.STAGING_MODEL_NAME || 'Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
           echo "REACT_APP_DEFAULT_MODEL_ID=${{ secrets.STAGING_MODEL_ID || 'llama-3.1' }}" >> $GITHUB_ENV
+          # Staging fallback endpoints
+          echo "SECONDARY_ENDPOINT_URL=${{ secrets.STAGING_SECONDARY_ENDPOINT_URL || 'https://api.openai.com/v1/chat/completions' }}" >> $GITHUB_ENV
+          echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ secrets.STAGING_SECONDARY_ENDPOINT_TOKEN_KEY || 'openai-api-key' }}" >> $GITHUB_ENV
+          echo "SECONDARY_ENDPOINT_MODEL=${{ secrets.STAGING_SECONDARY_ENDPOINT_MODEL || 'openrouter/auto' }}" >> $GITHUB_ENV
+          echo "CONSUMER_API_URL=${{ secrets.STAGING_CONSUMER_API_URL || 'https://consumer-node-1081887913409.us-west1.run.app' }}" >> $GITHUB_ENV
+          echo "USE_FALLBACK_AS_PRIMARY=${{ secrets.STAGING_USE_FALLBACK_AS_PRIMARY || 'false' }}" >> $GITHUB_ENV
         else
+          # Default to dev environment
           echo "SERVICE_NAME=morsaas-dev" >> $GITHUB_ENV
           echo "Deploying to development environment: morsaas-dev"
           echo "IS_PROD=false" >> $GITHUB_ENV
           # Development model config
           echo "REACT_APP_DEFAULT_MODEL_NAME=${{ secrets.DEV_MODEL_NAME || 'Hermes-3-Llama-3.1-8B' }}" >> $GITHUB_ENV
           echo "REACT_APP_DEFAULT_MODEL_ID=${{ secrets.DEV_MODEL_ID || 'llama-3.1' }}" >> $GITHUB_ENV
+          # Development fallback endpoints
+          echo "SECONDARY_ENDPOINT_URL=${{ secrets.DEV_SECONDARY_ENDPOINT_URL || 'https://api.openai.com/v1/chat/completions' }}" >> $GITHUB_ENV
+          echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ secrets.DEV_SECONDARY_ENDPOINT_TOKEN_KEY || 'openai-api-key' }}" >> $GITHUB_ENV
+          echo "SECONDARY_ENDPOINT_MODEL=${{ secrets.DEV_SECONDARY_ENDPOINT_MODEL || 'openrouter/auto' }}" >> $GITHUB_ENV
+          echo "CONSUMER_API_URL=${{ secrets.DEV_CONSUMER_API_URL || 'https://consumer-node-1081887913409.us-west1.run.app' }}" >> $GITHUB_ENV
+          echo "USE_FALLBACK_AS_PRIMARY=${{ secrets.DEV_USE_FALLBACK_AS_PRIMARY || 'false' }}" >> $GITHUB_ENV
         fi
       
     - name: Make deploy script executable
@@ -207,6 +226,31 @@ jobs:
         fi
         
         sed -i "s|YOUR_REDIS_URL|${{ secrets.REDIS_URL }}|g" cloud-run-deploy-config.yaml
+        
+        # Update the fallback endpoint and consumer API URLs
+        sed -i "s|SECONDARY_ENDPOINT_URL_VALUE|${{ env.SECONDARY_ENDPOINT_URL }}|g" cloud-run-deploy-config.yaml
+        sed -i "s|SECONDARY_ENDPOINT_TOKEN_KEY|${{ env.SECONDARY_ENDPOINT_TOKEN_KEY }}|g" cloud-run-deploy-config.yaml
+        sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|${{ env.SECONDARY_ENDPOINT_MODEL }}|g" cloud-run-deploy-config.yaml
+        sed -i "s|CONSUMER_API_URL_VALUE|${{ env.CONSUMER_API_URL }}|g" cloud-run-deploy-config.yaml
+        sed -i "s|USE_FALLBACK_AS_PRIMARY_VALUE|${{ env.USE_FALLBACK_AS_PRIMARY }}|g" cloud-run-deploy-config.yaml
+        
+        # Update OpenRouter configuration
+        if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
+          sed -i "s|https://morsaas.com|${{ secrets.PROD_OPENROUTER_HTTP_REFERER || 'https://morsaas.com' }}|g" cloud-run-deploy-config.yaml
+          sed -i "s|MorSaaS|${{ secrets.PROD_OPENROUTER_APP_TITLE || 'MorSaaS' }}|g" cloud-run-deploy-config.yaml
+          sed -i "s|1.0.0|${{ secrets.PROD_OPENROUTER_APP_VERSION || '1.0.0' }}|g" cloud-run-deploy-config.yaml
+        elif [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
+          sed -i "s|https://morsaas.com|${{ secrets.STAGING_OPENROUTER_HTTP_REFERER || 'https://staging.morsaas.com' }}|g" cloud-run-deploy-config.yaml
+          sed -i "s|MorSaaS|${{ secrets.STAGING_OPENROUTER_APP_TITLE || 'MorSaaS-Staging' }}|g" cloud-run-deploy-config.yaml
+          sed -i "s|1.0.0|${{ secrets.STAGING_OPENROUTER_APP_VERSION || '1.0.0-staging' }}|g" cloud-run-deploy-config.yaml
+        else
+          sed -i "s|https://morsaas.com|${{ secrets.DEV_OPENROUTER_HTTP_REFERER || 'https://dev.morsaas.com' }}|g" cloud-run-deploy-config.yaml
+          sed -i "s|MorSaaS|${{ secrets.DEV_OPENROUTER_APP_TITLE || 'MorSaaS-Dev' }}|g" cloud-run-deploy-config.yaml
+          sed -i "s|1.0.0|${{ secrets.DEV_OPENROUTER_APP_VERSION || '1.0.0-dev' }}|g" cloud-run-deploy-config.yaml
+        fi
+        
+        # Update the secret name with the appropriate environment name
+        sed -i "s|SECRETS_NAME|${{ env.SERVICE_NAME }}|g" cloud-run-deploy-config.yaml
         
         # Update alternative Redis credentials if available
         if [[ -n "${REDIS_PASSWORD}" ]]; then
