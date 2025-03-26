@@ -305,8 +305,8 @@ app.get('*', (req, res) => {
         <script>
           // Runtime model configuration from server environment
           window.RUNTIME_CONFIG = {
-            modelName: ${JSON.stringify(modelName)},
-            modelId: ${JSON.stringify(modelId)}
+            modelName: "${modelName}",
+            modelId: "${modelId}"
           };
           console.log("[RUNTIME] Injected runtime model config:", window.RUNTIME_CONFIG);
         </script>

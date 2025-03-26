@@ -32,16 +32,23 @@ interface ApiKey {
 const DEFAULT_MODEL_ID = getModelId();
 const DEFAULT_MODEL_NAME = getModelName();
 
-// Log the model configuration for debugging
-console.log(`[API_PLAYGROUND] Using model: ${DEFAULT_MODEL_NAME} (${DEFAULT_MODEL_ID})`);
-logConfigSource();
+console.log('[API_PLAYGROUND] Initial model config:', {
+  DEFAULT_MODEL_ID,
+  DEFAULT_MODEL_NAME,
+  models: [
+    { id: DEFAULT_MODEL_ID, name: DEFAULT_MODEL_NAME },
+    { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1 24B' }
+  ]
+});
 
 const models = [
   { id: DEFAULT_MODEL_ID, name: DEFAULT_MODEL_NAME },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1 24B' },
 ];
 
 const ApiPlayground = () => {
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+  console.log('[API_PLAYGROUND] Component initialized with selectedModel:', selectedModel);
   const [prompt, setPrompt] = useState('');
   const [isStreaming, setIsStreaming] = useState(true);
   const [response, setResponse] = useState<string | null>(null);
@@ -71,7 +78,7 @@ const ApiPlayground = () => {
 
   // Define updateRequestCode with useCallback before it's used
   const updateRequestCode = useCallback((model: string, promptText: string, streaming: boolean, apiKey: string) => {
-    const modelName = models.find(m => m.id === model)?.name || model;
+    console.log(`[API_PLAYGROUND] updateRequestCode called with model:`, model);
     const code = `fetch('${FRONTEND_API_ENDPOINT}/chat/completions', {
   method: 'POST',
   headers: {
@@ -79,12 +86,13 @@ const ApiPlayground = () => {
     'Authorization': 'Bearer ${apiKey}'
   },
   body: JSON.stringify({
-    model: '${modelName}',
+    model: ${model},
     messages: [{ role: 'user', content: '${promptText || 'Say hello'}' }],
     stream: ${streaming}
   })
 })`;
     
+    console.log(`[API_PLAYGROUND] Generated request code:`, code);
     setRequestCode(code);
   }, []);
 
@@ -148,6 +156,7 @@ const ApiPlayground = () => {
   }, [location.search, isStreaming, prompt, selectedModel, updateRequestCode]);
 
   const handleModelChange = (value: string) => {
+    console.log('[API_PLAYGROUND] handleModelChange called with value:', value);
     setSelectedModel(value);
     updateRequestCode(
       value, 
@@ -223,23 +232,24 @@ const ApiPlayground = () => {
     abortControllerRef.current = new AbortController();
     
     try {
-      console.log(`Making real API request to ${FRONTEND_API_ENDPOINT}/chat/completions`);
-      
-      const modelName = models.find(m => m.id === selectedModel)?.name || selectedModel;
+      console.log('[API_PLAYGROUND] Making API request with model:', selectedModel);
       
       if (isStreaming) {
         // Handle streaming response
+        const requestBody = {
+          model: selectedModel,
+          messages: [{ role: 'user', content: prompt }],
+          stream: true
+        };
+        console.log('[API_PLAYGROUND] Streaming request body:', JSON.stringify(requestBody, null, 2));
+        
         const response = await fetch(`${FRONTEND_API_ENDPOINT}/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
           },
-          body: JSON.stringify({
-            model: modelName,
-            messages: [{ role: 'user', content: prompt }],
-            stream: true
-          }),
+          body: JSON.stringify(requestBody),
           signal: abortControllerRef.current.signal
         });
         
@@ -294,17 +304,20 @@ const ApiPlayground = () => {
         }
       } else {
         // Handle non-streaming response
+        const requestBody = {
+          model: selectedModel,
+          messages: [{ role: 'user', content: prompt }],
+          stream: false
+        };
+        console.log(`[API_PLAYGROUND] Non-streaming request body:`, JSON.stringify(requestBody, null, 2));
+        
         const response = await fetch(`${FRONTEND_API_ENDPOINT}/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
           },
-          body: JSON.stringify({
-            model: modelName,
-            messages: [{ role: 'user', content: prompt }],
-            stream: false
-          }),
+          body: JSON.stringify(requestBody),
           signal: abortControllerRef.current.signal
         });
         

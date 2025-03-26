@@ -33,10 +33,14 @@ console.log(chalk.cyan(`[API] Using fallback as primary: ${USE_FALLBACK_AS_PRIMA
 export async function postChatCompletion(req: Request, res: Response) {
   try {
     console.log(chalk.blue(`[API] Chat completion request received`));
+    console.log(chalk.blue(`[API] Request body:`, JSON.stringify(req.body, null, 2)));
     
     // Extract model information for logging
-    const modelName = req.body?.model || 'unknown';
+    const modelName = (req.body?.model as string) || 'unknown';
     console.log(chalk.blue(`[API] Requested model: ${modelName}`));
+    console.log(chalk.blue(`[API] Model type: ${typeof modelName}`));
+    console.log(chalk.blue(`[API] Model length: ${modelName.length}`));
+    console.log(chalk.blue(`[API] Model characters: ${Array.from(modelName).map(c => c.charCodeAt(0)).join(', ')}`));
     
     // Check authentication status from middleware
     const authReq = req as AuthenticatedRequest;
@@ -105,6 +109,8 @@ export async function postChatCompletion(req: Request, res: Response) {
         try {
           // Try the primary endpoint first
           console.log(chalk.blue(`[API] Making request to primary endpoint: ${NFA_PROXY_URL}/v1/chat/completions`));
+          console.log(chalk.blue(`[API] Primary endpoint request body:`, JSON.stringify(req.body, null, 2)));
+          
           externalResponse = await fetch(`${NFA_PROXY_URL}/v1/chat/completions`, {
             method: 'POST',
             headers,
@@ -302,12 +308,16 @@ async function fallbackToSecondaryEndpoint(requestBody: any, isStreaming: boolea
   }
   
   console.log(chalk.blue(`[API] Using secondary endpoint: ${SECONDARY_ENDPOINT_URL}`));
+  console.log(chalk.blue(`[API] Original request body:`, JSON.stringify(requestBody, null, 2)));
   
   // Create a copy of the request body and modify for OpenRouter
   const openRouterBody = {
     ...requestBody,
-    model: SECONDARY_ENDPOINT_MODEL // Use configured model or default to openrouter/auto
+    // Use the model from the request body, or fall back to the configured model
+    model: requestBody.model || SECONDARY_ENDPOINT_MODEL
   };
+  
+  console.log(chalk.blue(`[API] Modified request body for OpenRouter:`, JSON.stringify(openRouterBody, null, 2)));
   
   // Create headers for OpenRouter API
   const headers: Record<string, string> = {
@@ -325,14 +335,49 @@ async function fallbackToSecondaryEndpoint(requestBody: any, isStreaming: boolea
     headers['Accept'] = 'application/json';
   }
   
-  console.log(chalk.blue(`[API] Using secondary endpoint model: ${SECONDARY_ENDPOINT_MODEL}`));
+  // Log all request details
+  console.log(chalk.cyan('\n[API] Secondary Endpoint Request Details:'));
+  console.log(chalk.cyan('----------------------------------------'));
+  console.log(chalk.cyan(`URL: ${SECONDARY_ENDPOINT_URL}`));
+  console.log(chalk.cyan('Headers:'));
+  Object.entries(headers).forEach(([key, value]) => {
+    // Show full Authorization header for debugging
+    console.log(chalk.cyan(`  ${key}: ${value}`));
+  });
+  console.log(chalk.cyan('\nRequest Body:'));
+  console.log(chalk.cyan(JSON.stringify(openRouterBody, null, 2)));
+  console.log(chalk.cyan('----------------------------------------\n'));
   
   // Make the request to OpenRouter
-  return fetch(SECONDARY_ENDPOINT_URL, {
+  const response = await fetch(SECONDARY_ENDPOINT_URL, {
     method: 'POST',
     headers,
     body: JSON.stringify(openRouterBody),
   });
+
+  // Log response details
+  console.log(chalk.cyan('\n[API] Secondary Endpoint Response Details:'));
+  console.log(chalk.cyan('----------------------------------------'));
+  console.log(chalk.cyan(`Status: ${response.status}`));
+  console.log(chalk.cyan(`Status Text: ${response.statusText}`));
+  console.log(chalk.cyan('Response Headers:'));
+  response.headers.forEach((value, key) => {
+    console.log(chalk.cyan(`  ${key}: ${value}`));
+  });
+  
+  // If there's an error, try to get the error message
+  if (!response.ok) {
+    try {
+      const errorText = await response.text();
+      console.log(chalk.red('\nError Response Body:'));
+      console.log(chalk.red(errorText));
+    } catch (e) {
+      console.log(chalk.red('\nCould not read error response body'));
+    }
+  }
+  console.log(chalk.cyan('----------------------------------------\n'));
+
+  return response;
 }
 
 // Export the handler as default as well for compatibility
