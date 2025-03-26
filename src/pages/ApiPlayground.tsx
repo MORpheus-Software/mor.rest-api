@@ -418,14 +418,6 @@ const ApiPlayground = () => {
                   />
                   <Label htmlFor="streaming">Enable streaming</Label>
                 </div>
-                
-                <div className="flex items-center space-x-2 mt-2">
-                  <Label htmlFor="network">Network:</Label>
-                  <ToggleGroup type="single" value="testnet" disabled>
-                    <ToggleGroupItem value="mainnet" disabled>Mainnet</ToggleGroupItem>
-                    <ToggleGroupItem value="testnet" disabled>Testnet</ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
               </div>
               
               <div className="space-y-2">
