@@ -12,9 +12,19 @@ RUN touch .env
 ARG REACT_APP_DEFAULT_MODEL_NAME
 ARG REACT_APP_DEFAULT_MODEL_ID
 ARG VITE_API_BASE_URL
+ARG SECONDARY_ENDPOINT_URL
+ARG SECONDARY_ENDPOINT_MODEL
+ARG USE_FALLBACK_AS_PRIMARY
+ARG CONSUMER_API_URL
+
+# Write environment variables to .env file
 RUN echo "REACT_APP_DEFAULT_MODEL_NAME=${REACT_APP_DEFAULT_MODEL_NAME:-Hermes-3-Llama-3.1-8B}" >> .env
 RUN echo "REACT_APP_DEFAULT_MODEL_ID=${REACT_APP_DEFAULT_MODEL_ID:-llama-3.1-8b-instant}" >> .env
 RUN echo "VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://nfa-proxy-1081887913409.us-west1.run.app}" >> .env
+RUN echo "SECONDARY_ENDPOINT_URL=${SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api}" >> .env
+RUN echo "SECONDARY_ENDPOINT_MODEL=${SECONDARY_ENDPOINT_MODEL:-openrouter/auto}" >> .env
+RUN echo "USE_FALLBACK_AS_PRIMARY=${USE_FALLBACK_AS_PRIMARY:-false}" >> .env
+RUN echo "CONSUMER_API_URL=${CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}" >> .env
 
 # Log environment variables for build
 RUN echo "Generated .env file:" && cat .env | sort
@@ -117,6 +127,34 @@ RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'if [ ! -z "$REACT_APP_DEFAULT_MODEL_ID" ]; then' >> /app/start.sh && \
     echo '  echo "REACT_APP_DEFAULT_MODEL_ID=$REACT_APP_DEFAULT_MODEL_ID" >> /app/.env.runtime' >> /app/start.sh && \
     echo '  echo "Using runtime model ID: $REACT_APP_DEFAULT_MODEL_ID"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo 'if [ ! -z "$SECONDARY_ENDPOINT_URL" ]; then' >> /app/start.sh && \
+    echo '  echo "SECONDARY_ENDPOINT_URL=$SECONDARY_ENDPOINT_URL" >> /app/.env.runtime' >> /app/start.sh && \
+    echo '  echo "Using runtime secondary endpoint URL: $SECONDARY_ENDPOINT_URL"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo 'if [ ! -z "$SECONDARY_ENDPOINT_MODEL" ]; then' >> /app/start.sh && \
+    echo '  echo "SECONDARY_ENDPOINT_MODEL=$SECONDARY_ENDPOINT_MODEL" >> /app/.env.runtime' >> /app/start.sh && \
+    echo '  echo "Using runtime secondary endpoint model: $SECONDARY_ENDPOINT_MODEL"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo 'if [ ! -z "$USE_FALLBACK_AS_PRIMARY" ]; then' >> /app/start.sh && \
+    echo '  echo "USE_FALLBACK_AS_PRIMARY=$USE_FALLBACK_AS_PRIMARY" >> /app/.env.runtime' >> /app/start.sh && \
+    echo '  echo "Using runtime fallback as primary setting: $USE_FALLBACK_AS_PRIMARY"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo 'if [ ! -z "$CONSUMER_API_URL" ]; then' >> /app/start.sh && \
+    echo '  echo "CONSUMER_API_URL=$CONSUMER_API_URL" >> /app/.env.runtime' >> /app/start.sh && \
+    echo '  echo "Using runtime consumer API URL: $CONSUMER_API_URL"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo 'if [ ! -z "$OPENROUTER_HTTP_REFERER" ]; then' >> /app/start.sh && \
+    echo '  echo "OPENROUTER_HTTP_REFERER=$OPENROUTER_HTTP_REFERER" >> /app/.env.runtime' >> /app/start.sh && \
+    echo '  echo "Using runtime OpenRouter HTTP referer: $OPENROUTER_HTTP_REFERER"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo 'if [ ! -z "$OPENROUTER_APP_TITLE" ]; then' >> /app/start.sh && \
+    echo '  echo "OPENROUTER_APP_TITLE=$OPENROUTER_APP_TITLE" >> /app/.env.runtime' >> /app/start.sh && \
+    echo '  echo "Using runtime OpenRouter app title: $OPENROUTER_APP_TITLE"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo 'if [ ! -z "$OPENROUTER_APP_VERSION" ]; then' >> /app/start.sh && \
+    echo '  echo "OPENROUTER_APP_VERSION=$OPENROUTER_APP_VERSION" >> /app/.env.runtime' >> /app/start.sh && \
+    echo '  echo "Using runtime OpenRouter app version: $OPENROUTER_APP_VERSION"' >> /app/start.sh && \
     echo 'fi' >> /app/start.sh && \
     echo '# Start the server with the runtime environment' >> /app/start.sh && \
     echo 'export $(grep -v "^#" /app/.env.runtime | xargs)' >> /app/start.sh && \

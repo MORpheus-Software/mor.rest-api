@@ -82,8 +82,7 @@ for ENV in DEV STAGING PROD; do
     fi
 done
 
-# Set the Secret Key Reference names for each environment
-# These are the references to the actual secrets in Google Cloud Secret Manager
+# Set the OpenRouter-specific variables for each environment
 for ENV in DEV STAGING PROD; do
     # Set OpenRouter endpoint URL for all environments
     gh variable set "${ENV}_SECONDARY_ENDPOINT_URL" -b "https://openrouter.ai/api/" -R "$REPO"
@@ -92,7 +91,30 @@ for ENV in DEV STAGING PROD; do
     # Set the token key reference
     gh variable set "${ENV}_SECONDARY_ENDPOINT_TOKEN_KEY" -b "openai-api-key" -R "$REPO"
     echo "✅ Set ${ENV}_SECONDARY_ENDPOINT_TOKEN_KEY to 'openai-api-key'"
+    
+    # Set OpenRouter HTTP referer
+    if [ "$ENV" == "PROD" ]; then
+        gh variable set "${ENV}_OPENROUTER_HTTP_REFERER" -b "https://morsaas.com" -R "$REPO"
+        gh variable set "${ENV}_OPENROUTER_APP_TITLE" -b "MorSaaS" -R "$REPO"
+        gh variable set "${ENV}_OPENROUTER_APP_VERSION" -b "1.0.0" -R "$REPO"
+    elif [ "$ENV" == "STAGING" ]; then
+        gh variable set "${ENV}_OPENROUTER_HTTP_REFERER" -b "https://staging.morsaas.com" -R "$REPO"
+        gh variable set "${ENV}_OPENROUTER_APP_TITLE" -b "MorSaaS-Staging" -R "$REPO"
+        gh variable set "${ENV}_OPENROUTER_APP_VERSION" -b "1.0.0-staging" -R "$REPO"
+    else
+        gh variable set "${ENV}_OPENROUTER_HTTP_REFERER" -b "https://dev.morsaas.com" -R "$REPO"
+        gh variable set "${ENV}_OPENROUTER_APP_TITLE" -b "MorSaaS-Dev" -R "$REPO"
+        gh variable set "${ENV}_OPENROUTER_APP_VERSION" -b "1.0.0-dev" -R "$REPO"
+    fi
+    echo "✅ Set ${ENV}_OPENROUTER_HTTP_REFERER, ${ENV}_OPENROUTER_APP_TITLE, and ${ENV}_OPENROUTER_APP_VERSION"
 done
 
-echo "Repository variables have been set successfully!"
-echo "Note: You still need to set up the actual OpenAI API key secret in Google Cloud Secret Manager!" 
+# Verify that the variables were set correctly
+echo -e "\nVerifying variables were set correctly..."
+for ENV in DEV STAGING PROD; do
+    echo -e "\n${ENV} Environment Variables:"
+    gh variable list -R "$REPO" | grep "^${ENV}_"
+done
+
+echo -e "\nRepository variables have been set successfully!"
+echo "Note: The OpenRouter API key should be stored in Google Cloud Secret Manager as 'openai-api-key'" 
