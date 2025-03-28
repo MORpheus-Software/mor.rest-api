@@ -25,8 +25,13 @@ export function setupLovableEnvironment(): void {
       (window as any).process.env = (window as any).process.env || {};
       (window as any).process.env.LOVABLE_ENV = 'true';
       
-      // Configure API URL for Lovable environment
-      (window as any).process.env.VITE_API_BASE_URL = 'https://nfa-proxy-1081887913409.us-west1.run.app';
+      // Use local Redis URL when in development
+      if (process.env.NODE_ENV === 'development') {
+        (window as any).process.env.REDIS_URL = 'redis://localhost:6379';
+      } else {
+        // Use Upstash Redis in preview/production modes
+        (window as any).process.env.REDIS_URL = 'rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379';
+      }
     }
     
     console.log('[ENVIRONMENT] Lovable environment configured');
@@ -37,8 +42,9 @@ export function setupLovableEnvironment(): void {
  * Gets the base API URL based on the current environment
  */
 export function getApiBaseUrl(): string {
-  if (isLovableEnvironment()) {
-    return 'https://nfa-proxy-1081887913409.us-west1.run.app';
+  // Always use the local API when in development or Lovable environment
+  if (process.env.NODE_ENV === 'development' || isLovableEnvironment()) {
+    return '/api';
   }
   
   // Return the configured API URL or default to the current origin

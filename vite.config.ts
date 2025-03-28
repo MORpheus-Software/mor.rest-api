@@ -17,13 +17,7 @@ export default defineConfig(({ mode }) => {
   // Check if we're running in the Lovable environment
   const isLovableEnv = process.env.LOVABLE_ENV === 'true' || env.LOVABLE_ENV === 'true';
   
-  // Set proxy target based on environment
-  const proxyTarget = isDevelopment 
-    ? 'http://localhost:4000'  // Use local server in development
-    : 'https://nfa-proxy-1081887913409.us-west1.run.app'; // Use production server otherwise
-  
   console.log(`[VITE] Environment: ${mode}`);
-  console.log(`[VITE] Proxy target: ${proxyTarget}`);
   console.log(`[VITE] Lovable environment: ${isLovableEnv ? 'yes' : 'no'}`);
   
   // Get the model environment variables, giving precedence to process.env over .env file
@@ -58,15 +52,15 @@ export default defineConfig(({ mode }) => {
       port: 8080, // Changed from 5173 to 8080 as required
       proxy: {
         '/api': {
-          target: proxyTarget,
-          changeOrigin: true,
-          secure: !isDevelopment, // Only use secure for production
+          target: isDevelopment ? 'http://localhost:4000' : '/api',
+          changeOrigin: isDevelopment,
+          secure: !isDevelopment,
           configure: (proxy, _options) => {
             proxy.on('error', (err, _req, _res) => {
               console.log('proxy error', err);
             });
             proxy.on('proxyReq', (proxyReq, req, _res) => {
-              console.log(`[VITE] Proxying ${req.method} ${req.url} to ${proxyTarget}`);
+              console.log(`[VITE] Proxying ${req.method} ${req.url}`);
             });
           },
         }
@@ -84,14 +78,11 @@ export default defineConfig(({ mode }) => {
     preview: {
       // Add preview server configuration specifically for Lovable
       port: 8080,
-      // Always enable proxy in preview mode to support API endpoints
+      // Don't proxy in preview mode - let the server handle API requests
       proxy: {
         '/api': {
-          target: isLovableEnv 
-            ? 'https://nfa-proxy-1081887913409.us-west1.run.app' // Use external API in Lovable
-            : 'http://localhost:4000', // Use local server otherwise
-          changeOrigin: true,
-          secure: true,
+          target: '/api',
+          changeOrigin: false,
           rewrite: (path) => path,
         }
       },
@@ -114,7 +105,7 @@ export default defineConfig(({ mode }) => {
       // Properly handle environment variables in both development and production
       'process.env': {
         NODE_ENV: JSON.stringify(mode),
-        VITE_API_BASE_URL: JSON.stringify(process.env.VITE_API_BASE_URL || env.VITE_API_BASE_URL || 'https://nfa-proxy-1081887913409.us-west1.run.app'),
+        VITE_API_BASE_URL: JSON.stringify(process.env.VITE_API_BASE_URL || env.VITE_API_BASE_URL || '/api'),
         // Add React App environment variables to make them available in client code
         REACT_APP_DEFAULT_MODEL_NAME: JSON.stringify(modelName),
         REACT_APP_DEFAULT_MODEL_ID: JSON.stringify(modelId),
