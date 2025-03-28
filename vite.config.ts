@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -11,6 +12,7 @@ export default defineConfig(({ mode }) => {
   
   // Determine if we're in development mode
   const isDevelopment = mode === 'development';
+  const isPreview = mode === 'preview' || mode === 'production';
   
   // Set proxy target based on environment
   const proxyTarget = isDevelopment 
@@ -29,7 +31,13 @@ export default defineConfig(({ mode }) => {
                   env.REACT_APP_DEFAULT_MODEL_ID || 
                   'llama-3.1-8b-instant';
   
+  // Set Upstash Redis URL for preview and production modes
+  const redisUrl = isPreview
+    ? 'rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379'
+    : (process.env.REDIS_URL || env.REDIS_URL || 'redis://localhost:6379');
+  
   console.log(`[VITE] Using model: ${modelName} (${modelId})`);
+  console.log(`[VITE] Using Redis URL: ${redisUrl.replace(/\/\/(.+?)@/, '//[credentials-hidden]@')}`);
   
   return {
     server: {
@@ -82,6 +90,8 @@ export default defineConfig(({ mode }) => {
         // Add React App environment variables to make them available in client code
         REACT_APP_DEFAULT_MODEL_NAME: JSON.stringify(modelName),
         REACT_APP_DEFAULT_MODEL_ID: JSON.stringify(modelId),
+        // Add Redis URL to the environment
+        REDIS_URL: JSON.stringify(redisUrl),
       },
     },
   };
