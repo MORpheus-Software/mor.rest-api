@@ -8,12 +8,12 @@
   },
   "scripts": {
     "start": "concurrently \"npm run server\" \"vite start\"",
-    "dev": "concurrently \"npm run server:dev\" \"vite\"",
+    "dev": "REDIS_URL=redis://localhost:6379 concurrently \"npm run server:dev\" \"vite\"",
     "dev:frontend": "vite",
     "build:dev": "vite build --mode development",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "ALLOW_LOCAL_STORAGE=true vite --mode production"
     "server": "tsx src/server/server.ts",
     "server:dev": "tsx watch src/server/server.ts",
     "test:api": "node scripts/test-api.js",
