@@ -8,8 +8,8 @@
  */
 export function isLovableEnvironment(): boolean {
   return process.env.LOVABLE_ENV === 'true' || 
-         window.location.hostname.includes('lovable.app') || 
-         window.location.hostname.includes('lovable.dev');
+         (typeof window !== 'undefined' && window.location.hostname.includes('lovable.app')) || 
+         (typeof window !== 'undefined' && window.location.hostname.includes('lovable.dev'));
 }
 
 /**
@@ -19,13 +19,15 @@ export function setupLovableEnvironment(): void {
   if (isLovableEnvironment()) {
     console.log('[ENVIRONMENT] Detected Lovable environment, configuring application...');
     
-    // Set the LOVABLE_ENV flag
-    (window as any).process = (window as any).process || {};
-    (window as any).process.env = (window as any).process.env || {};
-    (window as any).process.env.LOVABLE_ENV = 'true';
-    
-    // Configure API URL for Lovable environment
-    (window as any).process.env.VITE_API_BASE_URL = 'https://nfa-proxy-1081887913409.us-west1.run.app';
+    if (typeof window !== 'undefined') {
+      // Set the LOVABLE_ENV flag
+      (window as any).process = (window as any).process || {};
+      (window as any).process.env = (window as any).process.env || {};
+      (window as any).process.env.LOVABLE_ENV = 'true';
+      
+      // Configure API URL for Lovable environment
+      (window as any).process.env.VITE_API_BASE_URL = 'https://nfa-proxy-1081887913409.us-west1.run.app';
+    }
     
     console.log('[ENVIRONMENT] Lovable environment configured');
   }
@@ -41,7 +43,9 @@ export function getApiBaseUrl(): string {
   
   // Return the configured API URL or default to the current origin
   return process.env.VITE_API_BASE_URL || 
-         `${window.location.protocol}//${window.location.host}`;
+         (typeof window !== 'undefined' 
+           ? `${window.location.protocol}//${window.location.host}` 
+           : 'http://localhost:4000');
 }
 
 export default {
