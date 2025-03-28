@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
   const isDevelopment = mode === 'development';
   const isPreview = mode === 'preview' || mode === 'production';
   
+  // Check if we're running in the Lovable environment
+  const isLovableEnv = process.env.LOVABLE_ENV === 'true' || env.LOVABLE_ENV === 'true';
+  
   // Set proxy target based on environment
   const proxyTarget = isDevelopment 
     ? 'http://localhost:4000'  // Use local server in development
@@ -21,6 +24,7 @@ export default defineConfig(({ mode }) => {
   
   console.log(`[VITE] Environment: ${mode}`);
   console.log(`[VITE] Proxy target: ${proxyTarget}`);
+  console.log(`[VITE] Lovable environment: ${isLovableEnv ? 'yes' : 'no'}`);
   
   // Get the model environment variables, giving precedence to process.env over .env file
   const modelName = process.env.REACT_APP_DEFAULT_MODEL_NAME || 
@@ -77,6 +81,21 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    preview: {
+      // Add preview server configuration specifically for Lovable
+      port: 8080,
+      // Always enable proxy in preview mode to support API endpoints
+      proxy: {
+        '/api': {
+          target: isLovableEnv 
+            ? 'https://nfa-proxy-1081887913409.us-west1.run.app' // Use external API in Lovable
+            : 'http://localhost:4000', // Use local server otherwise
+          changeOrigin: true,
+          secure: true,
+          rewrite: (path) => path,
+        }
+      },
+    },
     build: {
       // Enable cache busting by adding timestamp hash to filenames
       rollupOptions: {
@@ -101,6 +120,8 @@ export default defineConfig(({ mode }) => {
         REACT_APP_DEFAULT_MODEL_ID: JSON.stringify(modelId),
         // Add Redis URL to the environment, using Upstash URL for preview/production
         REDIS_URL: JSON.stringify(redisUrl),
+        // Add Lovable environment flag
+        LOVABLE_ENV: JSON.stringify(isLovableEnv),
       },
     },
   };
