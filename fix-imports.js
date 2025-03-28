@@ -1,3 +1,4 @@
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -50,12 +51,15 @@ function fixImports(filePath) {
     // First, clean up any .js.js that might have been added previously
     content = content.replace(/\.js\.js/g, '.js');
     
-    // FIXED REGEX: Only target relative imports without .js extension
+    // IMPROVED REGEX: Only target relative imports without .js extension
     // This improved regex explicitly looks for paths that don't end with .js
     const importRegex = /from\s+(['"])(\.\.?\/[^'"]+?)(?!\.js)(['"])/g;
     
     // Replace with the same import but add .js extension before the closing quote
     content = content.replace(importRegex, 'from $1$2.js$3');
+    
+    // Fix Redis adapter imports specifically
+    content = content.replace(/from ['"]\.\.\/redis-adapter['"]/g, 'from "../redis-adapter.js"');
     
     fs.writeFileSync(filePath, content);
     console.log(`Successfully processed ${filePath}`);
@@ -97,4 +101,4 @@ function main() {
   }
 }
 
-main(); 
+main();

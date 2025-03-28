@@ -1,3 +1,4 @@
+
 import { Redis } from 'ioredis';
 import chalk from 'chalk';
 
@@ -30,6 +31,9 @@ async function createRedisClient(): Promise<Redis> {
         console.log(chalk.yellow('[REDIS_ADAPTER] Upgraded connection to use SSL (rediss://)'));
       }
       
+      // Add detailed logging before creating the client
+      console.log(chalk.blue(`[REDIS_ADAPTER] Creating Redis client with URL: ${redisUrl.replace(/\/\/(.+?)@/, '//[credentials-hidden]@')}`));
+      
       // Configure Redis client options
       const options: any = {
         connectTimeout: 20000,
@@ -57,9 +61,15 @@ async function createRedisClient(): Promise<Redis> {
       // Store the client globally
       globalRedisClient = client;
       
-      // Verify connection
-      await client.ping();
-      console.log(chalk.green('[REDIS_ADAPTER] Connection verified with PING'));
+      try {
+        // Verify connection
+        console.log(chalk.blue('[REDIS_ADAPTER] Verifying connection with PING'));
+        await client.ping();
+        console.log(chalk.green('[REDIS_ADAPTER] Connection verified with PING'));
+      } catch (pingError) {
+        console.error(chalk.red('[REDIS_ADAPTER] PING verification failed:'), pingError);
+        throw pingError;
+      }
       
       return client;
     } else {

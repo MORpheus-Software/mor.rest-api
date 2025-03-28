@@ -45,6 +45,9 @@ export default defineConfig(({ mode }) => {
   // Always set the REDIS_URL in process.env so it's available to the application
   process.env.REDIS_URL = redisUrl;
   
+  // Explicitly log Redis environment setup
+  console.log(`[VITE] Setting process.env.REDIS_URL to: ${process.env.REDIS_URL.replace(/\/\/(.+?)@/, '//[credentials-hidden]@')}`);
+  
   return {
     server: {
       host: "::",

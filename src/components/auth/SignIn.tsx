@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -56,19 +57,38 @@ export function SignInForm() {
       
       console.log('[SIGNIN] Fetch request completed with status:', response.status);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('[SIGNIN] Login error response:', errorData);
-        throw new Error(errorData.error?.message || 'Login failed');
-      }
-
-      // Clone the response before consuming it with json()
+      // First get the raw response text to help debug any JSON parsing issues
       const responseText = await response.clone().text();
-      console.log('[SIGNIN] Login raw response:', responseText);
+      console.log('[SIGNIN] Raw response text:', responseText);
       
-      // Process successful login
-      const responseData = await response.json();
-      console.log('[SIGNIN] Login parsed response:', responseData);
+      // Check for empty response or server errors
+      if (!responseText || responseText.trim() === '') {
+        console.error('[SIGNIN] Empty response received from server');
+        throw new Error('Server returned an empty response. This might indicate a Redis connection issue.');
+      }
+      
+      if (!response.ok) {
+        try {
+          // Try to parse error as JSON
+          const errorData = JSON.parse(responseText);
+          console.error('[SIGNIN] Login error response:', errorData);
+          throw new Error(errorData.error?.message || 'Login failed');
+        } catch (jsonError) {
+          // If JSON parsing fails, use the raw text
+          console.error('[SIGNIN] Login error (non-JSON):', responseText);
+          throw new Error(`Server error: ${response.status}. ${responseText || 'No additional details'}`);
+        }
+      }
+      
+      // Try to parse the response as JSON
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+        console.log('[SIGNIN] Login parsed response:', responseData);
+      } catch (jsonError) {
+        console.error('[SIGNIN] Error parsing JSON response:', jsonError);
+        throw new Error('Invalid response format from server');
+      }
       
       const user = responseData.data;
       
@@ -156,7 +176,9 @@ export function SignInForm() {
       console.error('[SIGNIN] Login error:', error);
       toast({
         title: "Authentication failed",
-        description: error instanceof Error ? error.message : "Please check your credentials and try again",
+        description: error instanceof Error 
+          ? error.message 
+          : "Please check your credentials and try again. If problem persists, Redis connection might be unavailable.",
         variant: "destructive",
       });
     } finally {
