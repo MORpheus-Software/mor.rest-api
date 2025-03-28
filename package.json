@@ -13,7 +13,7 @@
     "build:dev": "vite build --mode development",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "ALLOW_LOCAL_STORAGE=true concurrently \"npm run server:dev\" \"vite --mode production\"",
+    "preview": "ALLOW_LOCAL_STORAGE=true concurrently \"npm run server\" \"vite --mode production\"",
     "server": "tsx src/server/server.ts",
     "server:dev": "tsx watch src/server/server.ts",
     "test:api": "node scripts/test-api.js",
