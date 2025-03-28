@@ -1,9 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { createRedisClient } from '../redis-adapter.js';
 import { API_KEY_PREFIX } from './constants.js';
-// import { getRedisClient } from '../../server/setupRedis.js'; // Removed to solve circular dependency
 import { validateApiKey } from './keys.js';
-// import { verifyToken } from './auth.js'; // Commented out as it's not available
 import { Redis } from 'ioredis';
 
 // Safer environment detection that works in both Node.js and browser environments
@@ -11,7 +9,7 @@ const isBrowser = typeof process === 'undefined' ||
   !process.versions ||
   !process.versions.node;
 
-// Define a mock verifyToken function if needed by the rest of this file
+// Mock verifyToken function if needed by the rest of this file
 function verifyToken(token: string): Promise<any> {
   console.log('[AUTH] Using mock verifyToken, this should be replaced with actual implementation');
   return Promise.resolve(null);
@@ -30,6 +28,42 @@ export interface AuthenticatedRequest extends Request {
 
 // Redis client
 let redisClient: any = null;
+
+/**
+ * Get or create a Redis client with connection retries
+ */
+async function getRedisClientWithRetry(maxRetries: number = 3): Promise<any> {
+  if (redisClient) {
+    return redisClient;
+  }
+  
+  let lastError = null;
+  let attempts = 0;
+  
+  while (attempts < maxRetries) {
+    try {
+      console.log(`[AUTH] Redis client connection attempt ${attempts + 1}/${maxRetries}`);
+      redisClient = await createRedisClient();
+      
+      // Test the connection with a simple ping
+      await redisClient.ping();
+      console.log('[AUTH] Redis client connected successfully');
+      return redisClient;
+    } catch (error) {
+      lastError = error;
+      console.error(`[AUTH] Redis connection error (attempt ${attempts + 1}/${maxRetries}):`, error);
+      attempts++;
+      
+      // Wait before retrying
+      if (attempts < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+      }
+    }
+  }
+  
+  console.error('[AUTH] All Redis connection attempts failed');
+  throw lastError || new Error('Failed to connect to Redis after multiple attempts');
+}
 
 /**
  * Checks if an API key exists in localStorage (fallback when Redis is unavailable)
@@ -307,7 +341,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         try {
           // Initialize Redis client if not done already
           if (!redisClient) {
-            redisClient = await createRedisClient();
+            redisClient = await getRedisClientWithRetry();
           }
           
           // Use Redis client to check the key

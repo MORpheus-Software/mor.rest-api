@@ -1,3 +1,4 @@
+
 import { Request, Response } from 'express';
 import { 
   createUser, 
@@ -107,8 +108,9 @@ export const register = async (req: Request, res: Response) => {
     if (error.message && error.message.includes('Redis')) {
       return res.status(503).json({
         error: {
-          message: 'Service temporarily unavailable',
-          type: 'service_unavailable'
+          message: 'Service temporarily unavailable: Redis connection issue',
+          type: 'service_unavailable',
+          details: error.message
         }
       });
     }
@@ -116,7 +118,8 @@ export const register = async (req: Request, res: Response) => {
     return res.status(500).json({
       error: {
         message: 'Failed to register user',
-        type: 'server_error'
+        type: 'server_error',
+        details: error.message
       }
     });
   }
@@ -128,6 +131,7 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     console.log('[AUTH] Processing login request');
+    console.log('[AUTH] Login data:', { email: req.body.email, password: req.body.password ? '(provided)' : '(missing)' });
     
     const { email, password } = req.body;
     
@@ -141,8 +145,31 @@ export const login = async (req: Request, res: Response) => {
       });
     }
     
-    // Authenticate user
-    const user = await authenticateUser(email, password);
+    // Authenticate user with retry logic
+    let user = null;
+    let retries = 0;
+    const maxRetries = 3;
+    
+    while (retries < maxRetries) {
+      try {
+        // Authenticate user
+        user = await authenticateUser(email, password);
+        console.log('[AUTH] Authentication result:', user ? 'success' : 'failed');
+        break; // If successful, exit the retry loop
+      } catch (redisError) {
+        console.error(`[AUTH] Redis error during authentication (Attempt ${retries + 1}/${maxRetries}):`, redisError);
+        
+        if (retries >= maxRetries - 1) {
+          // If we've reached max retries, throw the error to be caught by the outer catch
+          throw redisError;
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1)));
+        retries++;
+      }
+    }
+    
     if (!user) {
       return res.status(401).json({
         error: {
@@ -163,9 +190,10 @@ export const login = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[AUTH] Login error:', error);
     
+    // More detailed error response
     return res.status(500).json({
       error: {
-        message: 'Failed to log in',
+        message: 'Failed to log in: ' + (error.message || 'Unknown error'),
         type: 'server_error'
       }
     });
