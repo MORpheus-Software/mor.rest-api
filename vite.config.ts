@@ -31,16 +31,19 @@ export default defineConfig(({ mode }) => {
                   env.REACT_APP_DEFAULT_MODEL_ID || 
                   'llama-3.1-8b-instant';
   
-  // Set Upstash Redis URL for preview and production modes
-  // IMPORTANT: Always use secure Redis URL (rediss://) for Upstash
+  // Always use secure Upstash Redis URL for preview and production modes
   const upstashRedisUrl = 'rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379';
   
+  // Ensure we're using the right Redis URL for the environment
   const redisUrl = isPreview
     ? upstashRedisUrl
     : (process.env.REDIS_URL || env.REDIS_URL || 'redis://localhost:6379');
   
   console.log(`[VITE] Using model: ${modelName} (${modelId})`);
   console.log(`[VITE] Using Redis URL: ${redisUrl.replace(/\/\/(.+?)@/, '//[credentials-hidden]@')}`);
+
+  // Always set the REDIS_URL in process.env so it's available to the application
+  process.env.REDIS_URL = redisUrl;
   
   return {
     server: {
