@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { MainLayout } from '@/components/layouts/MainLayout';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -8,6 +9,7 @@ interface AuthLayoutProps {
   description: string;
   footer?: React.ReactNode;
   className?: string;
+  useMainLayout?: boolean;
 }
 
 export function AuthLayout({
@@ -15,9 +17,10 @@ export function AuthLayout({
   title,
   description,
   footer,
-  className
+  className,
+  useMainLayout = false
 }: AuthLayoutProps) {
-  return (
+  const authContent = (
     <div className="flex min-h-screen w-full flex-col items-center justify-center animate-blur-in py-10 px-4 md:px-8">
       <Link to="/" className="absolute top-8 left-8 flex items-center gap-2 text-lg font-medium hover:opacity-80 transition-opacity">
         <div className="rounded-lg bg-primary p-1.5 text-white">API</div>
@@ -43,4 +46,11 @@ export function AuthLayout({
       )}
     </div>
   );
+
+  // Either use MainLayout or just render auth content directly
+  return useMainLayout ? (
+    <MainLayout hideNavigation>
+      {authContent}
+    </MainLayout>
+  ) : authContent;
 }

@@ -2,10 +2,17 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, ChevronRight, Key, LockKeyhole, Shield, Code, BookOpen, Wallet } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { MainLayout } from '@/components/layouts/MainLayout';
+
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
+  
+  useEffect(() => {
+    // Check if user is authenticated
+    const auth = localStorage.getItem('isAuthenticated');
+    setIsAuthenticated(!!auth);
+  }, []);
+  
   const features = [{
     title: 'Secure Token Management',
     description: 'Create, activate, deactivate, and delete API tokens with ease. Full control over who has access to your API.',
@@ -31,59 +38,9 @@ const Index = () => {
     description: 'Stake MOR tokens to unlock premium features and higher rate limits for your API usage.',
     icon: Wallet
   }];
-  useEffect(() => {
-    // Check if user is authenticated
-    const auth = localStorage.getItem('isAuthenticated');
-    setIsAuthenticated(!!auth);
-
-    // Add scroll listener
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-  return <div className="flex flex-col min-h-screen">
-      {/* Navbar */}
-      <header className={cn("fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-apple-ease py-4 px-6", scrollY > 10 ? "bg-white/80 backdrop-blur-lg shadow-sm" : "bg-transparent")}>
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 font-medium">
-            <div className="rounded-lg bg-primary p-1.5 text-white">API</div>
-            <span>MOR.rest API</span>
-          </div>
-          
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link to="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </Link>
-            <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Documentation
-            </Link>
-            <Link to="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Pricing
-            </Link>
-          </nav>
-          
-          <div className="flex items-center gap-4">
-            {isAuthenticated ? <Button asChild>
-                <Link to="/playground">
-                  Dashboard
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button> : <>
-                <Button variant="ghost" asChild>
-                  <Link to="/signin">Sign In</Link>
-                </Button>
-                <Button asChild>
-                  <Link to="/signup">Sign Up</Link>
-                </Button>
-              </>}
-          </div>
-        </div>
-      </header>
-
+  
+  return (
+    <MainLayout>
       {/* Hero Section */}
       <section className="flex-1 flex flex-col items-center justify-center px-6 pt-24 pb-16">
         <div className="max-w-4xl text-center space-y-6 animate-fade-in">
@@ -252,6 +209,8 @@ const Index = () => {
           </div>
         </div>
       </footer>
-    </div>;
+    </MainLayout>
+  );
 };
+
 export default Index;

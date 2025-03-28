@@ -15,6 +15,7 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AuthCheck from "./components/auth/AuthCheck";
 import DebugPage from "./pages/Debug";
 import { isAuthenticated } from "./lib/auth";
+import { MainLayout } from "./components/layouts/MainLayout";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
           <Routes key={`routes-${Date.now()}`}>
             {/* Public routes */}
             <Route path="/" element={<RootRedirect />} />
+            <Route path="/index" element={<Index />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />

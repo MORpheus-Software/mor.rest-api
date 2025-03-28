@@ -1,19 +1,42 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Sidebar } from '@/components/dashboard/Sidebar';
+import { cn } from '@/lib/utils';
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  // Authentication is now handled by AuthCheck and ProtectedRoute
-  // No need for redundant checks here
+  const [isMobileView, setIsMobileView] = useState(false);
+  
+  // Check if we're in mobile view
+  useEffect(() => {
+    const checkScreenWidth = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+
+    checkScreenWidth();
+    window.addEventListener('resize', checkScreenWidth);
+
+    return () => {
+      window.removeEventListener('resize', checkScreenWidth);
+    };
+  }, []);
   
   return (
-    <div className="flex h-screen w-full">
+    <div className="flex h-screen w-full overflow-hidden">
+      {/* Always render Sidebar - it will adapt to mobile/desktop internally */}
       <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-background">
-        <div className="container py-6 animate-fade-in max-w-6xl">
+      
+      {/* Main content area */}
+      <main className={cn(
+        "flex-1 overflow-y-auto bg-background",
+        isMobileView ? "pt-16 w-full" : ""
+      )}>
+        <div className={cn(
+          "animate-fade-in py-6",
+          isMobileView ? "px-4" : "container max-w-6xl"
+        )}>
           {children}
         </div>
       </main>

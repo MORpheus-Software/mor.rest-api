@@ -5,12 +5,12 @@ MODEL_NAME="${1:-anthropic/claude-3-opus-20240229}"
 
 echo "Testing model: $MODEL_NAME"
 
+# NOTE: Streaming is disabled (remove comments to enable streaming)
 curl https://nfa-proxy-101868473812.us-west1.run.app/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "HTTP-Referer: https://morsaas.com" \
   -H "X-Title: MorSaaS" \
   -H "User-Agent: MorSaaS/1.0.0" \
-  -H "Accept: text/event-stream" \
   -d "{
   \"model\": \"$MODEL_NAME\",
   \"messages\": [
@@ -41,9 +41,12 @@ curl https://nfa-proxy-101868473812.us-west1.run.app/v1/chat/completions \
       }
     }
   ],
-  \"tool_choice\": \"auto\",
-  \"stream\": true
+  \"tool_choice\": \"auto\"
 }"
+
+# To enable streaming, add:
+# 1. "stream": true to the JSON payload 
+# 2. -H "Accept: text/event-stream" to the curl headers
 
 # Note: The "Accept: text/event-stream" header is required for streaming responses
 
