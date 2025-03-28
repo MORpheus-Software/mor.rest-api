@@ -80,16 +80,19 @@ export async function checkRedisConnection() {
     const client = await getRedisClient();
     
     // Use PING to verify connection
-    console.log(chalk.blue('[REDIS] Sending PING command...'));
-    const result = await client.ping();
-    
-    if (result === 'PONG') {
-      console.log(chalk.green('[REDIS] Redis connection successful ✓'));
-      return true;
-    } else {
-      console.error(chalk.red('[REDIS] Redis PING returned unexpected result:'), result);
-      return false;
+    if (client) {
+      console.log(chalk.blue('[REDIS] Sending PING command...'));
+      const result = await client.ping();
+      
+      if (result === 'PONG') {
+        console.log(chalk.green('[REDIS] Redis connection successful ✓'));
+        return true;
+      } else {
+        console.error(chalk.red('[REDIS] Redis PING returned unexpected result:'), result);
+        return false;
+      }
     }
+    return false;
   } catch (error) {
     console.error(chalk.red('[REDIS] Redis connection check failed:'), error);
     return false;
