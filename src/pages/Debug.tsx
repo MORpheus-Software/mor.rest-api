@@ -1,14 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { isAuthenticated, getCurrentUser, logout, createTestUser, debugAuth } from '@/lib/auth';
 import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants';
+import { DemoStakingClient } from '@/demoStakingClient';
+import { getTokenBalance, getStakedBalance } from '@/services/ethService';
 
 export default function DebugPage() {
-  const [authStatus, setAuthStatus] = useState<boolean | null>(null);
+  const [envVars, setEnvVars] = useState<Record<string, string>>({});
+  const [authStatus, setAuthStatus] = useState<boolean>(false);
   const [userData, setUserData] = useState<any>(null);
   const [apiResponse, setApiResponse] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [mockBalance, setMockBalance] = useState<number>(0);
+  const [mockStakedBalance, setMockStakedBalance] = useState<number>(0);
+  
+  useEffect(() => {
+    // Gather environment variables
+    const vars: Record<string, string> = {};
+    for (const key in import.meta.env) {
+      if (typeof import.meta.env[key] === 'string') {
+        vars[key] = import.meta.env[key];
+      }
+    }
+    setEnvVars(vars);
+    
+    // Check authentication status
+    setAuthStatus(isAuthenticated());
+
+    // Test the DemoStakingClient
+    const testDemoClient = async () => {
+      try {
+        // Check mock balance
+        const balance = await getTokenBalance('mock-address');
+        setMockBalance(balance);
+        
+        // Check mock staked balance
+        const stakedBalance = await getStakedBalance('mock-address');
+        setMockStakedBalance(stakedBalance);
+      } catch (error) {
+        console.error('Error testing demo client:', error);
+      }
+    };
+    
+    testDemoClient();
+  }, []);
   
   // Check authentication status
   const checkAuth = () => {
@@ -139,6 +175,41 @@ export default function DebugPage() {
         <Button onClick={() => window.location.href = '/dashboard'} variant="outline">
           Go to Dashboard
         </Button>
+      </div>
+      
+      <div className="mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Environment Variables</CardTitle>
+            <CardDescription>Details about the environment</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <pre className="bg-gray-100 p-4 rounded-lg overflow-auto">
+              {JSON.stringify(envVars, null, 2)}
+            </pre>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <div className="mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Staking Demo Client Test</CardTitle>
+            <CardDescription>Test the DemoStakingClient</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="border p-3 rounded-lg">
+                <p className="font-medium">Mock Token Balance</p>
+                <p className="text-xl">{mockBalance} MOR</p>
+              </div>
+              <div className="border p-3 rounded-lg">
+                <p className="font-medium">Mock Staked Balance</p>
+                <p className="text-xl">{mockStakedBalance} MOR</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -1,9 +1,16 @@
+import { ethers } from 'ethers';
+import { StakingClient } from '@/StakingClient';
+import { DemoStakingClient } from '@/demoStakingClient';
 
 declare global {
   interface Window {
     ethereum?: any;
   }
 }
+
+// Determine if we're in development mode
+const isDevelopment = import.meta.env.MODE === 'development';
+const useMockData = isDevelopment && import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
 // ABI for the MOR token contract - simplified version
 const MOR_TOKEN_ABI = [
@@ -56,8 +63,8 @@ const STAKING_CONTRACT_ABI = [
 ];
 
 // Contract addresses (mainnet)
-const MOR_TOKEN_ADDRESS = "0x1C9491865a1DE77C5b6e19d2E6a5F1D7a6F2b25F"; // Example address
-const STAKING_CONTRACT_ADDRESS = "0x7396F26DdEE748D3cE166852Ef56E24cdA25CBD4"; // Example address
+const MOR_TOKEN_ADDRESS = import.meta.env.VITE_MOR_TOKEN_ADDRESS || "0x1C9491865a1DE77C5b6e19d2E6a5F1D7a6F2b25F";
+const STAKING_CONTRACT_ADDRESS = import.meta.env.VITE_STAKING_CONTRACT_ADDRESS || "0x7396F26DdEE748D3cE166852Ef56E24cdA25CBD4";
 
 // Network configurations
 const NETWORKS = {
@@ -83,6 +90,52 @@ const NETWORKS = {
     rpcUrls: ['https://sepolia.infura.io/v3/'],
     blockExplorerUrls: ['https://sepolia.etherscan.io']
   }
+};
+
+// Get StakingClient instance
+const getStakingClient = () => {
+  // Use demo client if in development mode and mock data is enabled
+  if (useMockData) {
+    return new DemoStakingClient();
+  }
+
+  if (!window.ethereum) {
+    throw new Error("MetaMask is not installed");
+  }
+  
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const signerPromise = provider.getSigner();
+  
+  // Create a proxy object that resolves the signer promise on demand
+  const asyncStakingClient = {
+    async stake(amount: string) {
+      const signer = await signerPromise;
+      const client = new StakingClient(provider, signer);
+      return client.stake(amount);
+    },
+    async unstake(amount: string) {
+      const signer = await signerPromise;
+      const client = new StakingClient(provider, signer);
+      return client.unstake(amount);
+    },
+    async getStakedAmount(address: string) {
+      const signer = await signerPromise;
+      const client = new StakingClient(provider, signer);
+      return client.getStakedAmount(address);
+    },
+    async getStakedBalance(address: string) {
+      const signer = await signerPromise;
+      const client = new StakingClient(provider, signer);
+      return client.getStakedBalance(address);
+    },
+    async claimReward() {
+      const signer = await signerPromise;
+      const client = new StakingClient(provider, signer);
+      return client.claimReward();
+    },
+  };
+  
+  return asyncStakingClient;
 };
 
 /**
@@ -175,21 +228,19 @@ export const switchNetwork = async (networkName: 'mainnet' | 'sepolia'): Promise
  */
 export const getTokenBalance = async (address: string): Promise<number> => {
   try {
+    if (useMockData) {
+      // Return mock balance in development mode
+      return 1000;
+    }
+
     if (!window.ethereum) {
       throw new Error("MetaMask is not installed");
     }
     
-    // For demo purposes, return a random number
-    // In a real implementation, this would call the token contract's balanceOf method
-    return Math.floor(Math.random() * 1000) + 500;
-    
-    /* 
-    // Real implementation would look like:
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const provider = new ethers.BrowserProvider(window.ethereum);
     const tokenContract = new ethers.Contract(MOR_TOKEN_ADDRESS, MOR_TOKEN_ABI, provider);
     const balance = await tokenContract.balanceOf(address);
-    return ethers.utils.formatUnits(balance, 18); // Assuming 18 decimal places
-    */
+    return parseFloat(ethers.formatEther(balance));
   } catch (error) {
     console.error("Error getting token balance:", error);
     return 0;
@@ -201,21 +252,13 @@ export const getTokenBalance = async (address: string): Promise<number> => {
  */
 export const getStakedBalance = async (address: string): Promise<number> => {
   try {
-    if (!window.ethereum) {
+    if (!window.ethereum && !useMockData) {
       throw new Error("MetaMask is not installed");
     }
     
-    // For demo purposes, return a random number
-    // In a real implementation, this would call the staking contract's stakedBalance method
-    return Math.floor(Math.random() * 500) + 100;
-    
-    /* 
-    // Real implementation would look like:
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const stakingContract = new ethers.Contract(STAKING_CONTRACT_ADDRESS, STAKING_CONTRACT_ABI, provider);
-    const balance = await stakingContract.stakedBalance(address);
-    return ethers.utils.formatUnits(balance, 18); // Assuming 18 decimal places
-    */
+    const stakingClient = getStakingClient();
+    const balance = await stakingClient.getStakedBalance(address);
+    return parseFloat(balance);
   } catch (error) {
     console.error("Error getting staked balance:", error);
     return 0;
@@ -227,34 +270,30 @@ export const getStakedBalance = async (address: string): Promise<number> => {
  */
 export const stakeTokens = async (amount: number): Promise<boolean> => {
   try {
+    if (useMockData) {
+      const demoClient = new DemoStakingClient();
+      await demoClient.stake(amount.toString());
+      return true;
+    }
+
     if (!window.ethereum) {
       throw new Error("MetaMask is not installed");
     }
     
-    // Simulate transaction delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    console.log(`Staking ${amount} tokens (mock transaction)`);
-    
-    /* 
-    // Real implementation would look like:
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const signer = provider.getSigner();
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
     
     // First approve the staking contract to spend tokens
     const tokenContract = new ethers.Contract(MOR_TOKEN_ADDRESS, MOR_TOKEN_ABI, signer);
-    const amountInWei = ethers.utils.parseUnits(amount.toString(), 18);
+    const amountInWei = ethers.parseEther(amount.toString());
     
     const approveTx = await tokenContract.approve(STAKING_CONTRACT_ADDRESS, amountInWei);
     await approveTx.wait();
     
-    // Then stake the tokens
-    const stakingContract = new ethers.Contract(STAKING_CONTRACT_ADDRESS, STAKING_CONTRACT_ABI, signer);
-    const stakeTx = await stakingContract.stake(amountInWei);
-    await stakeTx.wait();
-    */
+    // Now stake the tokens using the StakingClient
+    const stakingClient = getStakingClient();
+    await stakingClient.stake(amount.toString());
     
-    // Returning true indicates success
     return true;
   } catch (error) {
     console.error("Error staking tokens:", error);
@@ -267,27 +306,20 @@ export const stakeTokens = async (amount: number): Promise<boolean> => {
  */
 export const unstakeTokens = async (amount: number): Promise<boolean> => {
   try {
+    if (useMockData) {
+      const demoClient = new DemoStakingClient();
+      await demoClient.unstake(amount.toString());
+      return true;
+    }
+
     if (!window.ethereum) {
       throw new Error("MetaMask is not installed");
     }
     
-    // Simulate transaction delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Use the StakingClient to unstake
+    const stakingClient = getStakingClient();
+    await stakingClient.unstake(amount.toString());
     
-    console.log(`Unstaking ${amount} tokens (mock transaction)`);
-    
-    /* 
-    // Real implementation would look like:
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const signer = provider.getSigner();
-    const stakingContract = new ethers.Contract(STAKING_CONTRACT_ADDRESS, STAKING_CONTRACT_ABI, signer);
-    
-    const amountInWei = ethers.utils.parseUnits(amount.toString(), 18);
-    const unstakeTx = await stakingContract.unstake(amountInWei);
-    await unstakeTx.wait();
-    */
-    
-    // Returning true indicates success
     return true;
   } catch (error) {
     console.error("Error unstaking tokens:", error);
@@ -300,4 +332,29 @@ export const unstakeTokens = async (amount: number): Promise<boolean> => {
  */
 export const getBlockchainBalance = async (address: string): Promise<number> => {
   return getTokenBalance(address);
+};
+
+/**
+ * Claim staking rewards
+ */
+export const claimRewards = async (): Promise<boolean> => {
+  try {
+    if (useMockData) {
+      const demoClient = new DemoStakingClient();
+      await demoClient.claimReward();
+      return true;
+    }
+
+    if (!window.ethereum) {
+      throw new Error("MetaMask is not installed");
+    }
+    
+    const stakingClient = getStakingClient();
+    await stakingClient.claimReward();
+    
+    return true;
+  } catch (error) {
+    console.error("Error claiming rewards:", error);
+    return false;
+  }
 };

@@ -11,13 +11,35 @@ import ApiPlayground from "./pages/ApiPlayground";
 import ProfilePage from "./pages/ProfilePage";
 import Documentation from "./pages/Documentation";
 import Tokens from "./pages/Tokens";
+import Staking from "./pages/Staking";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AuthCheck from "./components/auth/AuthCheck";
 import DebugPage from "./pages/Debug";
-import { isAuthenticated } from "./lib/auth";
+import { isAuthenticated, login } from "./lib/auth";
 import { MainLayout } from "./components/layouts/MainLayout";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
+
+// FOR DEVELOPMENT ONLY: Auto-login functionality
+const DevLoginHelper = () => {
+  useEffect(() => {
+    // Check if we're in development and VITE_USE_MOCK_DATA is true
+    if (import.meta.env.MODE === 'development' && import.meta.env.VITE_USE_MOCK_DATA === 'true') {
+      // Create a test user if not already logged in
+      if (!isAuthenticated()) {
+        console.log('DEV MODE: Creating test user for development');
+        login({
+          id: 'dev-user-123',
+          name: 'Development User',
+          email: 'dev@example.com',
+        });
+      }
+    }
+  }, []);
+
+  return null;
+};
 
 // Component to handle root path redirection based on authentication
 const RootRedirect = () => {
@@ -38,6 +60,7 @@ const App = () => (
           closeButton: true
         }}
       />
+      <DevLoginHelper />
       <BrowserRouter>
         <AuthCheck>
           <Routes key={`routes-${Date.now()}`}>
@@ -54,7 +77,7 @@ const App = () => (
             <Route path="/tokens" element={<ProtectedRoute><Tokens /></ProtectedRoute>} />
             <Route path="/playground" element={<ProtectedRoute><ApiPlayground /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-            <Route path="/staking" element={<Navigate to="/playground" replace />} />
+            <Route path="/staking" element={<ProtectedRoute><Staking /></ProtectedRoute>} />
             <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
             
             {/* Catch-all route */}

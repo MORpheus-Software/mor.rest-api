@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { LogOut, Key, Play, User, BookOpen, Menu } from 'lucide-react';
+import { LogOut, Key, Play, User, BookOpen, Menu, Coins } from 'lucide-react';
 import { toast } from 'sonner';
 import { logout } from '@/lib/auth';
 import { useState, useEffect } from 'react';
@@ -22,6 +22,11 @@ export function Sidebar() {
       title: 'API Playground',
       href: '/playground',
       icon: Play,
+    },
+    {
+      title: 'Staking',
+      href: '/staking',
+      icon: Coins,
     },
     {
       title: 'Documents',

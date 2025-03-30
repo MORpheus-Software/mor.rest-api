@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -7,14 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Wallet, Coins, ArrowUp, ArrowDown, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Wallet, Coins, ArrowUp, ArrowDown, ExternalLink, AlertTriangle, Gift } from 'lucide-react';
 import WalletConnect from '@/components/wallet/WalletConnect';
 import { 
   stakeTokens, 
   unstakeTokens, 
   getTokenBalance, 
   getStakedBalance,
-  switchNetwork 
+  switchNetwork,
+  claimRewards
 } from '@/services/ethService';
 import {
   Dialog,
@@ -27,9 +27,9 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Mock contract data similar to MOR Dashboard
-const CONTRACT_ADDRESS = "0x7396F26DdEE748D3cE166852Ef56E24cdA25CBD4";
-const TOKEN_ADDRESS = "0x1C9491865a1DE77C5b6e19d2E6a5F1D7a6F2b25F";
+// Real contract addresses
+const CONTRACT_ADDRESS = import.meta.env.VITE_STAKING_CONTRACT_ADDRESS || "0x7396F26DdEE748D3cE166852Ef56E24cdA25CBD4";
+const TOKEN_ADDRESS = import.meta.env.VITE_MOR_TOKEN_ADDRESS || "0x1C9491865a1DE77C5b6e19d2E6a5F1D7a6F2b25F";
 
 const Staking = () => {
   const [balance, setBalance] = useState<number>(0);
@@ -38,6 +38,7 @@ const Staking = () => {
   const [amountToUnstake, setAmountToUnstake] = useState('');
   const [isStaking, setIsStaking] = useState(false);
   const [isUnstaking, setIsUnstaking] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
   const [tier, setTier] = useState('Basic');
   const [connectedAccount, setConnectedAccount] = useState<string | null>(null);
   const [showUnstakeDialog, setShowUnstakeDialog] = useState(false);
@@ -176,6 +177,30 @@ const Staking = () => {
     }
   };
 
+  const handleClaimRewards = async () => {
+    if (!connectedAccount) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
+    
+    setIsClaiming(true);
+    
+    try {
+      const success = await claimRewards();
+      
+      if (success) {
+        toast.success('Successfully claimed rewards');
+      } else {
+        toast.error('Transaction failed');
+      }
+    } catch (error) {
+      toast.error('Failed to claim rewards. Please try again.');
+      console.error(error);
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+
   const getNextTier = () => {
     if (stakedAmount < 100) return { name: 'Silver', required: 100 };
     if (stakedAmount < 500) return { name: 'Gold', required: 500 };
@@ -290,9 +315,10 @@ const Staking = () => {
         <Card>
           <CardHeader>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="stake">Stake</TabsTrigger>
                 <TabsTrigger value="unstake">Unstake</TabsTrigger>
+                <TabsTrigger value="rewards">Rewards</TabsTrigger>
               </TabsList>
             </Tabs>
           </CardHeader>
@@ -397,6 +423,36 @@ const Staking = () => {
                       <strong>Important:</strong> Unstaking tokens will reduce your tier level and associated benefits if your staked amount falls below a tier threshold.
                     </div>
                   </div>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="rewards" className="mt-0">
+              <div className="space-y-6">
+                <div className="rounded-md border bg-card p-6 text-center">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                    <Gift className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="mb-1 text-lg font-semibold">Staking Rewards</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Claim your rewards for staking MOR tokens
+                  </p>
+                  <Button 
+                    onClick={handleClaimRewards} 
+                    disabled={!connectedAccount || isClaiming || stakedAmount <= 0 || isLoading}
+                    className="w-full"
+                  >
+                    {isClaiming ? 'Claiming...' : 'Claim Rewards'}
+                  </Button>
+                </div>
+                
+                <div className="text-sm text-muted-foreground">
+                  <p>Reward details:</p>
+                  <ul className="list-disc list-inside pl-4 space-y-1 mt-2">
+                    <li>Rewards accumulate based on your staked amount</li>
+                    <li>Higher tiers receive additional reward bonuses</li>
+                    <li>Rewards can be claimed once every 24 hours</li>
+                  </ul>
                 </div>
               </div>
             </TabsContent>
