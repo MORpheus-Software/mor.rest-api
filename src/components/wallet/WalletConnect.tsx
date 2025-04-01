@@ -27,29 +27,26 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
   const updateNetworkInfo = useCallback((chainId: string) => {
     // Map chainId to network name
     const networks: Record<string, string> = {
-      '0x1': 'Mainnet',
-      '0x3': 'Ropsten',
-      '0x4': 'Rinkeby',
-      '0x5': 'Goerli',
-      '0xaa36a7': 'Sepolia',
+      '0x1': 'Ethereum',
+      '0xa4b1': 'Arbitrum One',
+      '0x66dee': 'Arbitrum Sepolia',
       '0x89': 'Polygon',
       '0xa': 'Optimism',
-      '0xa4b1': 'Arbitrum'
     };
     
     setChainId(chainId);
     setNetwork(networks[chainId] || `Unknown (${chainId})`);
   }, []);
 
-  const handleAccountsChanged = useCallback((accounts: string[]) => {
+  const handleAccountsChanged = useCallback((accounts: string[], showToast = true) => {
     if (accounts.length === 0) {
       setAccount(null);
-      toast.error("Disconnected from MetaMask");
+      if (showToast) toast.error("Disconnected from MetaMask");
     } else {
       const newAccount = accounts[0];
       setAccount(newAccount);
       onConnect(newAccount);
-      toast.success("Connected to MetaMask");
+      if (showToast) toast.success("Connected to MetaMask");
     }
   }, [onConnect]);
 
@@ -90,7 +87,8 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
     const checkConnection = async () => {
       const connectedAccount = await checkIfWalletIsConnected();
       if (connectedAccount) {
-        handleAccountsChanged([connectedAccount]);
+        // Don't show toast for initial connection check
+        handleAccountsChanged([connectedAccount], false);
       }
     };
     
@@ -124,7 +122,7 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
     try {
       const account = await connectWallet();
       if (account) {
-        handleAccountsChanged([account]);
+        handleAccountsChanged([account], true);
       }
     } catch (error: any) {
       console.error("Failed to connect:", error);
@@ -191,13 +189,13 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
             className="cursor-pointer"
             onClick={() => handleSwitchNetwork('mainnet')}
           >
-            Switch to Mainnet
+            Switch to Arbitrum One
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={() => handleSwitchNetwork('sepolia')}
           >
-            Switch to Sepolia Testnet
+            Switch to Arbitrum Sepolia
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -211,9 +209,9 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer"
-            onClick={() => window.open(`https://etherscan.io/address/${account}`, '_blank')}
+            onClick={() => window.open(`https://arbiscan.io/address/${account}`, '_blank')}
           >
-            View on Etherscan
+            View on Arbiscan
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

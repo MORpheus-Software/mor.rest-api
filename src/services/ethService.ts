@@ -8,6 +8,17 @@ declare global {
   }
 }
 
+// Helper function to ensure proper checksum format for addresses
+const getChecksumAddress = (address: string): string => {
+  try {
+    return ethers.getAddress(address);
+  } catch (error) {
+    console.error("Invalid address format:", error);
+    // Return the original address if conversion fails
+    return address;
+  }
+};
+
 // Determine if we're in development mode
 const isDevelopment = import.meta.env.MODE === 'development';
 const useMockData = isDevelopment && import.meta.env.VITE_USE_MOCK_DATA === 'true';
@@ -62,33 +73,37 @@ const STAKING_CONTRACT_ABI = [
   }
 ];
 
-// Contract addresses (mainnet)
-const MOR_TOKEN_ADDRESS = import.meta.env.VITE_MOR_TOKEN_ADDRESS || "0x1C9491865a1DE77C5b6e19d2E6a5F1D7a6F2b25F";
-const STAKING_CONTRACT_ADDRESS = import.meta.env.VITE_STAKING_CONTRACT_ADDRESS || "0x7396F26DdEE748D3cE166852Ef56E24cdA25CBD4";
+// Contract addresses with proper checksum
+const MOR_TOKEN_ADDRESS = getChecksumAddress(
+  import.meta.env.VITE_MOR_TOKEN_ADDRESS || "0x1C9491865a1DE77C5b6e19d2E6a5F1D7a6F2b25F"
+);
+const STAKING_CONTRACT_ADDRESS = getChecksumAddress(
+  import.meta.env.VITE_STAKING_CONTRACT_ADDRESS || "0x7396F26DdEE748D3cE166852Ef56E24cdA25CBD4"
+);
 
 // Network configurations
 const NETWORKS = {
   mainnet: {
-    chainId: '0x1',
-    chainName: 'Ethereum Mainnet',
+    chainId: '0xa4b1',
+    chainName: 'Arbitrum One',
     nativeCurrency: {
       name: 'Ether',
       symbol: 'ETH',
       decimals: 18
     },
-    rpcUrls: ['https://mainnet.infura.io/v3/'],
-    blockExplorerUrls: ['https://etherscan.io']
+    rpcUrls: ['https://arb1.arbitrum.io/rpc'],
+    blockExplorerUrls: ['https://arbiscan.io']
   },
   sepolia: {
-    chainId: '0xaa36a7',
-    chainName: 'Sepolia Testnet',
+    chainId: '0x66dee',
+    chainName: 'Arbitrum Sepolia',
     nativeCurrency: {
-      name: 'Sepolia Ether',
-      symbol: 'SEP',
+      name: 'Ether',
+      symbol: 'ETH',
       decimals: 18
     },
-    rpcUrls: ['https://sepolia.infura.io/v3/'],
-    blockExplorerUrls: ['https://sepolia.etherscan.io']
+    rpcUrls: ['https://sepolia-rollup.arbitrum.io/rpc'],
+    blockExplorerUrls: ['https://sepolia.arbiscan.io']
   }
 };
 
@@ -110,27 +125,27 @@ const getStakingClient = () => {
   const asyncStakingClient = {
     async stake(amount: string) {
       const signer = await signerPromise;
-      const client = new StakingClient(provider, signer);
+      const client = new StakingClient(provider, signer, STAKING_CONTRACT_ADDRESS);
       return client.stake(amount);
     },
     async unstake(amount: string) {
       const signer = await signerPromise;
-      const client = new StakingClient(provider, signer);
+      const client = new StakingClient(provider, signer, STAKING_CONTRACT_ADDRESS);
       return client.unstake(amount);
     },
     async getStakedAmount(address: string) {
       const signer = await signerPromise;
-      const client = new StakingClient(provider, signer);
+      const client = new StakingClient(provider, signer, STAKING_CONTRACT_ADDRESS);
       return client.getStakedAmount(address);
     },
     async getStakedBalance(address: string) {
       const signer = await signerPromise;
-      const client = new StakingClient(provider, signer);
+      const client = new StakingClient(provider, signer, STAKING_CONTRACT_ADDRESS);
       return client.getStakedBalance(address);
     },
     async claimReward() {
       const signer = await signerPromise;
-      const client = new StakingClient(provider, signer);
+      const client = new StakingClient(provider, signer, STAKING_CONTRACT_ADDRESS);
       return client.claimReward();
     },
   };
@@ -228,18 +243,19 @@ export const switchNetwork = async (networkName: 'mainnet' | 'sepolia'): Promise
  */
 export const getTokenBalance = async (address: string): Promise<number> => {
   try {
-    if (useMockData) {
-      // Return mock balance in development mode
-      return 1000;
-    }
-
     if (!window.ethereum) {
+      if (useMockData) {
+        // When mock data is enabled but no wallet is connected
+        return 0;
+      }
       throw new Error("MetaMask is not installed");
     }
     
     const provider = new ethers.BrowserProvider(window.ethereum);
     const tokenContract = new ethers.Contract(MOR_TOKEN_ADDRESS, MOR_TOKEN_ABI, provider);
-    const balance = await tokenContract.balanceOf(address);
+    // Use checksum address
+    const checksumAddress = getChecksumAddress(address);
+    const balance = await tokenContract.balanceOf(checksumAddress);
     return parseFloat(ethers.formatEther(balance));
   } catch (error) {
     console.error("Error getting token balance:", error);
@@ -287,7 +303,9 @@ export const stakeTokens = async (amount: number): Promise<boolean> => {
     const tokenContract = new ethers.Contract(MOR_TOKEN_ADDRESS, MOR_TOKEN_ABI, signer);
     const amountInWei = ethers.parseEther(amount.toString());
     
-    const approveTx = await tokenContract.approve(STAKING_CONTRACT_ADDRESS, amountInWei);
+    // Use checksum address for approval
+    const checksumStakingAddress = getChecksumAddress(STAKING_CONTRACT_ADDRESS);
+    const approveTx = await tokenContract.approve(checksumStakingAddress, amountInWei);
     await approveTx.wait();
     
     // Now stake the tokens using the StakingClient

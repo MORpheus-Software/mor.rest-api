@@ -39,7 +39,7 @@ const Staking = () => {
   const [isStaking, setIsStaking] = useState(false);
   const [isUnstaking, setIsUnstaking] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
-  const [tier, setTier] = useState('Basic');
+  const [tier, setTier] = useState('Locked');
   const [connectedAccount, setConnectedAccount] = useState<string | null>(null);
   const [showUnstakeDialog, setShowUnstakeDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,14 +47,10 @@ const Staking = () => {
   
   // Calculate tier based on staked amount
   useEffect(() => {
-    if (stakedAmount >= 1000) {
-      setTier('Platinum');
-    } else if (stakedAmount >= 500) {
-      setTier('Gold');
-    } else if (stakedAmount >= 100) {
-      setTier('Silver');
+    if (stakedAmount >= 100) {
+      setTier('Unlocked');
     } else {
-      setTier('Basic');
+      setTier('Locked');
     }
   }, [stakedAmount]);
 
@@ -202,9 +198,7 @@ const Staking = () => {
   };
 
   const getNextTier = () => {
-    if (stakedAmount < 100) return { name: 'Silver', required: 100 };
-    if (stakedAmount < 500) return { name: 'Gold', required: 500 };
-    if (stakedAmount < 1000) return { name: 'Platinum', required: 1000 };
+    if (stakedAmount < 100) return { name: 'Unlocked', required: 100 };
     return { name: 'Maximum Tier Reached', required: stakedAmount };
   };
 
@@ -230,7 +224,7 @@ const Staking = () => {
             <div>
               <h3 className="text-lg font-semibold">Connect your wallet</h3>
               <p className="text-sm text-muted-foreground">
-                Connect your Ethereum wallet to view your MOR token balance and stake tokens.
+                Connect your Arbitrum wallet to view your MOR token balance and stake tokens.
               </p>
             </div>
           </CardContent>
@@ -314,148 +308,150 @@ const Staking = () => {
         
         <Card>
           <CardHeader>
+            <CardTitle>Staking Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="stake">Stake</TabsTrigger>
                 <TabsTrigger value="unstake">Unstake</TabsTrigger>
                 <TabsTrigger value="rewards">Rewards</TabsTrigger>
               </TabsList>
+              
+              <TabsContent value="stake" className="mt-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="stakeAmount">Amount to Stake</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        id="stakeAmount"
+                        type="number"
+                        placeholder="Enter amount"
+                        value={amountToStake}
+                        onChange={(e) => setAmountToStake(e.target.value)}
+                        disabled={!connectedAccount || isStaking || isLoading}
+                      />
+                      <Button 
+                        onClick={handleStake} 
+                        disabled={isStaking || !connectedAccount || isLoading}
+                        className="min-w-24"
+                      >
+                        {isStaking ? 'Staking...' : 'Stake'}
+                        <ArrowUp className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                    {connectedAccount && (
+                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                        <span>Available: {balance} MOR</span>
+                        <button 
+                          className="text-primary hover:underline" 
+                          onClick={() => setAmountToStake(balance.toString())}
+                          disabled={isLoading || balance <= 0}
+                        >
+                          Max
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2 pt-2">
+                    <div className="text-sm">Staking Benefits:</div>
+                    <ul className="text-sm space-y-1">
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500">•</span>
+                        <span>Access to premium API features</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500">•</span>
+                        <span>Higher API rate limits based on your tier</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-500">•</span>
+                        <span>Priority support and dedicated account manager (Platinum tier)</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="unstake" className="mt-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="unstakeAmount">Amount to Unstake</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        id="unstakeAmount"
+                        type="number"
+                        placeholder="Enter amount"
+                        value={amountToUnstake}
+                        onChange={(e) => setAmountToUnstake(e.target.value)}
+                        disabled={!connectedAccount || isUnstaking || isLoading}
+                      />
+                      <Button 
+                        onClick={handleUnstake}
+                        disabled={isUnstaking || !connectedAccount || isLoading}
+                        variant="outline"
+                        className="min-w-24"
+                      >
+                        {isUnstaking ? 'Processing...' : 'Unstake'}
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                    {connectedAccount && (
+                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                        <span>Staked: {stakedAmount} MOR</span>
+                        <button 
+                          className="text-primary hover:underline" 
+                          onClick={() => setAmountToUnstake(stakedAmount.toString())}
+                          disabled={isLoading || stakedAmount <= 0}
+                        >
+                          Max
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="rounded-md bg-amber-50 dark:bg-amber-950/50 p-3 text-sm text-amber-800 dark:text-amber-200 mt-4">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <strong>Important:</strong> Unstaking tokens will reduce your tier level and associated benefits if your staked amount falls below a tier threshold.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="rewards" className="mt-4">
+                <div className="space-y-6">
+                  <div className="rounded-md border bg-card p-6 text-center">
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                      <Gift className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="mb-1 text-lg font-semibold">Staking Rewards</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Claim your rewards for staking MOR tokens
+                    </p>
+                    <Button 
+                      onClick={handleClaimRewards} 
+                      disabled={!connectedAccount || isClaiming || stakedAmount <= 0 || isLoading}
+                      className="w-full"
+                    >
+                      {isClaiming ? 'Claiming...' : 'Claim Rewards'}
+                    </Button>
+                  </div>
+                  
+                  <div className="text-sm text-muted-foreground">
+                    <p>Reward details:</p>
+                    <ul className="list-disc list-inside pl-4 space-y-1 mt-2">
+                      <li>Rewards accumulate based on your staked amount</li>
+                      <li>Higher tiers receive additional reward bonuses</li>
+                      <li>Rewards can be claimed once every 24 hours</li>
+                    </ul>
+                  </div>
+                </div>
+              </TabsContent>
             </Tabs>
-          </CardHeader>
-          <CardContent>
-            <TabsContent value="stake" className="mt-0">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="stakeAmount">Amount to Stake</Label>
-                  <div className="flex space-x-2">
-                    <Input
-                      id="stakeAmount"
-                      type="number"
-                      placeholder="Enter amount"
-                      value={amountToStake}
-                      onChange={(e) => setAmountToStake(e.target.value)}
-                      disabled={!connectedAccount || isStaking || isLoading}
-                    />
-                    <Button 
-                      onClick={handleStake} 
-                      disabled={isStaking || !connectedAccount || isLoading}
-                      className="min-w-24"
-                    >
-                      {isStaking ? 'Staking...' : 'Stake'}
-                      <ArrowUp className="ml-2 h-4 w-4" />
-                    </Button>
-                  </div>
-                  {connectedAccount && (
-                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                      <span>Available: {balance} MOR</span>
-                      <button 
-                        className="text-primary hover:underline" 
-                        onClick={() => setAmountToStake(balance.toString())}
-                        disabled={isLoading || balance <= 0}
-                      >
-                        Max
-                      </button>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-2 pt-2">
-                  <div className="text-sm">Staking Benefits:</div>
-                  <ul className="text-sm space-y-1">
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500">•</span>
-                      <span>Access to premium API features</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500">•</span>
-                      <span>Higher API rate limits based on your tier</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-green-500">•</span>
-                      <span>Priority support and dedicated account manager (Platinum tier)</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="unstake" className="mt-0">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="unstakeAmount">Amount to Unstake</Label>
-                  <div className="flex space-x-2">
-                    <Input
-                      id="unstakeAmount"
-                      type="number"
-                      placeholder="Enter amount"
-                      value={amountToUnstake}
-                      onChange={(e) => setAmountToUnstake(e.target.value)}
-                      disabled={!connectedAccount || isUnstaking || isLoading}
-                    />
-                    <Button 
-                      onClick={handleUnstake}
-                      disabled={isUnstaking || !connectedAccount || isLoading}
-                      variant="outline"
-                      className="min-w-24"
-                    >
-                      {isUnstaking ? 'Processing...' : 'Unstake'}
-                      <ArrowDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </div>
-                  {connectedAccount && (
-                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                      <span>Staked: {stakedAmount} MOR</span>
-                      <button 
-                        className="text-primary hover:underline" 
-                        onClick={() => setAmountToUnstake(stakedAmount.toString())}
-                        disabled={isLoading || stakedAmount <= 0}
-                      >
-                        Max
-                      </button>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="rounded-md bg-amber-50 dark:bg-amber-950/50 p-3 text-sm text-amber-800 dark:text-amber-200 mt-4">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <strong>Important:</strong> Unstaking tokens will reduce your tier level and associated benefits if your staked amount falls below a tier threshold.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="rewards" className="mt-0">
-              <div className="space-y-6">
-                <div className="rounded-md border bg-card p-6 text-center">
-                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                    <Gift className="h-6 w-6 text-primary" />
-                  </div>
-                  <h3 className="mb-1 text-lg font-semibold">Staking Rewards</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Claim your rewards for staking MOR tokens
-                  </p>
-                  <Button 
-                    onClick={handleClaimRewards} 
-                    disabled={!connectedAccount || isClaiming || stakedAmount <= 0 || isLoading}
-                    className="w-full"
-                  >
-                    {isClaiming ? 'Claiming...' : 'Claim Rewards'}
-                  </Button>
-                </div>
-                
-                <div className="text-sm text-muted-foreground">
-                  <p>Reward details:</p>
-                  <ul className="list-disc list-inside pl-4 space-y-1 mt-2">
-                    <li>Rewards accumulate based on your staked amount</li>
-                    <li>Higher tiers receive additional reward bonuses</li>
-                    <li>Rewards can be claimed once every 24 hours</li>
-                  </ul>
-                </div>
-              </div>
-            </TabsContent>
           </CardContent>
         </Card>
         
@@ -477,18 +473,16 @@ const Staking = () => {
                   <div>
                     <h3 className="text-lg font-semibold">Current Tier: {tier}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {tier === 'Basic' && 'Limited access to API features'}
-                      {tier === 'Silver' && 'Increased rate limits and standard support'}
-                      {tier === 'Gold' && 'Higher rate limits and priority support'}
-                      {tier === 'Platinum' && 'Maximum rate limits and dedicated support'}
+                      {tier === 'Locked' && 'Limited access to MOR features'}
+                      {tier === 'Unlocked' && 'Full access to all MOR features and services'}
                     </p>
                   </div>
-                  <div className="bg-primary/10 text-primary font-semibold rounded-full px-4 py-1">
+                  <div className={`${tier === 'Unlocked' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'} font-semibold rounded-full px-4 py-1`}>
                     {tier}
                   </div>
                 </div>
                 
-                {tier !== 'Platinum' && (
+                {tier !== 'Unlocked' && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Progress to {nextTier.name}</span>
@@ -496,41 +490,31 @@ const Staking = () => {
                     </div>
                     <Progress value={progressToNextTier} className="h-2" />
                     <p className="text-sm text-muted-foreground">
-                      Stake {nextTier.required - stakedAmount} more MOR tokens to reach the {nextTier.name} tier.
+                      Stake {nextTier.required - stakedAmount} more MOR tokens to unlock all features.
                     </p>
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                   <div className="border rounded-lg p-4">
-                    <h4 className="font-semibold mb-2">Silver Tier Benefits</h4>
+                    <h4 className="font-semibold mb-2">Locked Tier</h4>
                     <ul className="text-sm space-y-1">
-                      <li>• 100,000 requests per month</li>
-                      <li>• Access to standard models</li>
-                      <li>• Standard support response time</li>
+                      <li>• Basic API access</li>
+                      <li>• Limited requests per month</li>
+                      <li>• Standard support</li>
                     </ul>
-                    <div className="mt-2 text-xs text-muted-foreground">Requires 100 MOR</div>
+                    <div className="mt-2 text-xs text-muted-foreground">Default tier (0-99 MOR)</div>
                   </div>
                   
                   <div className="border rounded-lg p-4">
-                    <h4 className="font-semibold mb-2">Gold Tier Benefits</h4>
+                    <h4 className="font-semibold mb-2">Unlocked Tier</h4>
                     <ul className="text-sm space-y-1">
-                      <li>• 500,000 requests per month</li>
-                      <li>• Access to all models</li>
+                      <li>• Unlimited API access</li>
                       <li>• Priority support</li>
+                      <li>• Access to all features</li>
+                      <li>• Early access to new releases</li>
                     </ul>
-                    <div className="mt-2 text-xs text-muted-foreground">Requires 500 MOR</div>
-                  </div>
-                  
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-semibold mb-2">Platinum Tier Benefits</h4>
-                    <ul className="text-sm space-y-1">
-                      <li>• Unlimited requests</li>
-                      <li>• Early access to new models</li>
-                      <li>• Dedicated support</li>
-                      <li>• Custom model training</li>
-                    </ul>
-                    <div className="mt-2 text-xs text-muted-foreground">Requires 1000 MOR</div>
+                    <div className="mt-2 text-xs text-muted-foreground">Requires 100+ MOR</div>
                   </div>
                 </div>
               </>
