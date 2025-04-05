@@ -1,0 +1,11 @@
+{
+  "subnetName": "MorSaaS API Access Subnet",
+  "subnetDescription": "A subnet for API access testing on Arbitrum Sepolia",
+  "adminAddress": "0x8F3b7156763717a99de1eBcB552f879fB5973c73",
+  "startTime": 1743657004,
+  "minDeposit": "0.001",
+  "depositsLocked": false,
+  "builderRewardsStaked": true,
+  "skipPrompts": true,
+  "makeInitialDeposit": true
+}

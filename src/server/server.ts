@@ -289,7 +289,7 @@ app.get('*', (req, res) => {
   }
   
   // Get model env variables for runtime injection
-  const modelName = process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Hermes-3-Llama-3.1-8B';
+  const modelName = process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Llama-3.1-8B';
   const modelId = process.env.REACT_APP_DEFAULT_MODEL_ID || 'llama-3.1-8b-instant';
   
   console.log(chalk.yellow(`[SERVER] Using runtime model config: ${modelName} (${modelId})`));

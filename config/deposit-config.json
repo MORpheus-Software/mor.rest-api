@@ -1,0 +1,6 @@
+{
+  "poolId": "0x4d6f72536161532054657374205375626e657400000000000000000000000000",
+  "subnetName": "MorSaaS Test Subnet",
+  "depositAmount": "10.0",
+  "skipPrompts": true
+}

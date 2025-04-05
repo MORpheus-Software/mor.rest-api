@@ -1,0 +1,19 @@
+{
+  "subnets": [
+    {
+      "id": "0xec137a1bc567b812cf54661dfce96dfc53640b79f3d7360046c0f9a7300adee8",
+      "name": "AI Computing Subnet",
+      "description": "A subnet for distributed AI computation tasks",
+      "adminAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "startTime": 1718035200,
+      "areDepositsLocked": false,
+      "areBuilderRewardsStaked": true,
+      "minDeposit": "10.0",
+      "isActive": true,
+      "network": "testnet",
+      "contractAddress": "0x649B24D0b6F5A4c3852fD4C0dD91308902E5fe8a",
+      "transactionHash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+      "createdAt": "2023-06-10T08:30:00.000Z"
+    }
+  ]
+} 

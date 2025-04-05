@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -19,14 +18,83 @@ export function SignInForm() {
     email: '',
     password: ''
   });
+  const [errors, setErrors] = useState<{
+    email?: string;
+    password?: string;
+    auth?: string;
+  }>({});
+  const [touched, setTouched] = useState({
+    email: false,
+    password: false
+  });
+
+  const validateEmail = (email: string) => {
+    if (!email) return 'Email is required';
+    if (!/\S+@\S+\.\S+/.test(email)) return 'Please enter a valid email address';
+    return '';
+  };
+
+  const validatePassword = (password: string) => {
+    if (!password) return 'Password is required';
+    if (password.length < 1) return 'Password is required';
+    return '';
+  };
+
+  const validateForm = () => {
+    const newErrors = {
+      email: validateEmail(formData.email),
+      password: validatePassword(formData.password)
+    };
+    
+    setErrors(prev => ({...prev, ...newErrors}));
+    return !newErrors.email && !newErrors.password;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear auth error when user starts typing
+    if (errors.auth) {
+      setErrors(prev => ({ ...prev, auth: undefined }));
+    }
+
+    // Validate on change if the field has been touched
+    if (touched[name as keyof typeof touched]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: name === 'email' ? validateEmail(value) : validatePassword(value)
+      }));
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name } = e.target;
+    setTouched(prev => ({ ...prev, [name]: true }));
+    
+    // Validate the field on blur
+    setErrors(prev => ({
+      ...prev,
+      [name]: name === 'email' 
+        ? validateEmail(formData.email) 
+        : validatePassword(formData.password)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Clear previous auth error
+    setErrors(prev => ({ ...prev, auth: undefined }));
+    
+    // Mark all fields as touched
+    setTouched({ email: true, password: true });
+    
+    // Validate all fields
+    if (!validateForm()) {
+      return; // Stop submission if validation fails
+    }
+    
     setIsLoading(true);
     
     console.log('[SIGNIN] Starting login process...');
@@ -72,10 +140,24 @@ export function SignInForm() {
           // Try to parse error as JSON
           const errorData = JSON.parse(responseText);
           console.error('[SIGNIN] Login error response:', errorData);
+          
+          // Set auth error message
+          setErrors(prev => ({ 
+            ...prev, 
+            auth: errorData.error?.message || 'Invalid email or password' 
+          }));
+          
           throw new Error(errorData.error?.message || 'Login failed');
         } catch (jsonError) {
           // If JSON parsing fails, use the raw text
           console.error('[SIGNIN] Login error (non-JSON):', responseText);
+          
+          // Set auth error message
+          setErrors(prev => ({ 
+            ...prev, 
+            auth: `Invalid email or password` 
+          }));
+          
           throw new Error(`Server error: ${response.status}. ${responseText || 'No additional details'}`);
         }
       }
@@ -174,6 +256,15 @@ export function SignInForm() {
       
     } catch (error) {
       console.error('[SIGNIN] Login error:', error);
+      
+      // If no specific auth error was set earlier, set a generic one
+      if (!errors.auth) {
+        setErrors(prev => ({ 
+          ...prev, 
+          auth: 'Invalid email or password. Please try again.' 
+        }));
+      }
+      
       toast({
         title: "Authentication failed",
         description: error instanceof Error 
@@ -188,6 +279,12 @@ export function SignInForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {errors.auth && (
+        <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+          {errors.auth}
+        </div>
+      )}
+      
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <div className="relative">
@@ -199,14 +296,18 @@ export function SignInForm() {
             name="email"
             type="email"
             placeholder="you@example.com"
-            className="pl-10"
+            className={`pl-10 ${errors.email && touched.email ? 'border-destructive' : ''}`}
             required
             autoComplete="email"
             value={formData.email}
             onChange={handleChange}
+            onBlur={handleBlur}
             disabled={isLoading}
           />
         </div>
+        {errors.email && touched.email && (
+          <p className="text-sm text-destructive mt-1">{errors.email}</p>
+        )}
       </div>
       
       <div className="space-y-2">
@@ -237,11 +338,12 @@ export function SignInForm() {
             name="password"
             type={showPassword ? "text" : "password"}
             placeholder="••••••••"
-            className="pl-10 pr-10"
+            className={`pl-10 pr-10 ${errors.password && touched.password ? 'border-destructive' : ''}`}
             required
             autoComplete="current-password"
             value={formData.password}
             onChange={handleChange}
+            onBlur={handleBlur}
             disabled={isLoading}
           />
           <button
@@ -253,6 +355,9 @@ export function SignInForm() {
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
+        {errors.password && touched.password && (
+          <p className="text-sm text-destructive mt-1">{errors.password}</p>
+        )}
       </div>
       
       <Button 

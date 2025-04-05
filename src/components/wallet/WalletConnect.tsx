@@ -29,7 +29,7 @@ const WalletConnect = ({ onConnect }: WalletConnectProps) => {
     const networks: Record<string, string> = {
       '0x1': 'Ethereum',
       '0xa4b1': 'Arbitrum One',
-      '0x66dee': 'Arbitrum Sepolia',
+      '0x66eee': 'Arbitrum Sepolia',
       '0x89': 'Polygon',
       '0xa': 'Optimism',
     };

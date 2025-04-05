@@ -26,7 +26,7 @@ UPSTASH_PRODUCTION_URL=redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0N
 
 # React Environment Variables - Get from environment variables or use defaults
 # This allows GitHub Actions to pass model configuration to the deployment script
-REACT_APP_DEFAULT_MODEL_NAME="${REACT_APP_DEFAULT_MODEL_NAME:-Hermes-3-Llama-3.1-8B}"
+REACT_APP_DEFAULT_MODEL_NAME="${REACT_APP_DEFAULT_MODEL_NAME:-Llama-3.1-8B}"
 REACT_APP_DEFAULT_MODEL_ID="${REACT_APP_DEFAULT_MODEL_ID:-llama-3.1-8b-instant}"
 
 # Get the environment from the branch name or environment variable

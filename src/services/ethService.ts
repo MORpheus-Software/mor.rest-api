@@ -1,6 +1,5 @@
 import { ethers } from 'ethers';
-import { StakingClient } from '@/StakingClient';
-import { DemoStakingClient } from '@/demoStakingClient';
+import { BuildersClient } from '../staking/BuildersClient';
 
 declare global {
   interface Window {
@@ -10,12 +9,13 @@ declare global {
 
 // Helper function to ensure proper checksum format for addresses
 const getChecksumAddress = (address: string): string => {
+  if (!address) return "";
   try {
-    return ethers.getAddress(address);
+    return ethers.getAddress(address.toLowerCase());
   } catch (error) {
     console.error("Invalid address format:", error);
     // Return the original address if conversion fails
-    return address;
+    return address.toLowerCase();
   }
 };
 
@@ -48,38 +48,21 @@ const MOR_TOKEN_ABI = [
   }
 ];
 
-// ABI for the staking contract - simplified version
-const STAKING_CONTRACT_ABI = [
-  {
-    "constant": false,
-    "inputs": [{"name": "amount", "type": "uint256"}],
-    "name": "stake",
-    "outputs": [],
-    "type": "function"
+// Contract addresses based on network
+const CONTRACT_ADDRESSES = {
+  mainnet: {
+    token: getChecksumAddress(
+      import.meta.env.VITE_MOR_TOKEN_ADDRESS || "0x1c9491865a1de77c5b6e19d2e6a5f1d7a6f2b25f"
+    ),
+    builders: getChecksumAddress(
+      import.meta.env.VITE_BUILDERS_CONTRACT_ADDRESS || "0xC0eD68f163d44B6e9985F0041fDf6f67c6BCFF3f"
+    )
   },
-  {
-    "constant": false,
-    "inputs": [{"name": "amount", "type": "uint256"}],
-    "name": "unstake",
-    "outputs": [],
-    "type": "function"
-  },
-  {
-    "constant": true,
-    "inputs": [{"name": "account", "type": "address"}],
-    "name": "stakedBalance",
-    "outputs": [{"name": "", "type": "uint256"}],
-    "type": "function"
+  testnet: {
+    token: getChecksumAddress("0x34a285A1B1C166420Df5b6630132542923B5b27E"), // Arbitrum Sepolia Test MOR Token
+    builders: getChecksumAddress("0xF651907Bfc6A67eCAb3E448c6C8200cD13566baA") // Arbitrum Sepolia Builders Contract
   }
-];
-
-// Contract addresses with proper checksum
-const MOR_TOKEN_ADDRESS = getChecksumAddress(
-  import.meta.env.VITE_MOR_TOKEN_ADDRESS || "0x1C9491865a1DE77C5b6e19d2E6a5F1D7a6F2b25F"
-);
-const STAKING_CONTRACT_ADDRESS = getChecksumAddress(
-  import.meta.env.VITE_STAKING_CONTRACT_ADDRESS || "0x7396F26DdEE748D3cE166852Ef56E24cdA25CBD4"
-);
+};
 
 // Network configurations
 const NETWORKS = {
@@ -94,63 +77,61 @@ const NETWORKS = {
     rpcUrls: ['https://arb1.arbitrum.io/rpc'],
     blockExplorerUrls: ['https://arbiscan.io']
   },
-  sepolia: {
-    chainId: '0x66dee',
+  testnet: {
+    chainId: '0x66eee',
     chainName: 'Arbitrum Sepolia',
     nativeCurrency: {
-      name: 'Ether',
-      symbol: 'ETH',
+      name: 'Arbitrum Sepolia Ether',
+      symbol: 'SepoliaETH',
       decimals: 18
     },
-    rpcUrls: ['https://sepolia-rollup.arbitrum.io/rpc'],
+    rpcUrls: [
+      'https://sepolia-rollup.arbitrum.io/rpc',
+      'https://arbitrum-sepolia.blockpi.network/v1/rpc/public',
+      'https://arbitrum-sepolia.public.blastapi.io',
+      'https://421614.rpc.thirdweb.com'
+    ],
     blockExplorerUrls: ['https://sepolia.arbiscan.io']
   }
 };
 
-// Get StakingClient instance
-const getStakingClient = () => {
-  // Use demo client if in development mode and mock data is enabled
-  if (useMockData) {
-    return new DemoStakingClient();
+/**
+ * Get contract addresses for the current network
+ */
+export const getContractAddresses = async () => {
+  if (!window.ethereum) {
+    return CONTRACT_ADDRESSES.mainnet; // Default to mainnet if no ethereum provider
   }
+  
+  try {
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    if (chainId === NETWORKS.testnet.chainId) {
+      return CONTRACT_ADDRESSES.testnet;
+    }
+    return CONTRACT_ADDRESSES.mainnet;
+  } catch (error) {
+    console.error("Error getting chain ID:", error);
+    return CONTRACT_ADDRESSES.mainnet;
+  }
+};
 
+// Get BuildersClient instance
+const getBuildersClient = async (contractAddress?: string) => {
   if (!window.ethereum) {
     throw new Error("MetaMask is not installed");
   }
   
   const provider = new ethers.BrowserProvider(window.ethereum);
-  const signerPromise = provider.getSigner();
+  const signer = await provider.getSigner();
   
-  // Create a proxy object that resolves the signer promise on demand
-  const asyncStakingClient = {
-    async stake(amount: string) {
-      const signer = await signerPromise;
-      const client = new StakingClient(provider, signer, STAKING_CONTRACT_ADDRESS);
-      return client.stake(amount);
-    },
-    async unstake(amount: string) {
-      const signer = await signerPromise;
-      const client = new StakingClient(provider, signer, STAKING_CONTRACT_ADDRESS);
-      return client.unstake(amount);
-    },
-    async getStakedAmount(address: string) {
-      const signer = await signerPromise;
-      const client = new StakingClient(provider, signer, STAKING_CONTRACT_ADDRESS);
-      return client.getStakedAmount(address);
-    },
-    async getStakedBalance(address: string) {
-      const signer = await signerPromise;
-      const client = new StakingClient(provider, signer, STAKING_CONTRACT_ADDRESS);
-      return client.getStakedBalance(address);
-    },
-    async claimReward() {
-      const signer = await signerPromise;
-      const client = new StakingClient(provider, signer, STAKING_CONTRACT_ADDRESS);
-      return client.claimReward();
-    },
-  };
+  // If contract address is provided, use it; otherwise get the address for the current network
+  let buildersContractAddress = contractAddress;
+  if (!buildersContractAddress) {
+    const addresses = await getContractAddresses();
+    buildersContractAddress = addresses.builders;
+  }
   
-  return asyncStakingClient;
+  return new BuildersClient(provider, signer, buildersContractAddress);
 };
 
 /**
@@ -200,21 +181,26 @@ export const connectWallet = async (): Promise<string | null> => {
 /**
  * Switch to a specific network
  */
-export const switchNetwork = async (networkName: 'mainnet' | 'sepolia'): Promise<boolean> => {
+export const switchNetwork = async (networkName: 'mainnet' | 'testnet'): Promise<boolean> => {
   if (!window.ethereum) return false;
   
   const network = NETWORKS[networkName];
+  console.log(`Attempting to switch to ${networkName} with chainId ${network.chainId}`);
   
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: network.chainId }],
     });
+    console.log(`Successfully switched to ${networkName}`);
     return true;
   } catch (switchError: any) {
+    console.log(`Error when switching to ${networkName}:`, switchError);
+    
     // This error code indicates that the chain has not been added to MetaMask
     if (switchError.code === 4902) {
       try {
+        console.log(`Adding ${networkName} network to wallet`);
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',
           params: [
@@ -227,35 +213,46 @@ export const switchNetwork = async (networkName: 'mainnet' | 'sepolia'): Promise
             },
           ],
         });
+        console.log(`${networkName} network added successfully`);
         return true;
       } catch (addError) {
-        console.error("Error adding chain:", addError);
+        console.error(`Error adding ${networkName} chain:`, addError);
         return false;
       }
     }
-    console.error("Error switching chain:", switchError);
+    // User rejected the request (common error)
+    if (switchError.code === 4001) {
+      console.log("User rejected the request to switch networks");
+      return false;
+    }
     return false;
   }
 };
 
 /**
- * Get MOR token balance for an address
+ * Get token balance for an address
  */
-export const getTokenBalance = async (address: string): Promise<number> => {
+export const getTokenBalance = async (address: string, tokenAddress?: string): Promise<number> => {
+  if (useMockData) {
+    console.log("Using mock data for token balance");
+    return 100.0;
+  }
+  
   try {
     if (!window.ethereum) {
-      if (useMockData) {
-        // When mock data is enabled but no wallet is connected
-        return 0;
-      }
       throw new Error("MetaMask is not installed");
     }
     
+    // Get contract addresses for current network
+    const addresses = await getContractAddresses();
+    
+    // Use provided token address or default for current network
+    const tokenContractAddress = tokenAddress || addresses.token;
+    
     const provider = new ethers.BrowserProvider(window.ethereum);
-    const tokenContract = new ethers.Contract(MOR_TOKEN_ADDRESS, MOR_TOKEN_ABI, provider);
-    // Use checksum address
-    const checksumAddress = getChecksumAddress(address);
-    const balance = await tokenContract.balanceOf(checksumAddress);
+    const tokenContract = new ethers.Contract(tokenContractAddress, MOR_TOKEN_ABI, provider);
+    
+    const balance = await tokenContract.balanceOf(address);
     return parseFloat(ethers.formatEther(balance));
   } catch (error) {
     console.error("Error getting token balance:", error);
@@ -264,53 +261,52 @@ export const getTokenBalance = async (address: string): Promise<number> => {
 };
 
 /**
- * Get staked token balance for an address
+ * Stake tokens (deposit into a builder pool)
  */
-export const getStakedBalance = async (address: string): Promise<number> => {
-  try {
-    if (!window.ethereum && !useMockData) {
-      throw new Error("MetaMask is not installed");
-    }
-    
-    const stakingClient = getStakingClient();
-    const balance = await stakingClient.getStakedBalance(address);
-    return parseFloat(balance);
-  } catch (error) {
-    console.error("Error getting staked balance:", error);
-    return 0;
+export const stakeTokens = async (amount: number, poolId: string, buildersAddress?: string, tokenAddress?: string): Promise<boolean> => {
+  if (useMockData) {
+    console.log("Using mock data for staking");
+    return true;
   }
-};
-
-/**
- * Stake tokens
- */
-export const stakeTokens = async (amount: number): Promise<boolean> => {
+  
   try {
-    if (useMockData) {
-      const demoClient = new DemoStakingClient();
-      await demoClient.stake(amount.toString());
-      return true;
-    }
-
     if (!window.ethereum) {
       throw new Error("MetaMask is not installed");
     }
     
+    // Get contract addresses for current network
+    const addresses = await getContractAddresses();
+    
+    // Use provided addresses or defaults for current network
+    const buildersContractAddress = buildersAddress || addresses.builders;
+    const tokenContractAddress = tokenAddress || addresses.token;
+    
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
+    const signerAddress = await signer.getAddress();
     
-    // First approve the staking contract to spend tokens
-    const tokenContract = new ethers.Contract(MOR_TOKEN_ADDRESS, MOR_TOKEN_ABI, signer);
-    const amountInWei = ethers.parseEther(amount.toString());
+    // Create BuildersClient instance
+    const buildersClient = await getBuildersClient(buildersContractAddress);
     
-    // Use checksum address for approval
-    const checksumStakingAddress = getChecksumAddress(STAKING_CONTRACT_ADDRESS);
-    const approveTx = await tokenContract.approve(checksumStakingAddress, amountInWei);
-    await approveTx.wait();
+    // Convert amount to wei
+    const amountWei = ethers.parseEther(amount.toString());
     
-    // Now stake the tokens using the StakingClient
-    const stakingClient = getStakingClient();
-    await stakingClient.stake(amount.toString());
+    // Check allowance
+    const allowance = await buildersClient.getMorAllowance();
+    
+    // If allowance is insufficient, approve tokens first
+    if (allowance < amountWei) {
+      console.log("Approving tokens for staking...");
+      const approveTx = await buildersClient.approveMorTokens(amount.toString());
+      await approveTx.wait();
+      console.log("Tokens approved");
+    }
+    
+    // Deposit tokens (stake)
+    console.log(`Depositing ${amount} MOR to pool ${poolId}...`);
+    const tx = await buildersClient.deposit(poolId, amount.toString());
+    await tx.wait();
+    console.log("Tokens staked successfully");
     
     return true;
   } catch (error) {
@@ -320,23 +316,33 @@ export const stakeTokens = async (amount: number): Promise<boolean> => {
 };
 
 /**
- * Unstake tokens
+ * Unstake tokens (withdraw from a builder pool)
  */
-export const unstakeTokens = async (amount: number): Promise<boolean> => {
+export const unstakeTokens = async (amount: number, poolId: string, buildersAddress?: string): Promise<boolean> => {
+  if (useMockData) {
+    console.log("Using mock data for unstaking");
+    return true;
+  }
+  
   try {
-    if (useMockData) {
-      const demoClient = new DemoStakingClient();
-      await demoClient.unstake(amount.toString());
-      return true;
-    }
-
     if (!window.ethereum) {
       throw new Error("MetaMask is not installed");
     }
     
-    // Use the StakingClient to unstake
-    const stakingClient = getStakingClient();
-    await stakingClient.unstake(amount.toString());
+    // Get contract addresses for current network
+    const addresses = await getContractAddresses();
+    
+    // Use provided address or default for current network
+    const buildersContractAddress = buildersAddress || addresses.builders;
+    
+    // Get BuildersClient
+    const buildersClient = await getBuildersClient(buildersContractAddress);
+    
+    // Withdraw tokens (unstake)
+    console.log(`Withdrawing ${amount} MOR from pool ${poolId}...`);
+    const tx = await buildersClient.withdraw(poolId, amount.toString());
+    await tx.wait();
+    console.log("Tokens unstaked successfully");
     
     return true;
   } catch (error) {
@@ -346,33 +352,23 @@ export const unstakeTokens = async (amount: number): Promise<boolean> => {
 };
 
 /**
- * Get blockchain balance (alias for getTokenBalance for backward compatibility)
+ * Get staked balance for an address in a specific pool
  */
-export const getBlockchainBalance = async (address: string): Promise<number> => {
-  return getTokenBalance(address);
-};
-
-/**
- * Claim staking rewards
- */
-export const claimRewards = async (): Promise<boolean> => {
+export const getStakedBalance = async (address: string, poolId: string, contractAddress?: string): Promise<number> => {
+  if (useMockData) {
+    console.log("Using mock data for staked balance");
+    return 25.0;
+  }
+  
   try {
-    if (useMockData) {
-      const demoClient = new DemoStakingClient();
-      await demoClient.claimReward();
-      return true;
-    }
-
-    if (!window.ethereum) {
-      throw new Error("MetaMask is not installed");
-    }
+    // Get BuildersClient
+    const buildersClient = await getBuildersClient(contractAddress);
     
-    const stakingClient = getStakingClient();
-    await stakingClient.claimReward();
-    
-    return true;
+    // Get user data for the pool
+    const userData = await buildersClient.getUserData(address, poolId);
+    return parseFloat(userData.deposited.formatted);
   } catch (error) {
-    console.error("Error claiming rewards:", error);
-    return false;
+    console.error("Error getting staked balance:", error);
+    return 0;
   }
 };

@@ -8,7 +8,7 @@ MODELS_FILE=$(mktemp)
 
 # Add all the model names to the temporary file
 cat > "$MODELS_FILE" << 'EOL'
-Hermes-3-Llama-3.1-8B
+Llama-3.1-8B
 Hermes-2-Theta-Llama-3-8B
 Prodia-Image-SD
 Prodia-Image-SDX
@@ -20,7 +20,7 @@ Llama 3.1 - 8B
 Llama 2.0
 Llama 2.0
 ARCX Tinyllama
-Hermes-3-Llama-3.1-8B(2)
+Llama-3.1-8B
 Llama-3.1-8B
 Llama 3.2 3B Instruct
 Hermes 2 Pro Llama 3 Instruct
@@ -28,10 +28,10 @@ NousResearch/Hermes-2-Theta-Llama-3-8B
 cognitivecomputations/dolphin-2.9.2-qwen2-72b
 meta-llama/Llama-3.2-3B-Instruct
 nvidia/Llama-3.1-Nemotron-70B-Instruct-HF
-mlabonne/Hermes-3-Llama-3.1-8B-lorablated
+mlabonne/Llama-3.1-8B-lorablated
 Qwen/Qwen2.5-Coder-32B-Instruct
 Llama-3.1-405B
-Hermes-3-Llama-3.1-8B(2)
+Llama-3.1-8B
 Akash Test
 CYGNUS Llama 2.0
 OpenAI-GPT-4o

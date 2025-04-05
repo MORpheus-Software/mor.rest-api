@@ -1,0 +1,21 @@
+{
+  "arbiscanApiKey": "HFJRFHGCVPMXNB949YMP9TFP3KZG1QZE2A",
+  "mainnet": {
+    "proxyAddress": "0xC0eD68f163d44B6e9985F0041fDf6f67c6BCFF3f",
+    "implementationAddress": "0x969C0F87623dc33010b4069Fea48316Ba2e45382",
+    "baseBuilderContractAddress": "0x42BB446eAE6dca7723a9eBdb81EA88aFe77eF4B9",
+    "buildersProxyAddress": "0xF651907Bfc6A67eCAb3E448c6C8200cD13566baA",
+    "buildersImplAddress": "0xCA56F2286cb8733A202c37Ba719b4D3413F23616",
+    "feeConfigAddress": "0xA961F1c0A03aA601a951cf84F93492aE620Bd82A",
+    "buildersTreasuryAddress": "0x4e766052bdEc519cDe88C732C08835Ca3bA33Daf"
+  },
+  "testnet": {
+    "proxyAddress": "0x649B24D0b6F5A4c3852fD4C0dD91308902E5fe8a",
+    "implementationAddress": "",
+    "baseBuilderContractAddress": "",
+    "buildersProxyAddress": "",
+    "buildersImplAddress": "",
+    "feeConfigAddress": "0x0000000000000000000000000000000000000000",
+    "buildersTreasuryAddress": "0x0000000000000000000000000000000000000000"
+  }
+}

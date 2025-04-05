@@ -25,6 +25,15 @@ dist-ssr
 
 # Environment variables
 .env
+.env.*
+!.env.example
+!.env.integration.example
 
 # Testing
 model_test_results
+
+# Sensitive files
+gcp-key.json
+**/gcp-key.json
+**/*.pem
+**/*.key

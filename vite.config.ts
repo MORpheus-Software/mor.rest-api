@@ -1,4 +1,3 @@
-
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -23,7 +22,7 @@ export default defineConfig(({ mode }) => {
   // Get the model environment variables, giving precedence to process.env over .env file
   const modelName = process.env.REACT_APP_DEFAULT_MODEL_NAME || 
                     env.REACT_APP_DEFAULT_MODEL_NAME || 
-                    'Hermes-3-Llama-3.1-8B';
+                    'Llama-3.1-8B';
                     
   const modelId = process.env.REACT_APP_DEFAULT_MODEL_ID || 
                   env.REACT_APP_DEFAULT_MODEL_ID || 

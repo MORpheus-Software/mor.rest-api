@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { isAuthenticated, getCurrentUser, logout, createTestUser, debugAuth } from '@/lib/auth';
 import { FRONTEND_API_ENDPOINT } from '@/lib/api/constants';
-import { DemoStakingClient } from '@/demoStakingClient';
+import { StakingClient } from '@/staking/StakingClient';
 import { getTokenBalance, getStakedBalance } from '@/services/ethService';
 
 export default function DebugPage() {
@@ -28,8 +28,8 @@ export default function DebugPage() {
     // Check authentication status
     setAuthStatus(isAuthenticated());
 
-    // Test the DemoStakingClient
-    const testDemoClient = async () => {
+    // Test the ethService methods which now use StakingClient internally
+    const testStakingService = async () => {
       try {
         // Check mock balance
         const balance = await getTokenBalance('mock-address');
@@ -39,11 +39,11 @@ export default function DebugPage() {
         const stakedBalance = await getStakedBalance('mock-address');
         setMockStakedBalance(stakedBalance);
       } catch (error) {
-        console.error('Error testing demo client:', error);
+        console.error('Error testing staking service:', error);
       }
     };
     
-    testDemoClient();
+    testStakingService();
   }, []);
   
   // Check authentication status
@@ -194,17 +194,17 @@ export default function DebugPage() {
       <div className="mt-6">
         <Card>
           <CardHeader>
-            <CardTitle>Staking Demo Client Test</CardTitle>
-            <CardDescription>Test the DemoStakingClient</CardDescription>
+            <CardTitle>Staking Client Test</CardTitle>
+            <CardDescription>Test the StakingClient via ethService</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <div className="border p-3 rounded-lg">
-                <p className="font-medium">Mock Token Balance</p>
+                <p className="font-medium">Token Balance</p>
                 <p className="text-xl">{mockBalance} MOR</p>
               </div>
               <div className="border p-3 rounded-lg">
-                <p className="font-medium">Mock Staked Balance</p>
+                <p className="font-medium">Staked Balance</p>
                 <p className="text-xl">{mockStakedBalance} MOR</p>
               </div>
             </div>

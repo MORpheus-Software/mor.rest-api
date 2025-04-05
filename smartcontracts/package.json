@@ -1,0 +1,33 @@
+{
+  "name": "smartcontracts",
+  "version": "1.0.0",
+  "description": "Smart contract helper scripts",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "update-implementation": "node scripts/update-implementation.js",
+    "fetch-contracts": "node scripts/fetch-contracts.js",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:sepolia": "hardhat run scripts/deploy-builders.js --network arbitrumSepolia",
+    "deploy:testnet": "hardhat run scripts/deploy-builders.js --network arbitrumGoerli",
+    "deploy:mainnet": "hardhat run scripts/deploy-builders.js --network arbitrumOne",
+    "verify:sepolia": "hardhat verify --network arbitrumSepolia",
+    "verify:testnet": "hardhat verify --network arbitrumGoerli",
+    "verify:mainnet": "hardhat verify --network arbitrumOne"
+  },
+  "dependencies": {
+    "@solarity/solidity-lib": "^3.0.1",
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.5",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@openzeppelin/contracts": "^4.9.0",
+    "@openzeppelin/contracts-upgradeable": "^4.9.0",
+    "@openzeppelin/hardhat-upgrades": "^3.0.3",
+    "hardhat": "^2.20.1"
+  }
+}
