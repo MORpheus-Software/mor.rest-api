@@ -116,3 +116,13 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Morpheus Network Documentation](https://docs.mor.org)
 - [Morpheus Builders Contract Documentation](https://github.com/MorpheusAIs/SmartContracts/blob/main/docs/Builders%20Contract%20Testnet%20Guide.md)
 - [Arbitrum Sepolia Explorer](https://sepolia.arbiscan.io/)
+
+## Changelog
+
+### Version 1.0.0 (Released: April 5, 2025)
+- Implemented staking functionality with Morpheus Builders Contract integration
+- Added subnet management capabilities for creating and monitoring subnets
+- Integrated with Arbitrum Sepolia testnet for testing contract interactions
+- Added demo mode for simulating blockchain interactions without real transactions
+- Created configuration tools and scripts for subnet registration and management
+- Added comprehensive testing framework with integration and E2E tests
