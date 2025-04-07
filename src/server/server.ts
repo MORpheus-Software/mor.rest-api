@@ -9,13 +9,16 @@ import * as chatCompletionsHandler from '../api/v1/chat/completions.js';
 import keyHandlers from '../api/v1/keys.js';
 import metricsHandlers from '../api/v1/metrics.js';
 import authHandlers from '../api/v1/auth.js';
+import stakingHandlers from '../api/v1/staking.js';
 import { checkRedisConnection } from './setupRedis.js';
 import { 
   userAuthMiddleware, 
   apiKeyAuthMiddleware, 
   requireAuth 
 } from '../lib/api/auth-middleware.js';
+import { combinedStakeCheckMiddleware } from '../lib/api/staking-middleware.js';
 import fs from 'fs';
+import { initializeStakeTrackingSystem } from './initStakeTracking.js';
 
 // Load environment variables
 dotenv.config();
@@ -106,6 +109,7 @@ const apiRouter = express.Router();
 const appManagementRouter = express.Router();
 const nfaServiceRouter = express.Router();
 const authRouter = express.Router();
+const stakingRouter = express.Router();
 
 // Authentication endpoints - no auth required for registration/login
 authRouter.post('/register', (req, res) => {
@@ -145,11 +149,17 @@ appManagementRouter.get('/metrics', requireAuth, (req, res) => {
   metricsHandlers.getMetrics(req, res);
 });
 
+// Mount staking routes
+stakingRouter.get('/status/:userAddress/:poolId', stakingHandlers.getStakeStatus);
+stakingRouter.get('/pools', stakingHandlers.getAllPools);
+stakingRouter.get('/user/:userAddress', stakingHandlers.getUserStakeStatus);
+
 // Apply API key authentication to NFA service proxy endpoints
 nfaServiceRouter.use(apiKeyAuthMiddleware);
 
-// NFA service proxy endpoints - require API key authentication
-nfaServiceRouter.post('/chat/completions', requireAuth, (req, res) => {
+// NFA service proxy endpoints - require API key authentication and combined stake checking
+// The combined middleware prioritizes blockchain checks with a grace period fallback to database
+nfaServiceRouter.post('/chat/completions', requireAuth, combinedStakeCheckMiddleware, (req, res) => {
   chatCompletionsHandler.postChatCompletion(req, res);
 });
 
@@ -158,11 +168,75 @@ nfaServiceRouter.get('/auth/verify', requireAuth, (req, res) => {
   res.json({ authenticated: true, userId: (req as any).userId });
 });
 
+// Debug endpoint to test staking status
+nfaServiceRouter.get('/debug/check-stake', requireAuth, async (req, res) => {
+  try {
+    const authReq = req as any;
+    const userId = authReq.userId;
+    
+    if (!userId) {
+      return res.status(401).json({
+        error: {
+          message: 'User not authenticated',
+          code: 'NOT_AUTHENTICATED'
+        }
+      });
+    }
+    
+    // Import needed functions - need to do dynamic import since they're ESM modules
+    const stakingMiddlewarePath = '../lib/api/staking-middleware.js';
+    const ethersPath = 'ethers';
+    
+    // Get the required functions
+    const stakingModule = await import(stakingMiddlewarePath);
+    const ethersModule = await import(ethersPath);
+    
+    // Get user's wallet address
+    const walletAddress = await stakingModule.getUserWalletAddress(userId);
+    
+    if (!walletAddress) {
+      return res.status(403).json({
+        error: {
+          message: 'No wallet address associated with this user',
+          code: 'NO_WALLET_ADDRESS',
+          canAccess: false
+        }
+      });
+    }
+    
+    // Get pool ID
+    const DEFAULT_POOL_ID = process.env.DEFAULT_POOL_ID || ethersModule.ethers.id("mor.rest");
+    
+    // Check if user has minimum stake
+    const hasStake = await stakingModule.hasMinimumStake(walletAddress, DEFAULT_POOL_ID);
+    
+    return res.json({
+      userId,
+      walletAddress,
+      poolId: DEFAULT_POOL_ID,
+      hasMinimumStake: hasStake,
+      canAccessChatApi: hasStake
+    });
+  } catch (error) {
+    console.error(chalk.red(`[SERVER] Error checking stake status: ${error}`));
+    return res.status(500).json({
+      error: {
+        message: 'Error checking stake status',
+        code: 'STAKE_CHECK_ERROR',
+        canAccess: false
+      }
+    });
+  }
+});
+
 // Mount auth routes
 app.use('/api/v1/auth', authRouter);
 
 // Mount app management routes
 app.use('/api/v1/app', appManagementRouter);
+
+// Mount staking routes
+app.use('/api/v1/staking', stakingRouter);
 
 // Mount NFA service proxy routes 
 app.use('/api/v1', nfaServiceRouter);
@@ -363,6 +437,15 @@ async function startServer() {
       console.error(chalk.red('[SERVER] Error checking Redis connection:'), redisError);
       // Don't proceed if Redis is required
       throw new Error('Redis is required for operation');
+    }
+    
+    // Initialize stake status tracking system
+    try {
+      await initializeStakeTrackingSystem();
+      console.log(chalk.green('[SERVER] Stake status tracking system initialized ✓'));
+    } catch (stakeError) {
+      console.error(chalk.red('[SERVER] Error initializing stake status tracking:'), stakeError);
+      console.log(chalk.yellow('[SERVER] Continuing without stake status tracking'));
     }
     
     // Start the HTTP server

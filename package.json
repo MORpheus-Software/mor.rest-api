@@ -40,7 +40,8 @@
     "basic:create-pool": "tsx scripts/basic-create-pool.ts",
     "test": "jest --config=jest.config.cjs",
     "test:integration": "jest --config=jest.integration.config.cjs",
-    "test:e2e": "jest --config=jest.e2e.config.cjs"
+    "test:e2e": "jest --config=jest.e2e.config.cjs",
+    "test:e2e:with-env": "dotenv_config_path=.env.test node -r dotenv/config ./node_modules/.bin/jest --config=jest.e2e.config.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

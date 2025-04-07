@@ -10,8 +10,15 @@ const config = {
     }],
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  testMatch: ['**/__tests__/**/*.ts?(x)', '**/?(*.)+(spec|test).ts?(x)'],
+  testMatch: ['**/*.test.ts'],
   modulePathIgnorePatterns: ['<rootDir>/dist/'],
+  collectCoverage: false,
+  // Individual test timeout
+  testTimeout: 30000,
+  // Global setup script
+  globalSetup: './.jest/globalSetup.js',
+  // Global teardown script
+  globalTeardown: './.jest/globalTeardown.js',
 };
 
 export default config; 
