@@ -41,7 +41,7 @@ jobs:
           echo "IS_PROD=true" >> $GITHUB_ENV
           # Production model config
           echo "REACT_APP_DEFAULT_MODEL_NAME=${{ vars.PROD_MODEL_NAME || 'Llama-3.1-8B' }}" >> $GITHUB_ENV
-          echo "REACT_APP_DEFAULT_MODEL_ID=${{ vars.PROD_MODEL_ID || 'llama-3.1-8b-instant' }}" >> $GITHUB_ENV
+          echo "REACT_APP_DEFAULT_MODEL_ID=${{ vars.PROD_MODEL_ID || 'meta-llama/llama-3.3-70b-instruct' }}" >> $GITHUB_ENV
           # Production fallback endpoints
           echo "SECONDARY_ENDPOINT_URL=${{ vars.PROD_SECONDARY_ENDPOINT_URL || 'https://openrouter.ai/api/v1/chat/completions' }}" >> $GITHUB_ENV
           echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ vars.PROD_SECONDARY_ENDPOINT_TOKEN_KEY || 'openai-api-key' }}" >> $GITHUB_ENV
@@ -54,7 +54,7 @@ jobs:
           echo "IS_PROD=false" >> $GITHUB_ENV
           # Staging model config
           echo "REACT_APP_DEFAULT_MODEL_NAME=${{ vars.STAGING_MODEL_NAME || 'Llama-3.1-8B' }}" >> $GITHUB_ENV
-          echo "REACT_APP_DEFAULT_MODEL_ID=${{ vars.STAGING_MODEL_ID || 'llama-3.1-8b-instant' }}" >> $GITHUB_ENV
+          echo "REACT_APP_DEFAULT_MODEL_ID=${{ vars.STAGING_MODEL_ID || 'meta-llama/llama-3.3-70b-instruct' }}" >> $GITHUB_ENV
           # Staging fallback endpoints
           echo "SECONDARY_ENDPOINT_URL=${{ vars.STAGING_SECONDARY_ENDPOINT_URL || 'https://openrouter.ai/api/v1/chat/completions' }}" >> $GITHUB_ENV
           echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ vars.STAGING_SECONDARY_ENDPOINT_TOKEN_KEY || 'openai-api-key' }}" >> $GITHUB_ENV
@@ -68,7 +68,7 @@ jobs:
           echo "IS_PROD=false" >> $GITHUB_ENV
           # Development model config
           echo "REACT_APP_DEFAULT_MODEL_NAME=${{ vars.DEV_MODEL_NAME || 'Llama-3.1-8B' }}" >> $GITHUB_ENV
-          echo "REACT_APP_DEFAULT_MODEL_ID=${{ vars.DEV_MODEL_ID || 'llama-3.1-8b-instant' }}" >> $GITHUB_ENV
+          echo "REACT_APP_DEFAULT_MODEL_ID=${{ vars.DEV_MODEL_ID || 'meta-llama/llama-3.3-70b-instruct' }}" >> $GITHUB_ENV
           # Development fallback endpoints
           echo "SECONDARY_ENDPOINT_URL=${{ vars.DEV_SECONDARY_ENDPOINT_URL || 'https://openrouter.ai/api/v1/chat/completions' }}" >> $GITHUB_ENV
           echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ vars.DEV_SECONDARY_ENDPOINT_TOKEN_KEY || 'openai-api-key' }}" >> $GITHUB_ENV

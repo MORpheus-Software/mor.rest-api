@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
                     
   const modelId = process.env.REACT_APP_DEFAULT_MODEL_ID || 
                   env.REACT_APP_DEFAULT_MODEL_ID || 
-                  'llama-3.1-8b-instant';
+                  'meta-llama/llama-3.3-70b-instruct';
   
   // Always use secure Upstash Redis URL for preview and production modes
   const upstashRedisUrl = 'rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379';
@@ -108,6 +108,7 @@ export default defineConfig(({ mode }) => {
         // Add React App environment variables to make them available in client code
         REACT_APP_DEFAULT_MODEL_NAME: JSON.stringify(modelName),
         REACT_APP_DEFAULT_MODEL_ID: JSON.stringify(modelId),
+        REACT_APP_AVAILABLE_MODELS: JSON.stringify(process.env.REACT_APP_AVAILABLE_MODELS || env.REACT_APP_AVAILABLE_MODELS),
         // Add Redis URL to the environment, using Upstash URL for preview/production
         REDIS_URL: JSON.stringify(redisUrl),
         // Add Lovable environment flag

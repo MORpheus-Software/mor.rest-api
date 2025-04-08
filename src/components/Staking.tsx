@@ -199,7 +199,7 @@ export default function Staking({ networkType = 'testnet' }: StakingProps) {
     };
     
     initializeWithNetwork();
-  }, [isConnected, provider, signer, networkType]);
+  }, [isConnected, provider, signer, networkType, address]);
   
   // Load user MOR balance when wallet is connected
   useEffect(() => {

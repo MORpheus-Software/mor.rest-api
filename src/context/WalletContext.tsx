@@ -207,13 +207,51 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children, networ
   };
 
   // Handle account changes
-  const handleAccountsChanged = (accounts: string[]) => {
-    if (accounts.length === 0) {
-      // User disconnected their wallet
+  const handleAccountsChanged = async (accounts: string[]) => {
+    try {
+      if (accounts.length === 0) {
+        // User disconnected their wallet
+        disconnectWallet();
+        return;
+      }
+
+      const newAddress = accounts[0];
+      
+      // Create a new provider and signer for the new account
+      const ethersProvider = new ethers.BrowserProvider(window.ethereum);
+      const ethersSigner = await ethersProvider.getSigner();
+      
+      // Get the network
+      const networkInfo = await ethersProvider.getNetwork();
+      let chainName = networkInfo.name;
+      
+      // Handle special case for Arbitrum networks
+      if (networkInfo.name === 'arbitrum-sepolia') {
+        chainName = 'Arbitrum Sepolia';
+        setCurrentNetworkType('testnet');
+      } else if (networkInfo.chainId === BigInt(parseInt('0xa4b1', 16))) {
+        chainName = 'Arbitrum One';
+        setCurrentNetworkType('mainnet');
+      }
+      
+      // Update state with new account info
+      setProvider(ethersProvider);
+      setSigner(ethersSigner);
+      setAddress(newAddress);
+      setNetwork(chainName);
+      setIsConnected(true);
+      
+      // Switch to the required network if needed
+      const targetChainId = NETWORKS[currentNetworkType].chainId;
+      const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+      
+      if (currentChainId !== targetChainId) {
+        await switchToNetwork(currentNetworkType);
+      }
+    } catch (error) {
+      console.error('Error handling account change:', error);
+      setError('Failed to connect to new wallet account');
       disconnectWallet();
-    } else {
-      // User switched accounts
-      setAddress(accounts[0]);
     }
   };
 
