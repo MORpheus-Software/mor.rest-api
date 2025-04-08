@@ -274,7 +274,7 @@ describe('BuildersClient Integration Tests', () => {
         throw error;
       }
     }
-  });
+  }, 30000);
   
   // Test getPoolInfo
   test('should retrieve pool information', async () => {
@@ -344,7 +344,7 @@ describe('BuildersClient Integration Tests', () => {
       console.error('Error approving tokens:', error);
       throw error;
     }
-  });
+  }, 30000);
   
   // Test deposit
   test('should deposit MOR tokens into a pool', async () => {

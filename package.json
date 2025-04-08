@@ -41,7 +41,7 @@
     "test": "jest --config=jest.config.cjs",
     "test:integration": "jest --config=jest.integration.config.cjs",
     "test:e2e": "jest --config=jest.e2e.config.cjs",
-    "test:e2e:with-env": "dotenv_config_path=.env.test node -r dotenv/config ./node_modules/.bin/jest --config=jest.e2e.config.cjs"
+    "test:e2e:with-env": "TEST_PRIVATE_KEY=e373b5f3259f5fca69e0b96266e85bddde7c1da47581d458621e18a53a00a631 dotenv_config_path=.env.test node -r dotenv/config ./node_modules/.bin/jest --config=jest.e2e.config.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

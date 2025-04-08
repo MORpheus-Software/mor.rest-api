@@ -19,7 +19,7 @@ const DEFAULT_POOL_ID = process.env.DEFAULT_POOL_ID ||
 const ETHEREUM_RPC_URL = process.env.ETHEREUM_RPC_URL || 
                          (process.env.NODE_ENV === 'production' 
                            ? 'https://arb-sepolia.g.alchemy.com/v2/demo'
-                           : 'http://localhost:8545');
+                           : 'https://sepolia-rollup.arbitrum.io/rpc');
 
 // Redis cache key for user stake status
 const USER_STAKE_PREFIX = 'stake:amount:';
