@@ -239,10 +239,10 @@ jobs:
           # Format: redis(s)://default:password@hostname.upstash.io:6379
           
           # Extract everything after 'default:' and before '@'
-          REDIS_PASSWORD=$(echo "${REDIS_URL}" | grep -o 'default:[^@]*' | sed 's|default:||')
+          REDIS_PASSWORD=$(echo "${REDIS_URL}" | grep -o 'default:[^@]*' | sed "s|default:||")
           
           # Extract the hostname (everything between '@' and ':6379')
-          REDIS_HOST=$(echo "${REDIS_URL}" | grep -o '@[^:]*' | sed 's|@||')
+          REDIS_HOST=$(echo "${REDIS_URL}" | grep -o '@[^:]*' | sed "s|@||")
           
           echo "Extracted Redis host for alternative config: ${REDIS_HOST}"
           echo "Extracted Redis password: (hidden for security)"
