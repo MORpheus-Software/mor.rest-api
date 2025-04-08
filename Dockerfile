@@ -19,7 +19,7 @@ ARG CONSUMER_API_URL
 
 # Write environment variables to .env file
 RUN echo "REACT_APP_DEFAULT_MODEL_NAME=${REACT_APP_DEFAULT_MODEL_NAME:-Llama-3.1-8B}" >> .env
-RUN echo "REACT_APP_DEFAULT_MODEL_ID=${REACT_APP_DEFAULT_MODEL_ID:-llama-3.1-8b-instant}" >> .env
+RUN echo "REACT_APP_DEFAULT_MODEL_ID=${REACT_APP_DEFAULT_MODEL_ID:-meta-llama/llama-3.3-70b-instruct}" >> .env
 RUN echo "VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://nfa-proxy-1081887913409.us-west1.run.app}" >> .env
 RUN echo "SECONDARY_ENDPOINT_URL=${SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api}" >> .env
 RUN echo "SECONDARY_ENDPOINT_MODEL=${SECONDARY_ENDPOINT_MODEL:-openrouter/auto}" >> .env
