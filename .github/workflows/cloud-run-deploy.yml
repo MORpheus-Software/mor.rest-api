@@ -239,13 +239,27 @@ jobs:
         # Use the external script to safely replace the Redis URL
         ./scripts/replace-redis-url.sh cloud-run-deploy-config.yaml "${REDIS_URL}"
         
-        # Update all environment variables in the deployment config
+        # Make the script for escaping sed values executable
+        chmod +x ./scripts/escape-sed-value.sh
+        
+        # Update all environment variables in the deployment config, properly escaping special characters
         # These values come from the env variables set at the beginning of the workflow
-        sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|${{ env.REACT_APP_AVAILABLE_MODELS }}|g" cloud-run-deploy-config.yaml
-        sed -i "s|SECONDARY_ENDPOINT_URL_VALUE|${{ env.SECONDARY_ENDPOINT_URL }}|g" cloud-run-deploy-config.yaml
+        
+        # For values with special characters, use the escape script
+        ESCAPED_MODELS=$(./scripts/escape-sed-value.sh "${{ env.REACT_APP_AVAILABLE_MODELS }}")
+        sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|${ESCAPED_MODELS}|g" cloud-run-deploy-config.yaml
+        
+        # Process other environment variables
+        ESCAPED_ENDPOINT_URL=$(./scripts/escape-sed-value.sh "${{ env.SECONDARY_ENDPOINT_URL }}")
+        sed -i "s|SECONDARY_ENDPOINT_URL_VALUE|${ESCAPED_ENDPOINT_URL}|g" cloud-run-deploy-config.yaml
+        
         sed -i "s|SECONDARY_ENDPOINT_TOKEN_KEY|${{ env.SECONDARY_ENDPOINT_TOKEN_KEY }}|g" cloud-run-deploy-config.yaml
-        sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|${{ env.SECONDARY_ENDPOINT_MODEL }}|g" cloud-run-deploy-config.yaml
-        sed -i "s|CONSUMER_API_URL_VALUE|${{ env.CONSUMER_API_URL }}|g" cloud-run-deploy-config.yaml
+        
+        ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "${{ env.SECONDARY_ENDPOINT_MODEL }}")
+        sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|${ESCAPED_ENDPOINT_MODEL}|g" cloud-run-deploy-config.yaml
+        
+        ESCAPED_CONSUMER_API_URL=$(./scripts/escape-sed-value.sh "${{ env.CONSUMER_API_URL }}")
+        sed -i "s|CONSUMER_API_URL_VALUE|${ESCAPED_CONSUMER_API_URL}|g" cloud-run-deploy-config.yaml
         
         # For boolean values, ensure they're treated as strings by wrapping in 'true' or 'false'
         if [[ "${{ env.USE_FALLBACK_AS_PRIMARY }}" == "\"true\"" ]]; then
@@ -256,15 +270,24 @@ jobs:
         
         # Update OpenRouter configuration
         if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
-          sed -i "s|OPENROUTER_HTTP_REFERER_VALUE|${{ vars.PROD_OPENROUTER_HTTP_REFERER || 'https://morsaas.com' }}|g" cloud-run-deploy-config.yaml
+          # Escape values for sed
+          ESCAPED_URL=$(./scripts/escape-sed-value.sh "${{ vars.PROD_OPENROUTER_HTTP_REFERER || 'https://morsaas.com' }}")
+          sed -i "s|OPENROUTER_HTTP_REFERER_VALUE|${ESCAPED_URL}|g" cloud-run-deploy-config.yaml
+          
           sed -i "s|OPENROUTER_APP_TITLE_VALUE|${{ vars.PROD_OPENROUTER_APP_TITLE || 'MorSaaS' }}|g" cloud-run-deploy-config.yaml
           sed -i "s|OPENROUTER_APP_VERSION_VALUE|${{ vars.PROD_OPENROUTER_APP_VERSION || '1.0.0' }}|g" cloud-run-deploy-config.yaml
         elif [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
-          sed -i "s|OPENROUTER_HTTP_REFERER_VALUE|${{ vars.STAGING_OPENROUTER_HTTP_REFERER || 'https://staging.morsaas.com' }}|g" cloud-run-deploy-config.yaml
+          # Escape values for sed
+          ESCAPED_URL=$(./scripts/escape-sed-value.sh "${{ vars.STAGING_OPENROUTER_HTTP_REFERER || 'https://staging.morsaas.com' }}")
+          sed -i "s|OPENROUTER_HTTP_REFERER_VALUE|${ESCAPED_URL}|g" cloud-run-deploy-config.yaml
+          
           sed -i "s|OPENROUTER_APP_TITLE_VALUE|${{ vars.STAGING_OPENROUTER_APP_TITLE || 'MorSaaS-Staging' }}|g" cloud-run-deploy-config.yaml
           sed -i "s|OPENROUTER_APP_VERSION_VALUE|${{ vars.STAGING_OPENROUTER_APP_VERSION || '1.0.0-staging' }}|g" cloud-run-deploy-config.yaml
         else
-          sed -i "s|OPENROUTER_HTTP_REFERER_VALUE|${{ vars.DEV_OPENROUTER_HTTP_REFERER || 'https://dev.morsaas.com' }}|g" cloud-run-deploy-config.yaml
+          # Escape values for sed
+          ESCAPED_URL=$(./scripts/escape-sed-value.sh "${{ vars.DEV_OPENROUTER_HTTP_REFERER || 'https://dev.morsaas.com' }}")
+          sed -i "s|OPENROUTER_HTTP_REFERER_VALUE|${ESCAPED_URL}|g" cloud-run-deploy-config.yaml
+          
           sed -i "s|OPENROUTER_APP_TITLE_VALUE|${{ vars.DEV_OPENROUTER_APP_TITLE || 'MorSaaS-Dev' }}|g" cloud-run-deploy-config.yaml
           sed -i "s|OPENROUTER_APP_VERSION_VALUE|${{ vars.DEV_OPENROUTER_APP_VERSION || '1.0.0-dev' }}|g" cloud-run-deploy-config.yaml
         fi
