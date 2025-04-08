@@ -88,6 +88,25 @@ jobs:
       with:
         project_id: ${{ secrets.GCP_PROJECT_ID }}
         install_components: 'gke-gcloud-auth-plugin'
+
+    - name: Set OpenRouter API Key in Secret Manager
+      run: |
+        # Check if the secret exists
+        if gcloud secrets describe openai-api-key --project="${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
+          echo "Secret 'openai-api-key' exists. Adding new version..."
+          echo -n "${{ secrets.OPENROUTER_API_KEY }}" | gcloud secrets versions add openai-api-key --data-file=- --project="${{ env.PROJECT_ID }}"
+        else
+          echo "Creating new secret 'openai-api-key'..."
+          echo -n "${{ secrets.OPENROUTER_API_KEY }}" | gcloud secrets create openai-api-key --data-file=- --project="${{ env.PROJECT_ID }}"
+        fi
+
+        # Grant access to the Cloud Run service account
+        SERVICE_ACCOUNT="101868473812-compute@developer.gserviceaccount.com"
+        echo "Granting access to service account: $SERVICE_ACCOUNT"
+        gcloud secrets add-iam-policy-binding openai-api-key \
+          --member="serviceAccount:$SERVICE_ACCOUNT" \
+          --role="roles/secretmanager.secretAccessor" \
+          --project="${{ env.PROJECT_ID }}"
         
     - name: Authorize Docker push
       run: gcloud auth configure-docker --quiet
@@ -265,11 +284,13 @@ jobs:
         
         # Update alternative Redis credentials if available
         if [[ -n "${REDIS_PASSWORD}" ]]; then
-          sed -i "s|REDIS_PASSWORD_ONLY|${REDIS_PASSWORD}|g" cloud-run-deploy-config.yaml
+          # Use awk instead of sed to avoid issues with special characters
+          awk -v pass="${REDIS_PASSWORD}" '{gsub(/REDIS_PASSWORD_ONLY/, pass); print}' cloud-run-deploy-config.yaml > temp.yaml && mv temp.yaml cloud-run-deploy-config.yaml
         fi
         
         if [[ -n "${REDIS_HOST}" ]]; then
-          sed -i "s|REDIS_HOSTNAME_ONLY|${REDIS_HOST}|g" cloud-run-deploy-config.yaml
+          # Use awk instead of sed to avoid issues with special characters
+          awk -v host="${REDIS_HOST}" '{gsub(/REDIS_HOSTNAME_ONLY/, host); print}' cloud-run-deploy-config.yaml > temp.yaml && mv temp.yaml cloud-run-deploy-config.yaml
         fi
         
         # Display the configuration (without sensitive data)
