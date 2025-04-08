@@ -223,7 +223,12 @@ jobs:
           echo "Extracted Redis password: (hidden for security)"
         fi
         
-        sed -i "s|YOUR_REDIS_URL|${{ secrets.REDIS_URL }}|g" cloud-run-deploy-config.yaml
+        # Use a different approach to update the Redis URL in the YAML file
+        # This avoids issues with special characters in the URL
+        awk -v redis_url="${{ secrets.REDIS_URL }}" '
+          /YOUR_REDIS_URL/ { print "          value: " redis_url; next }
+          { print }
+        ' cloud-run-deploy-config.yaml > temp.yaml && mv temp.yaml cloud-run-deploy-config.yaml
         
         # Update all environment variables in the deployment config
         # These values come from the env variables set at the beginning of the workflow
