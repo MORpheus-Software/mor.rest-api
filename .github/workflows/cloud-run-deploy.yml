@@ -191,6 +191,9 @@ jobs:
         # Update service name in the YAML
         sed -i "s|morsaas|${{ env.SERVICE_NAME }}|g" cloud-run-deploy-config.yaml
         
+        # Update namespace to use project ID instead of "default"
+        sed -i "s|namespace: default|namespace: ${{ env.PROJECT_ID }}|g" cloud-run-deploy-config.yaml
+        
         # Update environment labels with actual environment name
         if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
           sed -i "s|ENVIRONMENT_NAME|prod|g" cloud-run-deploy-config.yaml

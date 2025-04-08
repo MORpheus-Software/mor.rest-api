@@ -13,6 +13,7 @@ spec:
         autoscaling.knative.dev/maxScale: '10'
         run.googleapis.com/client-name: github-actions
         run.googleapis.com/client-version: GITHUB_SHA
+        run.googleapis.com/startup-probe-timeout: '240s'
     spec:
       containerConcurrency: 80
       containers:

@@ -1,8 +1,8 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: morsaas-test
-  namespace: default
+  name: morsaas-dev
+  namespace: 101868473812
   labels:
     environment: test
 spec:
@@ -13,32 +13,31 @@ spec:
         autoscaling.knative.dev/maxScale: '10'
         run.googleapis.com/client-name: github-actions
         run.googleapis.com/client-version: GITHUB_SHA
+        run.googleapis.com/startup-probe-timeout: '240s'
     spec:
       containerConcurrency: 80
       containers:
-      - image: gcr.io/test-project-id/morsaas-test:abc123
+      - image: gcr.io/101868473812/morsaas-dev:latest
         env:
         - name: NODE_ENV
           value: production
         - name: REDIS_URL
           value: rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
         - name: REACT_APP_AVAILABLE_MODELS
-          value: model1,model2
+          value: mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B
         - name: SECONDARY_ENDPOINT_URL
-          value: https://test-endpoint.com
-        - name: openrouter-api-key
-          value: openrouter-api-key
+          value: https://openrouter.ai/api/v1/chat/completions
+        - name: SECONDARY_ENDPOINT_TOKEN_KEY
+          value: openai-api-key
         - name: SECONDARY_ENDPOINT_MODEL
-          value: test-model
+          value: meta-llama/llama-3.3-70b-instruct
         - name: CONSUMER_API_URL
-          value: https://test-consumer.com
+          value: https://consumer-node-1081887913409.us-west1.run.app
         - name: USE_FALLBACK_AS_PRIMARY
           value: "false"
         - name: OPENROUTER_HTTP_REFERER
-          value: https://test.morsaas.com
+          value: https://morsaas-dev.run.app
         - name: OPENROUTER_APP_TITLE
-          value: MorSaaS-Test
+          value: MorSaaS-Dev
         - name: OPENROUTER_APP_VERSION
-          value: 1.0.0-test
-AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA
-47025.upstash.io
+          value: 1.0.0-dev
