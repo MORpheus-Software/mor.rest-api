@@ -43,7 +43,7 @@ jobs:
           echo "REACT_APP_AVAILABLE_MODELS=${{ vars.PROD_AVAILABLE_MODELS || 'mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B' }}" >> $GITHUB_ENV
           # Production fallback endpoints
           echo "SECONDARY_ENDPOINT_URL=${{ vars.PROD_SECONDARY_ENDPOINT_URL || 'https://openrouter.ai/api/v1/chat/completions' }}" >> $GITHUB_ENV
-          echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ vars.PROD_SECONDARY_ENDPOINT_TOKEN_KEY || 'openai-api-key' }}" >> $GITHUB_ENV
+          echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ vars.PROD_SECONDARY_ENDPOINT_TOKEN_KEY || 'openrouter-api-key' }}" >> $GITHUB_ENV
           echo "SECONDARY_ENDPOINT_MODEL=${{ vars.PROD_SECONDARY_ENDPOINT_MODEL || 'openrouter/auto' }}" >> $GITHUB_ENV
           echo "CONSUMER_API_URL=${{ vars.PROD_CONSUMER_API_URL || 'https://consumer-node-1081887913409.us-west1.run.app' }}" >> $GITHUB_ENV
           echo "USE_FALLBACK_AS_PRIMARY=${{ vars.PROD_USE_FALLBACK_AS_PRIMARY || 'false' }}" >> $GITHUB_ENV
@@ -55,7 +55,7 @@ jobs:
           echo "REACT_APP_AVAILABLE_MODELS=${{ vars.STAGING_AVAILABLE_MODELS || 'mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B' }}" >> $GITHUB_ENV
           # Staging fallback endpoints
           echo "SECONDARY_ENDPOINT_URL=${{ vars.STAGING_SECONDARY_ENDPOINT_URL || 'https://openrouter.ai/api/v1/chat/completions' }}" >> $GITHUB_ENV
-          echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ vars.STAGING_SECONDARY_ENDPOINT_TOKEN_KEY || 'openai-api-key' }}" >> $GITHUB_ENV
+          echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ vars.STAGING_SECONDARY_ENDPOINT_TOKEN_KEY || 'openrouter-api-key' }}" >> $GITHUB_ENV
           echo "SECONDARY_ENDPOINT_MODEL=${{ vars.STAGING_SECONDARY_ENDPOINT_MODEL || 'openrouter/auto' }}" >> $GITHUB_ENV
           echo "CONSUMER_API_URL=${{ vars.STAGING_CONSUMER_API_URL || 'https://consumer-node-1081887913409.us-west1.run.app' }}" >> $GITHUB_ENV
           echo "USE_FALLBACK_AS_PRIMARY=${{ vars.STAGING_USE_FALLBACK_AS_PRIMARY || 'false' }}" >> $GITHUB_ENV
@@ -68,7 +68,7 @@ jobs:
           echo "REACT_APP_AVAILABLE_MODELS=${{ vars.DEV_AVAILABLE_MODELS || 'mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B' }}" >> $GITHUB_ENV
           # Development fallback endpoints
           echo "SECONDARY_ENDPOINT_URL=${{ vars.DEV_SECONDARY_ENDPOINT_URL || 'https://openrouter.ai/api/v1/chat/completions' }}" >> $GITHUB_ENV
-          echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ vars.DEV_SECONDARY_ENDPOINT_TOKEN_KEY || 'openai-api-key' }}" >> $GITHUB_ENV
+          echo "SECONDARY_ENDPOINT_TOKEN_KEY=${{ vars.DEV_SECONDARY_ENDPOINT_TOKEN_KEY || 'openrouter-api-key' }}" >> $GITHUB_ENV
           echo "SECONDARY_ENDPOINT_MODEL=${{ vars.DEV_SECONDARY_ENDPOINT_MODEL || 'openrouter/auto' }}" >> $GITHUB_ENV
           echo "CONSUMER_API_URL=${{ vars.DEV_CONSUMER_API_URL || 'https://consumer-node-1081887913409.us-west1.run.app' }}" >> $GITHUB_ENV
           echo "USE_FALLBACK_AS_PRIMARY=${{ vars.DEV_USE_FALLBACK_AS_PRIMARY || 'false' }}" >> $GITHUB_ENV
