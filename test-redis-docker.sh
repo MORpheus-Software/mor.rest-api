@@ -31,11 +31,11 @@ echo "✅ Created test YAML config file"
 
 # Create a Docker test script
 cat > docker-test/run-test.sh << 'EOL'
-#!/bin/bash
+#!/bin/sh
 set -e
 
 echo "=== Starting Redis URL replacement tests in Docker container ==="
-echo "This mimics the GitHub Actions Ubuntu environment"
+echo "This mimics the GitHub Actions environment"
 echo
 
 # Make sure the script is executable
@@ -76,15 +76,12 @@ EOL
 chmod +x docker-test/run-test.sh
 echo "✅ Created test script"
 
-# Create a Dockerfile
+# Create a Dockerfile with a smaller image
 cat > docker-test/Dockerfile << EOL
-FROM ubuntu:20.04
-
-# Set noninteractive mode for apt
-ENV DEBIAN_FRONTEND=noninteractive
+FROM alpine:3.18
 
 # Install necessary tools
-RUN apt-get update && apt-get install -y bash sed grep coreutils && apt-get clean
+RUN apk add --no-cache bash sed grep
 
 # Set up the working directory
 WORKDIR /app
