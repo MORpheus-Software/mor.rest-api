@@ -2,83 +2,41 @@ apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
   name: morsaas
-  annotations:
-    run.googleapis.com/ingress: all
-    run.googleapis.com/ingress-status: all
-    iam.gcp.io/allowed: "allUsers"
+  namespace: default
   labels:
-    app: morsaas
     environment: ENVIRONMENT_NAME
 spec:
   template:
     metadata:
       annotations:
-        run.googleapis.com/cpu-throttling: "false"
-        run.googleapis.com/execution-environment: gen2
-        run.googleapis.com/startup-cpu-boost: "true"
-        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/startup-cpu-boost: 'true'
+        autoscaling.knative.dev/maxScale: '10'
         run.googleapis.com/client-name: github-actions
         run.googleapis.com/client-version: GITHUB_SHA
-      labels:
-        app: morsaas
-        environment: ENVIRONMENT_NAME
     spec:
       containerConcurrency: 80
       containers:
       - image: gcr.io/PROJECT_ID/morsaas:COMMIT_SHA
         env:
-        - name: DEPLOY_ENVIRONMENT
-          value: ENVIRONMENT_NAME
         - name: NODE_ENV
           value: production
         - name: REDIS_URL
-          # Format MUST be: rediss://default:TOKEN@HOSTNAME.upstash.io:6379
-          # Always use rediss:// (secure) for Upstash connections
           value: YOUR_REDIS_URL
-        - name: VITE_API_BASE_URL
-          # This is used by both frontend (through import.meta.env) and backend (through process.env)
-          value: https://nfa-proxy-1081887913409.us-west1.run.app
-        # Environment variables for model configuration, set via GitHub variables
         - name: REACT_APP_AVAILABLE_MODELS
           value: REACT_APP_AVAILABLE_MODELS_VALUE
-        # Fallback endpoint configuration
         - name: SECONDARY_ENDPOINT_URL
           value: SECONDARY_ENDPOINT_URL_VALUE
-        - name: SECONDARY_ENDPOINT_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: latest
-              name: SECONDARY_ENDPOINT_TOKEN_KEY
+        - name: SECONDARY_ENDPOINT_TOKEN_KEY
+          value: SECONDARY_ENDPOINT_TOKEN_KEY
         - name: SECONDARY_ENDPOINT_MODEL
           value: SECONDARY_ENDPOINT_MODEL_VALUE
+        - name: CONSUMER_API_URL
+          value: CONSUMER_API_URL_VALUE
         - name: USE_FALLBACK_AS_PRIMARY
-          value: USE_FALLBACK_AS_PRIMARY_VALUE
-        # OpenRouter configuration
+          value: "USE_FALLBACK_AS_PRIMARY_VALUE"
         - name: OPENROUTER_HTTP_REFERER
           value: OPENROUTER_HTTP_REFERER_VALUE
         - name: OPENROUTER_APP_TITLE
           value: OPENROUTER_APP_TITLE_VALUE
         - name: OPENROUTER_APP_VERSION
           value: OPENROUTER_APP_VERSION_VALUE
-        # Consumer API configuration for session management
-        - name: CONSUMER_API_URL
-          value: CONSUMER_API_URL_VALUE
-        ports:
-        - containerPort: 8080
-          name: http1
-        resources:
-          limits:
-            cpu: "1"
-            memory: 2Gi
-        startupProbe:
-          # Maximum allowed values for startup probe (total time: 240s)
-          initialDelaySeconds: 0
-          periodSeconds: 240
-          timeoutSeconds: 240
-          failureThreshold: 1
-          tcpSocket:
-            port: 8080
-      timeoutSeconds: 600
-  traffic:
-  - latestRevision: true
-    percent: 100 
