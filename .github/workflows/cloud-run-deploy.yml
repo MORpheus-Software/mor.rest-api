@@ -208,14 +208,15 @@ jobs:
           sed -i "s|COMMIT_SHA|${{ github.sha }}|g" cloud-run-deploy-config.yaml
         fi
         
+        # Set REDIS_URL from GitHub secret
+        REDIS_URL="${{ secrets.REDIS_URL }}"
+        
         # Debug Redis URL format (without exposing secrets)
         echo "Redis URL format check:"
-        if [[ "${{ secrets.REDIS_URL }}" == redis://* ]]; then
+        if [[ "${REDIS_URL}" == redis://* ]]; then
           echo "WARNING: Standard Redis format detected (redis://). For Upstash connections, secure protocol (rediss://) is required."
           echo "Consider updating your REDIS_URL secret to use rediss:// instead of redis://"
-          
-          # The setupRedis.ts will auto-upgrade to rediss:// when connecting, but it's better to fix it in the secret
-        elif [[ "${{ secrets.REDIS_URL }}" == rediss://* ]]; then
+        elif [[ "${REDIS_URL}" == rediss://* ]]; then
           echo "Secure Redis format detected (rediss://). This is the correct format for Upstash connections."
         else
           echo "Unknown Redis format, please verify the URL"
@@ -224,8 +225,7 @@ jobs:
         fi
         
         # Verify the Redis URL is properly formatted for Upstash
-        # (No secrets are printed, just checking format)
-        if [[ ! "${{ secrets.REDIS_URL }}" == *"@"*".upstash.io:"* ]]; then
+        if [[ ! "${REDIS_URL}" == *"@"*".upstash.io:"* ]]; then
           echo "Warning: Redis URL doesn't appear to be in the expected Upstash format"
           echo "REQUIRED FORMAT: rediss://default:TOKEN@HOSTNAME.upstash.io:6379"
           echo "Please update the REDIS_URL secret in GitHub repository settings."
@@ -233,34 +233,11 @@ jobs:
           echo "Redis URL appears to have the correct Upstash format"
         fi
         
-        # Set REDIS_URL from GitHub secret
-        REDIS_URL="${{ secrets.REDIS_URL }}"
+        # Make the Redis URL replacement script executable
+        chmod +x ./scripts/replace-redis-url.sh
         
-        # Extract Redis credentials for alternative formats
-        if [[ "${REDIS_URL}" == redis://* || "${REDIS_URL}" == rediss://* ]]; then
-          # Extract the host and password using reliable Perl regex
-          # This is more robust for URLs with special characters
-          
-          # Extract just the hostname using perl regex
-          REDIS_HOST=$(echo "${REDIS_URL}" | perl -ne 'print "$1" if /(\w+[.-]\w+\.\w+):\d+$/')
-          
-          # Extract auth part using perl regex
-          AUTH_PART=$(echo "${REDIS_URL}" | perl -ne 'print "$1" if /^redis(?:s)?:\/\/(.*)@/')
-          
-          # Extract password (everything after default:)
-          REDIS_PASSWORD=${AUTH_PART#default:}
-          
-          echo "Extracted Redis host for alternative config: ${REDIS_HOST}"
-          echo "Extracted Redis password: (hidden for security)"
-        fi
-        
-        # Use awk instead of sed for inserting Redis URL into the YAML file
-        # This avoids issues with special characters in the URL
-        echo "Updating Redis URL in config..."
-        awk -v redis_url="${REDIS_URL}" '
-          /YOUR_REDIS_URL/ { print "          value: " redis_url; next }
-          { print }
-        ' cloud-run-deploy-config.yaml > temp.yaml && mv temp.yaml cloud-run-deploy-config.yaml
+        # Use the external script to safely replace the Redis URL
+        ./scripts/replace-redis-url.sh cloud-run-deploy-config.yaml "${REDIS_URL}"
         
         # Update all environment variables in the deployment config
         # These values come from the env variables set at the beginning of the workflow
@@ -294,19 +271,6 @@ jobs:
         
         # Update the secret name with the appropriate environment name
         sed -i "s|SECRETS_NAME|${{ env.SERVICE_NAME }}|g" cloud-run-deploy-config.yaml
-        
-        # Update alternative Redis credentials if available
-        if [[ -n "${REDIS_PASSWORD}" ]]; then
-          echo "Updating Redis password in config..."
-          # Use awk instead of sed to avoid issues with special characters
-          awk -v pass="${REDIS_PASSWORD}" '{gsub(/REDIS_PASSWORD_ONLY/, pass); print}' cloud-run-deploy-config.yaml > temp.yaml && mv temp.yaml cloud-run-deploy-config.yaml
-        fi
-        
-        if [[ -n "${REDIS_HOST}" ]]; then
-          echo "Updating Redis host in config..."
-          # Use awk instead of sed to avoid issues with special characters
-          awk -v host="${REDIS_HOST}" '{gsub(/REDIS_HOSTNAME_ONLY/, host); print}' cloud-run-deploy-config.yaml > temp.yaml && mv temp.yaml cloud-run-deploy-config.yaml
-        fi
         
         # Display the configuration (without sensitive data)
         echo "Deploying with the following configuration:"

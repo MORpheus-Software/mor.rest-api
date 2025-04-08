@@ -1,0 +1,44 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: morsaas-test
+  namespace: default
+  labels:
+    environment: test
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/startup-cpu-boost: 'true'
+        autoscaling.knative.dev/maxScale: '10'
+        run.googleapis.com/client-name: github-actions
+        run.googleapis.com/client-version: GITHUB_SHA
+    spec:
+      containerConcurrency: 80
+      containers:
+      - image: gcr.io/test-project-id/morsaas-test:abc123
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: REDIS_URL
+          value: rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
+        - name: REACT_APP_AVAILABLE_MODELS
+          value: model1,model2
+        - name: SECONDARY_ENDPOINT_URL
+          value: https://test-endpoint.com
+        - name: openrouter-api-key
+          value: openrouter-api-key
+        - name: SECONDARY_ENDPOINT_MODEL
+          value: test-model
+        - name: CONSUMER_API_URL
+          value: https://test-consumer.com
+        - name: USE_FALLBACK_AS_PRIMARY
+          value: "false"
+        - name: OPENROUTER_HTTP_REFERER
+          value: https://test.morsaas.com
+        - name: OPENROUTER_APP_TITLE
+          value: MorSaaS-Test
+        - name: OPENROUTER_APP_VERSION
+          value: 1.0.0-test
+AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA
+47025.upstash.io
