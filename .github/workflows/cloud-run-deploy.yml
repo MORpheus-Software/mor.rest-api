@@ -235,9 +235,14 @@ jobs:
         
         # Extract Redis credentials for alternative formats
         if [[ "${REDIS_URL}" == redis://* || "${REDIS_URL}" == rediss://* ]]; then
-          # Extract the password and hostname from the URL for alternative formats
-          REDIS_PASSWORD=$(echo "${REDIS_URL}" | awk -F'[@:]' '{print $2}')
-          REDIS_HOST=$(echo "${REDIS_URL}" | awk -F'[@:]' '{print $3}')
+          # Extract the password and hostname from the URL using a more reliable method
+          # Format: redis(s)://default:password@hostname.upstash.io:6379
+          
+          # Extract everything after 'default:' and before '@'
+          REDIS_PASSWORD=$(echo "${REDIS_URL}" | grep -o 'default:[^@]*' | sed 's/default://')
+          
+          # Extract the hostname (everything between '@' and ':6379')
+          REDIS_HOST=$(echo "${REDIS_URL}" | grep -o '@[^:]*' | sed 's/@//')
           
           echo "Extracted Redis host for alternative config: ${REDIS_HOST}"
           echo "Extracted Redis password: (hidden for security)"
