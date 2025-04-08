@@ -39,10 +39,8 @@ spec:
           # This is used by both frontend (through import.meta.env) and backend (through process.env)
           value: https://nfa-proxy-1081887913409.us-west1.run.app
         # Environment variables for model configuration, set via GitHub variables
-        - name: REACT_APP_DEFAULT_MODEL_NAME
-          value: REACT_APP_DEFAULT_MODEL_NAME_VALUE
-        - name: REACT_APP_DEFAULT_MODEL_ID
-          value: REACT_APP_DEFAULT_MODEL_ID_VALUE
+        - name: REACT_APP_AVAILABLE_MODELS
+          value: REACT_APP_AVAILABLE_MODELS_VALUE
         # Fallback endpoint configuration
         - name: SECONDARY_ENDPOINT_URL
           value: SECONDARY_ENDPOINT_URL_VALUE
