@@ -1,0 +1,30 @@
+name: Test Perl in GitHub Actions
+
+on:
+  push:
+    branches: [ test-perl ]
+  workflow_dispatch:
+
+jobs:
+  test-perl:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check Perl availability
+      run: |
+        echo "Checking if perl is available in GitHub Actions runtime..."
+        perl --version
+        
+        # Test if our regex works
+        TEST_URL="rediss://default:password123@hostname.upstash.io:6379"
+        
+        # Extract hostname
+        HOST=$(echo "$TEST_URL" | perl -ne 'print "$1" if /(\w+[.-]\w+\.\w+):\d+$/')
+        echo "Extracted host: $HOST"
+        
+        # Extract auth part
+        AUTH=$(echo "$TEST_URL" | perl -ne 'print "$1" if /^redis(?:s)?:\/\/(.*)@/')
+        echo "Extracted auth part: $AUTH"
+        
+        # Extract password
+        PASSWORD=${AUTH#default:}
+        echo "Extracted password: $PASSWORD" 
