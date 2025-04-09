@@ -288,27 +288,23 @@ app.get('*', (req, res) => {
     return res.redirect(`http://localhost:8080${req.path}`);
   }
   
-  // Get model env variables for runtime injection
-  const availableModels = process.env.REACT_APP_AVAILABLE_MODELS?.split(',') || [];
-  const defaultModel = availableModels[0]?.split('|')[0] || 'meta-llama/llama-3.3-70b-instruct';
-  const modelName = availableModels[0]?.split('|')[1] || 'Llama-3.1-8B';
-  const modelId = defaultModel;
-  
-  console.log(chalk.yellow(`[SERVER] Using runtime model config: ${modelName} (${modelId})`));
-  
   // Check if we need to inject runtime model variables
   if (fs.existsSync(path.join(publicPath, 'index.html'))) {
     try {
       // Read the index.html file
       const htmlContent = fs.readFileSync(path.join(publicPath, 'index.html'), 'utf-8');
       
+      // Get the available models from environment
+      const availableModels = process.env.REACT_APP_AVAILABLE_MODELS || '';
+      
       // Create the runtime config script
       const runtimeConfigScript = `
         <script>
           // Runtime model configuration from server environment
           window.RUNTIME_CONFIG = {
-            modelName: "${modelName}",
-            modelId: "${modelId}"
+            REACT_APP_DEFAULT_MODEL_NAME: "${process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Llama-3.1-8B'}",
+            REACT_APP_DEFAULT_MODEL_ID: "${process.env.REACT_APP_DEFAULT_MODEL_ID || 'meta-llama/llama-3.3-70b-instruct'}",
+            REACT_APP_AVAILABLE_MODELS: "${availableModels.replace(/"/g, '\\"')}"
           };
           console.log("[RUNTIME] Injected runtime model config:", window.RUNTIME_CONFIG);
         </script>
@@ -322,6 +318,7 @@ app.get('*', (req, res) => {
     } catch (error) {
       console.error(chalk.red(`[SERVER] Error injecting runtime config:`), error);
       // Fall back to sending the original file
+      res.sendFile(path.join(publicPath, 'index.html'));
     }
   }
   
