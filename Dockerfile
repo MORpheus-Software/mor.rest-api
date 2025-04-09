@@ -26,7 +26,7 @@ RUN echo "SECONDARY_ENDPOINT_URL=${SECONDARY_ENDPOINT_URL:-https://openrouter.ai
 RUN echo "SECONDARY_ENDPOINT_MODEL=${SECONDARY_ENDPOINT_MODEL:-openrouter/auto}" >> .env
 RUN echo "USE_FALLBACK_AS_PRIMARY=${USE_FALLBACK_AS_PRIMARY:-false}" >> .env
 RUN echo "CONSUMER_API_URL=${CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}" >> .env
-RUN echo "REACT_APP_AVAILABLE_MODELS=${REACT_APP_AVAILABLE_MODELS:-mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B} >> .env
+RUN echo 'REACT_APP_AVAILABLE_MODELS=${REACT_APP_AVAILABLE_MODELS:-mistralai/mistral-small-3.1-24b-instruct\|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero\|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct\|Llama 3.3 70B}' >> .env
 
 # Log environment variables for build
 RUN echo "Generated .env file:" && cat .env | sort
