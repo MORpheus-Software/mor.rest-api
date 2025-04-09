@@ -38,20 +38,21 @@ fi
 
 # Get the appropriate endpoint URL based on environment
 # All environments use OpenRouter with the required path
-SECONDARY_ENDPOINT_URL="${SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
+SECONDARY_ENDPOINT_URL="${SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
 if [[ "$ENVIRONMENT" == "dev" ]]; then
-  SECONDARY_ENDPOINT_URL="${DEV_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
+  SECONDARY_ENDPOINT_URL="${DEV_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
 elif [[ "$ENVIRONMENT" == "staging" ]]; then
-  SECONDARY_ENDPOINT_URL="${STAGING_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
+  SECONDARY_ENDPOINT_URL="${STAGING_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
 elif [[ "$ENVIRONMENT" == "prod" ]]; then
-  SECONDARY_ENDPOINT_URL="${PROD_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/}"
+  SECONDARY_ENDPOINT_URL="${PROD_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
 fi
 
 # Print the configuration
-echo "Using configuration:"
-echo "- Environment: $ENVIRONMENT"
-echo "- Available Models: $REACT_APP_AVAILABLE_MODELS"
-echo "- Secondary Endpoint URL: $SECONDARY_ENDPOINT_URL"
+echo -e "${BLUE}Deployment Configuration:${NC}"
+echo -e "${YELLOW}Environment: $ENVIRONMENT${NC}"
+echo -e "${YELLOW}Service Name: $SERVICE_NAME${NC}"
+echo -e "${YELLOW}Available Models: $REACT_APP_AVAILABLE_MODELS${NC}"
+echo -e "${YELLOW}Secondary Endpoint URL: $SECONDARY_ENDPOINT_URL${NC}"
 
 # NOTE: Cloud Run has a maximum startup probe timeout of 240 seconds (4 minutes).
 # If your container takes longer than that to start, you'll need to:

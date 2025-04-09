@@ -45,6 +45,10 @@ export default defineConfig(({ mode }) => {
   // Explicitly log Redis environment setup
   console.log(`[VITE] Setting process.env.REDIS_URL to: ${process.env.REDIS_URL.replace(/\/\/(.+?)@/, '//[credentials-hidden]@')}`);
   
+  const availableModels = process.env.REACT_APP_AVAILABLE_MODELS ||
+    env.REACT_APP_AVAILABLE_MODELS ||
+    'mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B';
+
   return {
     server: {
       host: "::",
@@ -108,7 +112,7 @@ export default defineConfig(({ mode }) => {
         // Add React App environment variables to make them available in client code
         REACT_APP_DEFAULT_MODEL_NAME: JSON.stringify(modelName),
         REACT_APP_DEFAULT_MODEL_ID: JSON.stringify(modelId),
-        REACT_APP_AVAILABLE_MODELS: JSON.stringify(process.env.REACT_APP_AVAILABLE_MODELS || env.REACT_APP_AVAILABLE_MODELS),
+        REACT_APP_AVAILABLE_MODELS: JSON.stringify(availableModels),
         // Add Redis URL to the environment, using Upstash URL for preview/production
         REDIS_URL: JSON.stringify(redisUrl),
         // Add Lovable environment flag
