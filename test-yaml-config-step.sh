@@ -13,6 +13,7 @@ PROJECT_ID="test-project-id"
 GITHUB_SHA="abc123"
 REACT_APP_AVAILABLE_MODELS="model1,model2"
 SECONDARY_ENDPOINT_URL="https://test-endpoint.com"
+# Using a standardized, sanitized key name for Cloud Run secret
 SECONDARY_ENDPOINT_TOKEN_KEY="openrouter-api-key"
 SECONDARY_ENDPOINT_MODEL="test-model"
 CONSUMER_API_URL="https://test-consumer.com"
@@ -49,8 +50,11 @@ spec:
           value: REACT_APP_AVAILABLE_MODELS_VALUE
         - name: SECONDARY_ENDPOINT_URL
           value: SECONDARY_ENDPOINT_URL_VALUE
-        - name: SECONDARY_ENDPOINT_TOKEN_KEY
-          value: SECONDARY_ENDPOINT_TOKEN_KEY
+        - name: SECONDARY_ENDPOINT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: SECRETS_NAME
+              key: openrouter-api-key
         - name: SECONDARY_ENDPOINT_MODEL
           value: SECONDARY_ENDPOINT_MODEL_VALUE
         - name: CONSUMER_API_URL

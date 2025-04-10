@@ -36,7 +36,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: SECRETS_NAME
-              key: SECONDARY_ENDPOINT_TOKEN_KEY
+              key: openrouter-api-key
         - name: SECONDARY_ENDPOINT_MODEL
           value: "SECONDARY_ENDPOINT_MODEL_VALUE"
         - name: CONSUMER_API_URL
