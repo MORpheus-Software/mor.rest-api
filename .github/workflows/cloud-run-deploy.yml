@@ -244,6 +244,7 @@ jobs:
         
         # For values with special characters, use the escape script
         ESCAPED_MODELS=$(./scripts/escape-sed-value.sh "${{ env.REACT_APP_AVAILABLE_MODELS }}")
+        # Add quotes around the model names to prevent shell script errors with version numbers
         sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|${ESCAPED_MODELS}|g" cloud-run-deploy-config.yaml
         
         # Process other environment variables
@@ -253,6 +254,7 @@ jobs:
         sed -i "s|SECONDARY_ENDPOINT_TOKEN_KEY|${{ env.SECONDARY_ENDPOINT_TOKEN_KEY }}|g" cloud-run-deploy-config.yaml
         
         ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "${{ env.SECONDARY_ENDPOINT_MODEL }}")
+        # Add quotes around the model name to prevent shell script errors with version numbers
         sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|${ESCAPED_ENDPOINT_MODEL}|g" cloud-run-deploy-config.yaml
         
         ESCAPED_CONSUMER_API_URL=$(./scripts/escape-sed-value.sh "${{ env.CONSUMER_API_URL }}")
@@ -299,8 +301,35 @@ jobs:
     - name: Deploy to Cloud Run using YAML
       id: deploy
       run: |
+        # Make the model simplification script executable
+        chmod +x ./scripts/simplify-model-names.sh
+        
         # Deploy using the YAML configuration for extended startup timeout
-        echo "Starting deployment with extended startup timeout (240s)..."
+        echo "Starting deployment with extended startup timeout (1800s)..."
+        
+        # Check the model names for potential shell script issues and simplify if needed
+        export ORIGINAL_MODELS="${{ env.REACT_APP_AVAILABLE_MODELS }}"
+        if [[ "$ORIGINAL_MODELS" =~ [0-9]\.[0-9] ]]; then
+          echo "Warning: Model names contain version numbers that could cause shell errors"
+          export REACT_APP_AVAILABLE_MODELS=$(./scripts/simplify-model-names.sh "$ORIGINAL_MODELS")
+          echo "Models simplified to avoid shell errors"
+        else
+          export REACT_APP_AVAILABLE_MODELS="$ORIGINAL_MODELS"
+        fi
+        
+        # Do the same for the secondary endpoint model
+        export ORIGINAL_ENDPOINT_MODEL="${{ env.SECONDARY_ENDPOINT_MODEL }}"
+        if [[ "$ORIGINAL_ENDPOINT_MODEL" =~ [0-9]\.[0-9] ]]; then
+          echo "Warning: Secondary endpoint model contains version numbers that could cause shell errors"
+          export SECONDARY_ENDPOINT_MODEL=$(./scripts/simplify-model-names.sh "$ORIGINAL_ENDPOINT_MODEL")
+          echo "Secondary endpoint model simplified to avoid shell errors"
+        else
+          export SECONDARY_ENDPOINT_MODEL="$ORIGINAL_ENDPOINT_MODEL"
+        fi
+        
+        echo "Using model configuration:"
+        echo "- Model Name: $REACT_APP_AVAILABLE_MODELS"
+        echo "- Secondary Endpoint Model: $SECONDARY_ENDPOINT_MODEL"
         
         # Pass environment variables to the deployment script
         export REACT_APP_AVAILABLE_MODELS="${{ env.REACT_APP_AVAILABLE_MODELS }}"
@@ -315,7 +344,7 @@ jobs:
           SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.url)')
           echo "url=${SERVICE_URL}" >> $GITHUB_OUTPUT
           
-          echo "Deployed with extended startup probe timeout (240 seconds)"
+          echo "Deployed with extended startup probe timeout (1800 seconds)"
         else
           echo "❌ Deployment failed!"
           
