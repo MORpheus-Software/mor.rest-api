@@ -24,13 +24,16 @@ spec:
         - name: REDIS_URL
           value: rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
         - name: REACT_APP_AVAILABLE_MODELS
-          value: mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B
+          value: mistralai/mistral-small-3.1-24b-instruct:free|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero:free|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct:free|Llama 3.3 70B
         - name: SECONDARY_ENDPOINT_URL
           value: https://openrouter.ai/api/v1/chat/completions
-        - name: SECONDARY_ENDPOINT_TOKEN_KEY
-          value: openai-api-key
+        - name: SECONDARY_ENDPOINT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: openai-api-key
+              key: latest
         - name: SECONDARY_ENDPOINT_MODEL
-          value: meta-llama/llama-3.3-70b-instruct
+          value: meta-llama/llama-3.3-70b-instruct:free
         - name: CONSUMER_API_URL
           value: https://consumer-node-1081887913409.us-west1.run.app
         - name: USE_FALLBACK_AS_PRIMARY

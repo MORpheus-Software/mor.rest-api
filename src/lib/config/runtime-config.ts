@@ -12,6 +12,7 @@
 
 interface RuntimeConfig {
   REACT_APP_AVAILABLE_MODELS?: string;
+  REACT_APP_DEFAULT_MODEL_NAME?: string;
 }
 
 declare global {
@@ -30,11 +31,11 @@ const getRuntimeConfig = (): Partial<RuntimeConfig> | undefined => {
 
 // Get the model name with the appropriate fallback logic
 export const getModelName = (): string => {
-  const availableModels = getAvailableModels();
-  if (availableModels.length > 0) {
-    return availableModels[0].name;
-  }
-  return 'Auto';
+  console.log('[RUNTIME_CONFIG] Getting model name from window.RUNTIME_CONFIG:', window.RUNTIME_CONFIG?.REACT_APP_DEFAULT_MODEL_NAME);
+  console.log('[RUNTIME_CONFIG] Getting model name from process.env:', process.env.REACT_APP_DEFAULT_MODEL_NAME);
+  const modelName = window.RUNTIME_CONFIG?.REACT_APP_DEFAULT_MODEL_NAME || process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Auto';
+  // Strip all quotes from the model name (both single and double quotes)
+  return modelName.replace(/['"]/g, '');
 };
 
 // Get the model ID with the appropriate fallback logic
@@ -79,6 +80,7 @@ export const getAvailableModels = (): Array<{ id: string; name: string }> => {
   try {
     return modelsString.split(',').map(modelStr => {
       const [id, name] = modelStr.split('|');
+      // Keep the original model ID including :free suffix
       return { id, name };
     });
   } catch (error) {

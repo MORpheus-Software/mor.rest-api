@@ -310,14 +310,19 @@ async function fallbackToSecondaryEndpoint(requestBody: any, isStreaming: boolea
   console.log(chalk.blue(`[API] Using secondary endpoint: ${SECONDARY_ENDPOINT_URL}`));
   console.log(chalk.blue(`[API] Original request body:`, JSON.stringify(requestBody, null, 2)));
   
+  // Get the model ID and clean it by removing any quotes
+  const modelId = requestBody.model || SECONDARY_ENDPOINT_MODEL;
+  const cleanModelId = modelId.replace(/['"]/g, '');
+  
   // Create a copy of the request body and modify for OpenRouter
   const openRouterBody = {
     ...requestBody,
-    // Use the model from the request body, or fall back to the configured model
-    model: requestBody.model || SECONDARY_ENDPOINT_MODEL
+    // Use the cleaned model ID
+    model: cleanModelId
   };
   
   console.log(chalk.blue(`[API] Modified request body for OpenRouter:`, JSON.stringify(openRouterBody, null, 2)));
+  console.log(chalk.blue(`[API] Using model ID: ${cleanModelId}`));
   
   // Create headers for OpenRouter API
   const headers: Record<string, string> = {
