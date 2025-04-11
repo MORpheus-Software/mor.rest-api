@@ -23,5 +23,10 @@ SIMPLIFIED_MODELS=$(echo "$SIMPLIFIED_MODELS" |
   sed 's/[0-9]\+B//g' |          # Remove any remaining size indicators like 24B
   sed 's/-[0-9]\+-/-/g')         # Replace patterns like -24- with just -
 
+# Replace comma separators with semicolons and pipe characters with colons
+SIMPLIFIED_MODELS=$(echo "$SIMPLIFIED_MODELS" | 
+  sed 's/,/;/g' |                # Replace commas with semicolons
+  sed 's/|/:/g')                 # Replace pipes with colons
+
 # Output the simplified value
 echo "$SIMPLIFIED_MODELS" 
