@@ -160,14 +160,19 @@ jobs:
         BUILD_ID="$(date +%s)-$(git rev-parse --short HEAD)"
         echo "Using BUILD_ID: $BUILD_ID for cache control"
         
+        # Sanitize model names to prevent shell script errors
+        chmod +x ./scripts/simplify-model-names.sh
+        SIMPLIFIED_MODELS=$(./scripts/simplify-model-names.sh "${{ env.REACT_APP_AVAILABLE_MODELS }}")
+        echo "Simplified model names for Docker build: $SIMPLIFIED_MODELS"
+        
         # Build and push the Docker image with BUILD_ID and environment variables
         # Using env.REACT_APP variables ensures they come from GitHub variables
         docker build \
           --build-arg BUILD_ID="$BUILD_ID" \
-          --build-arg REACT_APP_AVAILABLE_MODELS="${{ env.REACT_APP_AVAILABLE_MODELS }}" \
+          --build-arg REACT_APP_AVAILABLE_MODELS="$SIMPLIFIED_MODELS" \
           --build-arg VITE_API_BASE_URL="${{ secrets.VITE_API_BASE_URL }}" \
           --build-arg SECONDARY_ENDPOINT_URL="${{ env.SECONDARY_ENDPOINT_URL }}" \
-          --build-arg SECONDARY_ENDPOINT_MODEL="${{ env.SECONDARY_ENDPOINT_MODEL }}" \
+          --build-arg SECONDARY_ENDPOINT_MODEL="$(./scripts/simplify-model-names.sh "${{ env.SECONDARY_ENDPOINT_MODEL }}")" \
           --build-arg USE_FALLBACK_AS_PRIMARY="${{ env.USE_FALLBACK_AS_PRIMARY }}" \
           --build-arg CONSUMER_API_URL="${{ env.CONSUMER_API_URL }}" \
           -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
@@ -307,40 +312,37 @@ jobs:
         # Make the model simplification script executable
         chmod +x ./scripts/simplify-model-names.sh
         
+        # Create a function to completely sanitize version numbers from input strings
+        function sanitize_all_version_numbers() {
+          local input="$1"
+          # Remove all numbers with decimal points completely
+          echo "$input" | sed 's/[0-9]\+\.[0-9]\+//g' | sed 's/[0-9]\+B//g'
+        }
+        
         # Deploy using the YAML configuration for extended startup timeout
         echo "Starting deployment with extended startup timeout (1800s)..."
         
         # Check the model names for potential shell script issues and simplify if needed
         export ORIGINAL_MODELS="${{ env.REACT_APP_AVAILABLE_MODELS }}"
-        if [[ "$ORIGINAL_MODELS" =~ [0-9]\.[0-9] ]]; then
-          echo "Warning: Model names contain version numbers that could cause shell errors"
-          export REACT_APP_AVAILABLE_MODELS=$(./scripts/simplify-model-names.sh "$ORIGINAL_MODELS")
-          echo "Models simplified to avoid shell errors"
-          # Update the YAML with simplified model names
-          ESCAPED_MODELS=$(./scripts/escape-sed-value.sh "$REACT_APP_AVAILABLE_MODELS")
-          sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|\"${ESCAPED_MODELS}\"|g" cloud-run-deploy-config.yaml
-        else
-          export REACT_APP_AVAILABLE_MODELS="$ORIGINAL_MODELS"
-          # Still update the YAML even when no simplification needed
-          ESCAPED_MODELS=$(./scripts/escape-sed-value.sh "$REACT_APP_AVAILABLE_MODELS")
-          sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|\"${ESCAPED_MODELS}\"|g" cloud-run-deploy-config.yaml
-        fi
+        # Always simplify model names for safety, regardless of content
+        export REACT_APP_AVAILABLE_MODELS=$(./scripts/simplify-model-names.sh "$ORIGINAL_MODELS")
+        # Additional sanitization to ensure all version numbers are removed
+        export REACT_APP_AVAILABLE_MODELS=$(sanitize_all_version_numbers "$REACT_APP_AVAILABLE_MODELS")
+        echo "Models simplified to avoid shell errors"
+        # Update the YAML with simplified model names
+        ESCAPED_MODELS=$(./scripts/escape-sed-value.sh "$REACT_APP_AVAILABLE_MODELS")
+        sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|\"${ESCAPED_MODELS}\"|g" cloud-run-deploy-config.yaml
         
         # Do the same for the secondary endpoint model
         export ORIGINAL_ENDPOINT_MODEL="${{ env.SECONDARY_ENDPOINT_MODEL }}"
-        if [[ "$ORIGINAL_ENDPOINT_MODEL" =~ [0-9]\.[0-9] ]]; then
-          echo "Warning: Secondary endpoint model contains version numbers that could cause shell errors"
-          export SECONDARY_ENDPOINT_MODEL=$(./scripts/simplify-model-names.sh "$ORIGINAL_ENDPOINT_MODEL")
-          echo "Secondary endpoint model simplified to avoid shell errors"
-          # Update the YAML with simplified model name
-          ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "$SECONDARY_ENDPOINT_MODEL")
-          sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|\"${ESCAPED_ENDPOINT_MODEL}\"|g" cloud-run-deploy-config.yaml
-        else
-          export SECONDARY_ENDPOINT_MODEL="$ORIGINAL_ENDPOINT_MODEL"
-          # Still update the YAML even when no simplification needed
-          ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "$SECONDARY_ENDPOINT_MODEL")
-          sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|\"${ESCAPED_ENDPOINT_MODEL}\"|g" cloud-run-deploy-config.yaml
-        fi
+        # Always simplify model names for safety, regardless of content
+        export SECONDARY_ENDPOINT_MODEL=$(./scripts/simplify-model-names.sh "$ORIGINAL_ENDPOINT_MODEL")
+        # Additional sanitization to ensure all version numbers are removed
+        export SECONDARY_ENDPOINT_MODEL=$(sanitize_all_version_numbers "$SECONDARY_ENDPOINT_MODEL")
+        echo "Secondary endpoint model simplified to avoid shell errors"
+        # Update the YAML with simplified model name
+        ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "$SECONDARY_ENDPOINT_MODEL")
+        sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|\"${ESCAPED_ENDPOINT_MODEL}\"|g" cloud-run-deploy-config.yaml
         
         echo "Using model configuration:"
         echo "- Model Name: $REACT_APP_AVAILABLE_MODELS"
