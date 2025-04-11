@@ -252,8 +252,8 @@ jobs:
         sed -i "s|SECONDARY_ENDPOINT_URL_VALUE|${ESCAPED_ENDPOINT_URL}|g" cloud-run-deploy-config.yaml
         
         # Ensure SECONDARY_ENDPOINT_TOKEN_KEY only contains valid characters
-        # Use a sanitized key name like 'openrouter-api-key' instead of any custom value
-        sed -i "s|SECONDARY_ENDPOINT_TOKEN_KEY|openrouter-api-key|g" cloud-run-deploy-config.yaml
+        # Use a sanitized key name like 'openai-api-key' instead of any custom value
+        sed -i "s|SECONDARY_ENDPOINT_TOKEN_KEY|openai-api-key|g" cloud-run-deploy-config.yaml
         
         ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "${{ env.SECONDARY_ENDPOINT_MODEL }}")
         # Add quotes around the model name to prevent shell script errors with version numbers

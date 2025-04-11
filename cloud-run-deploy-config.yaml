@@ -1,8 +1,8 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: morsaas-dev
-  namespace: graphical-bus-433219-g5
+  name: morsaas-test
+  namespace: "101868473812"
   labels:
     environment: test
 spec:
@@ -13,39 +13,33 @@ spec:
         autoscaling.knative.dev/maxScale: '10'
         run.googleapis.com/client-name: github-actions
         run.googleapis.com/client-version: GITHUB_SHA
-        run.googleapis.com/startup-probe-timeout: '1800s'
-        run.googleapis.com/startup-probe-period-seconds: '30'
-        run.googleapis.com/startup-probe-failure-threshold: '60'
-        run.googleapis.com/execution-environment: 'gen2'
-        run.googleapis.com/cpu-throttling: 'false'
     spec:
-      timeoutSeconds: 3600
       containerConcurrency: 80
       containers:
-      - image: gcr.io/graphical-bus-433219-g5/morsaas-dev@sha256:bb6c065c6a6387fa17e2a87a9771fd6e7def6e8e40030b70d64b51fc01e7d7f0
+      - image: gcr.io/test-project-id/morsaas-test:abc123
         env:
         - name: NODE_ENV
           value: production
         - name: REDIS_URL
-          value: rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379
+          value: rediss://fake-redis-url-for-testing
         - name: REACT_APP_AVAILABLE_MODELS
-          value: "mistral-small|Mistral Small,deepseek-zero|Deepseek Zero,llama-70b|Llama 70B"
+          value: model1,model2
         - name: SECONDARY_ENDPOINT_URL
-          value: https://openrouter.ai/api/v1/chat/completions
+          value: https://test-endpoint.com
         - name: SECONDARY_ENDPOINT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: openai-api-key
-              key: latest
+              name: morsaas-test
+              key: openrouter-api-key
         - name: SECONDARY_ENDPOINT_MODEL
-          value: "llama-70b"
+          value: test-model
         - name: CONSUMER_API_URL
-          value: https://consumer-node-1081887913409.us-west1.run.app
+          value: https://test-consumer.com
         - name: USE_FALLBACK_AS_PRIMARY
           value: "false"
         - name: OPENROUTER_HTTP_REFERER
-          value: https://morsaas-dev.run.app
+          value: https://test.morsaas.com
         - name: OPENROUTER_APP_TITLE
-          value: MorSaaS-Dev
+          value: MorSaaS-Test
         - name: OPENROUTER_APP_VERSION
-          value: 1.0.0-dev
+          value: 1.0.0-test

@@ -13,13 +13,7 @@ spec:
         autoscaling.knative.dev/maxScale: '10'
         run.googleapis.com/client-name: github-actions
         run.googleapis.com/client-version: GITHUB_SHA
-        run.googleapis.com/startup-probe-timeout: '1800s'
-        run.googleapis.com/startup-probe-period-seconds: '30'
-        run.googleapis.com/startup-probe-failure-threshold: '60'
-        run.googleapis.com/execution-environment: 'gen2'
-        run.googleapis.com/cpu-throttling: 'false'
     spec:
-      timeoutSeconds: 3600
       containerConcurrency: 80
       containers:
       - image: gcr.io/PROJECT_ID/morsaas:COMMIT_SHA
@@ -29,16 +23,16 @@ spec:
         - name: REDIS_URL
           value: YOUR_REDIS_URL
         - name: REACT_APP_AVAILABLE_MODELS
-          value: "REACT_APP_AVAILABLE_MODELS_VALUE"
+          value: REACT_APP_AVAILABLE_MODELS_VALUE
         - name: SECONDARY_ENDPOINT_URL
           value: SECONDARY_ENDPOINT_URL_VALUE
         - name: SECONDARY_ENDPOINT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: SECRETS_NAME
-              key: openrouter-api-key
+              name: openai-api-key
+              key: latest
         - name: SECONDARY_ENDPOINT_MODEL
-          value: "SECONDARY_ENDPOINT_MODEL_VALUE"
+          value: SECONDARY_ENDPOINT_MODEL_VALUE
         - name: CONSUMER_API_URL
           value: CONSUMER_API_URL_VALUE
         - name: USE_FALLBACK_AS_PRIMARY

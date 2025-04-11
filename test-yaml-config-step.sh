@@ -37,7 +37,13 @@ spec:
         autoscaling.knative.dev/maxScale: '10'
         run.googleapis.com/client-name: github-actions
         run.googleapis.com/client-version: GITHUB_SHA
+        run.googleapis.com/startup-probe-timeout: '1800s'
+        run.googleapis.com/startup-probe-period-seconds: '30'
+        run.googleapis.com/startup-probe-failure-threshold: '60'
+        run.googleapis.com/execution-environment: 'gen2'
+        run.googleapis.com/cpu-throttling: 'false'
     spec:
+      timeoutSeconds: 3600
       containerConcurrency: 80
       containers:
       - image: gcr.io/PROJECT_ID/morsaas:COMMIT_SHA
@@ -53,8 +59,8 @@ spec:
         - name: SECONDARY_ENDPOINT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: SECRETS_NAME
-              key: openrouter-api-key
+              name: openai-api-key
+              key: latest
         - name: SECONDARY_ENDPOINT_MODEL
           value: SECONDARY_ENDPOINT_MODEL_VALUE
         - name: CONSUMER_API_URL
