@@ -168,13 +168,13 @@ jobs:
         # If we're still getting deployment failures, use an ultra-simple format known to work
         if [[ "${{ github.run_number }}" -gt "38" ]]; then
           echo "Using ultra-simple model format for Docker build"
-          SIMPLIFIED_MODELS="mistral-small"
-          SIMPLIFIED_SECONDARY_MODEL=""
+          SIMPLIFIED_MODELS="mistral_small--Mistral_Small__deepseek_zero--Deepseek_Zero__llama_model--Llama_Model"
+          SIMPLIFIED_SECONDARY_MODEL="mistral_small"
           
           # Alternatively, try JSON format for models
           if [[ "${{ github.run_number }}" -gt "39" ]]; then
             echo "Trying JSON format for models in Docker build"
-            SIMPLIFIED_MODELS='[{"id":"mistral-small","name":"Mistral Small"}]'
+            SIMPLIFIED_MODELS='[{"id":"mistral_small","name":"Mistral_Small"}]'
           fi
         fi
         
@@ -331,8 +331,8 @@ jobs:
         # Create a function to completely sanitize version numbers from input strings
         function sanitize_all_version_numbers() {
           local input="$1"
-          # Remove all numbers with decimal points completely
-          echo "$input" | sed 's/[0-9]\+\.[0-9]\+//g' | sed 's/[0-9]\+B//g' | sed 's/,/;/g' | sed 's/|/:/g'
+          # Remove all numbers with decimal points and special characters
+          echo "$input" | sed 's/[0-9]\+\.[0-9]\+//g' | sed 's/[0-9]\+B//g' | sed 's/ /_/g' | sed 's/,/__/g' | sed 's/|/--/g' | sed 's/[:;]/_/g'
         }
         
         # Deploy using the YAML configuration for extended startup timeout
@@ -348,20 +348,22 @@ jobs:
         # If we're still getting deployment failures, use an ultra-simple format known to work
         if [[ "${{ github.run_number }}" -gt "38" ]]; then
           echo "Using ultra-simple model format for deployment"
-          export REACT_APP_AVAILABLE_MODELS="mistral-small"
+          export REACT_APP_AVAILABLE_MODELS="mistral_small--Mistral_Small__deepseek_zero--Deepseek_Zero__llama_model--Llama_Model"
           
           # Alternatively, try JSON format for models
           if [[ "${{ github.run_number }}" -gt "39" ]]; then
             echo "Trying JSON format for models in deployment"
-            export REACT_APP_AVAILABLE_MODELS='[{"id":"mistral-small","name":"Mistral Small"}]'
+            export REACT_APP_AVAILABLE_MODELS='[{"id":"mistral_small","name":"Mistral_Small"}]'
           fi
         fi
         
         echo "Models simplified to avoid shell errors"
         echo "Simplified model format: $REACT_APP_AVAILABLE_MODELS"
-        # Update the YAML with simplified model names
+        # Update the YAML with simplified model names - single quotes are important
         ESCAPED_MODELS=$(./scripts/escape-sed-value.sh "$REACT_APP_AVAILABLE_MODELS")
-        sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|\"${ESCAPED_MODELS}\"|g" cloud-run-deploy-config.yaml
+        # Ensure no quotes in the value itself to prevent nesting issues
+        ESCAPED_MODELS=$(echo "$ESCAPED_MODELS" | sed "s/'//g")
+        sed -i "s|'REACT_APP_AVAILABLE_MODELS_VALUE'|'${ESCAPED_MODELS}'|g" cloud-run-deploy-config.yaml
         
         # Do the same for the secondary endpoint model
         export ORIGINAL_ENDPOINT_MODEL="${{ env.SECONDARY_ENDPOINT_MODEL }}"
@@ -370,9 +372,11 @@ jobs:
         # Additional sanitization to ensure all version numbers are removed
         export SECONDARY_ENDPOINT_MODEL=$(sanitize_all_version_numbers "$SECONDARY_ENDPOINT_MODEL")
         echo "Secondary endpoint model simplified to avoid shell errors"
-        # Update the YAML with simplified model name
+        # Update the YAML with simplified model name - single quotes are important
         ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "$SECONDARY_ENDPOINT_MODEL")
-        sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|\"${ESCAPED_ENDPOINT_MODEL}\"|g" cloud-run-deploy-config.yaml
+        # Ensure no quotes in the value itself to prevent nesting issues
+        ESCAPED_ENDPOINT_MODEL=$(echo "$ESCAPED_ENDPOINT_MODEL" | sed "s/'//g")
+        sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|'${ESCAPED_ENDPOINT_MODEL}'|g" cloud-run-deploy-config.yaml
         
         echo "Using model configuration:"
         echo "- Model Name: $REACT_APP_AVAILABLE_MODELS"

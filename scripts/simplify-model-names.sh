@@ -13,9 +13,9 @@ SIMPLIFIED_MODELS=$(echo "$MODEL_STRING" |
 
 # Remove ALL version numbers and sizes from the display names (after the |)
 SIMPLIFIED_MODELS=$(echo "$SIMPLIFIED_MODELS" | 
-  sed 's/|Mistral Small [0-9.]* [0-9]*B/|Mistral Small/g' | 
-  sed 's/|Deepseek R[0-9] Zero/|Deepseek Zero/g' | 
-  sed 's/|Llama [0-9.]* [0-9]*B/|Llama Model/g')
+  sed 's/|Mistral Small [0-9.]* [0-9]*B/|Mistral_Small/g' | 
+  sed 's/|Deepseek R[0-9] Zero/|Deepseek_Zero/g' | 
+  sed 's/|Llama [0-9.]* [0-9]*B/|Llama_Model/g')
 
 # Additional cleanup to catch any remaining version numbers anywhere in the string
 SIMPLIFIED_MODELS=$(echo "$SIMPLIFIED_MODELS" | 
@@ -23,10 +23,14 @@ SIMPLIFIED_MODELS=$(echo "$SIMPLIFIED_MODELS" |
   sed 's/[0-9]\+B//g' |          # Remove any remaining size indicators like 24B
   sed 's/-[0-9]\+-/-/g')         # Replace patterns like -24- with just -
 
-# Replace comma separators with semicolons and pipe characters with colons
+# Replace all spaces with underscores to prevent shell parsing issues
+SIMPLIFIED_MODELS=$(echo "$SIMPLIFIED_MODELS" | sed 's/ /_/g')
+
+# Replace all other special characters that might cause shell parsing issues
 SIMPLIFIED_MODELS=$(echo "$SIMPLIFIED_MODELS" | 
-  sed 's/,/;/g' |                # Replace commas with semicolons
-  sed 's/|/:/g')                 # Replace pipes with colons
+  sed 's/,/__/g' |               # Replace commas with double underscores
+  sed 's/|/--/g' |               # Replace pipes with double hyphens
+  sed 's/[:;]/_/g')              # Replace colons and semicolons with underscores
 
 # Output the simplified value
 echo "$SIMPLIFIED_MODELS" 

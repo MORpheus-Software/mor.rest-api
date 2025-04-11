@@ -23,7 +23,7 @@ spec:
         - name: REDIS_URL
           value: YOUR_REDIS_URL
         - name: REACT_APP_AVAILABLE_MODELS
-          value: REACT_APP_AVAILABLE_MODELS_VALUE
+          value: 'REACT_APP_AVAILABLE_MODELS_VALUE'
         - name: SECONDARY_ENDPOINT_URL
           value: SECONDARY_ENDPOINT_URL_VALUE
         - name: SECONDARY_ENDPOINT_TOKEN
@@ -32,7 +32,7 @@ spec:
               name: openai-api-key
               key: latest
         - name: SECONDARY_ENDPOINT_MODEL
-          value: SECONDARY_ENDPOINT_MODEL_VALUE
+          value: 'SECONDARY_ENDPOINT_MODEL_VALUE'
         - name: CONSUMER_API_URL
           value: CONSUMER_API_URL_VALUE
         - name: USE_FALLBACK_AS_PRIMARY
