@@ -1,10 +1,10 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: morsaas-test
-  namespace: "101868473812"
+  name: morsaas
+  namespace: default
   labels:
-    environment: test
+    environment: ENVIRONMENT_NAME
 spec:
   template:
     metadata:
@@ -16,30 +16,30 @@ spec:
     spec:
       containerConcurrency: 80
       containers:
-      - image: gcr.io/test-project-id/morsaas-test:abc123
+      - image: gcr.io/graphical-bus-433219-g5/morsaas:latest
         env:
         - name: NODE_ENV
           value: production
         - name: REDIS_URL
-          value: rediss://fake-redis-url-for-testing
+          value: YOUR_REDIS_URL
         - name: REACT_APP_AVAILABLE_MODELS
-          value: model1,model2
+          value: REACT_APP_AVAILABLE_MODELS_VALUE
         - name: SECONDARY_ENDPOINT_URL
-          value: https://test-endpoint.com
+          value: SECONDARY_ENDPOINT_URL_VALUE
         - name: SECONDARY_ENDPOINT_TOKEN
           valueFrom:
             secretKeyRef:
-              name: morsaas-test
-              key: openrouter-api-key
+              name: openai-api-key
+              key: latest
         - name: SECONDARY_ENDPOINT_MODEL
-          value: test-model
+          value: SECONDARY_ENDPOINT_MODEL_VALUE
         - name: CONSUMER_API_URL
-          value: https://test-consumer.com
+          value: CONSUMER_API_URL_VALUE
         - name: USE_FALLBACK_AS_PRIMARY
-          value: "false"
+          value: "USE_FALLBACK_AS_PRIMARY_VALUE"
         - name: OPENROUTER_HTTP_REFERER
-          value: https://test.morsaas.com
+          value: OPENROUTER_HTTP_REFERER_VALUE
         - name: OPENROUTER_APP_TITLE
-          value: MorSaaS-Test
+          value: OPENROUTER_APP_TITLE_VALUE
         - name: OPENROUTER_APP_VERSION
-          value: 1.0.0-test
+          value: OPENROUTER_APP_VERSION_VALUE

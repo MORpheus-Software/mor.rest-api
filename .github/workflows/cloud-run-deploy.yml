@@ -243,9 +243,9 @@ jobs:
         # These values come from the env variables set at the beginning of the workflow
         
         # For values with special characters, use the escape script
-        ESCAPED_MODELS=$(./scripts/escape-sed-value.sh "${{ env.REACT_APP_AVAILABLE_MODELS }}")
-        # Add quotes around the model names to prevent shell script errors with version numbers
-        sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|${ESCAPED_MODELS}|g" cloud-run-deploy-config.yaml
+        # Model names will be simplified and inserted later in the deployment step
+        # ESCAPED_MODELS=$(./scripts/escape-sed-value.sh "${{ env.REACT_APP_AVAILABLE_MODELS }}")
+        # sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|${ESCAPED_MODELS}|g" cloud-run-deploy-config.yaml
         
         # Process other environment variables
         ESCAPED_ENDPOINT_URL=$(./scripts/escape-sed-value.sh "${{ env.SECONDARY_ENDPOINT_URL }}")
@@ -255,9 +255,10 @@ jobs:
         # Use a sanitized key name like 'openai-api-key' instead of any custom value
         sed -i "s|SECONDARY_ENDPOINT_TOKEN_KEY|openai-api-key|g" cloud-run-deploy-config.yaml
         
-        ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "${{ env.SECONDARY_ENDPOINT_MODEL }}")
+        # Secondary endpoint model will be simplified and inserted later in the deployment step
+        # ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "${{ env.SECONDARY_ENDPOINT_MODEL }}")
         # Add quotes around the model name to prevent shell script errors with version numbers
-        sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|${ESCAPED_ENDPOINT_MODEL}|g" cloud-run-deploy-config.yaml
+        # sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|${ESCAPED_ENDPOINT_MODEL}|g" cloud-run-deploy-config.yaml
         
         ESCAPED_CONSUMER_API_URL=$(./scripts/escape-sed-value.sh "${{ env.CONSUMER_API_URL }}")
         sed -i "s|CONSUMER_API_URL_VALUE|${ESCAPED_CONSUMER_API_URL}|g" cloud-run-deploy-config.yaml
@@ -315,8 +316,14 @@ jobs:
           echo "Warning: Model names contain version numbers that could cause shell errors"
           export REACT_APP_AVAILABLE_MODELS=$(./scripts/simplify-model-names.sh "$ORIGINAL_MODELS")
           echo "Models simplified to avoid shell errors"
+          # Update the YAML with simplified model names
+          ESCAPED_MODELS=$(./scripts/escape-sed-value.sh "$REACT_APP_AVAILABLE_MODELS")
+          sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|\"${ESCAPED_MODELS}\"|g" cloud-run-deploy-config.yaml
         else
           export REACT_APP_AVAILABLE_MODELS="$ORIGINAL_MODELS"
+          # Still update the YAML even when no simplification needed
+          ESCAPED_MODELS=$(./scripts/escape-sed-value.sh "$REACT_APP_AVAILABLE_MODELS")
+          sed -i "s|REACT_APP_AVAILABLE_MODELS_VALUE|\"${ESCAPED_MODELS}\"|g" cloud-run-deploy-config.yaml
         fi
         
         # Do the same for the secondary endpoint model
@@ -325,8 +332,14 @@ jobs:
           echo "Warning: Secondary endpoint model contains version numbers that could cause shell errors"
           export SECONDARY_ENDPOINT_MODEL=$(./scripts/simplify-model-names.sh "$ORIGINAL_ENDPOINT_MODEL")
           echo "Secondary endpoint model simplified to avoid shell errors"
+          # Update the YAML with simplified model name
+          ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "$SECONDARY_ENDPOINT_MODEL")
+          sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|\"${ESCAPED_ENDPOINT_MODEL}\"|g" cloud-run-deploy-config.yaml
         else
           export SECONDARY_ENDPOINT_MODEL="$ORIGINAL_ENDPOINT_MODEL"
+          # Still update the YAML even when no simplification needed
+          ESCAPED_ENDPOINT_MODEL=$(./scripts/escape-sed-value.sh "$SECONDARY_ENDPOINT_MODEL")
+          sed -i "s|SECONDARY_ENDPOINT_MODEL_VALUE|\"${ESCAPED_ENDPOINT_MODEL}\"|g" cloud-run-deploy-config.yaml
         fi
         
         echo "Using model configuration:"
