@@ -13,6 +13,7 @@
 interface RuntimeConfig {
   REACT_APP_AVAILABLE_MODELS?: string;
   REACT_APP_DEFAULT_MODEL_NAME?: string;
+  REACT_APP_DEFAULT_MODEL_ID?: string;
 }
 
 declare global {
@@ -31,20 +32,19 @@ const getRuntimeConfig = (): Partial<RuntimeConfig> | undefined => {
 
 // Get the model name with the appropriate fallback logic
 export const getModelName = (): string => {
-  console.log('[RUNTIME_CONFIG] Getting model name from window.RUNTIME_CONFIG:', window.RUNTIME_CONFIG?.REACT_APP_DEFAULT_MODEL_NAME);
-  console.log('[RUNTIME_CONFIG] Getting model name from process.env:', process.env.REACT_APP_DEFAULT_MODEL_NAME);
-  const modelName = window.RUNTIME_CONFIG?.REACT_APP_DEFAULT_MODEL_NAME || process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Auto';
+  const modelName = window.RUNTIME_CONFIG?.REACT_APP_DEFAULT_MODEL_NAME || 
+                   process.env.REACT_APP_DEFAULT_MODEL_NAME || 
+                   'Mistral Small 3.1 24B';
   // Strip all quotes from the model name (both single and double quotes)
   return modelName.replace(/['"]/g, '');
 };
 
 // Get the model ID with the appropriate fallback logic
 export const getModelId = (): string => {
-  const availableModels = getAvailableModels();
-  if (availableModels.length > 0) {
-    return availableModels[0].id;
-  }
-  return 'openrouter/auto';
+  // Use the environment variable with a fallback
+  return window.RUNTIME_CONFIG?.REACT_APP_DEFAULT_MODEL_ID || 
+         process.env.REACT_APP_DEFAULT_MODEL_ID || 
+         'meta-llama/llama-3.3-70b-instruct:free';
 };
 
 // Check if we're using runtime configuration
@@ -64,10 +64,11 @@ export const logConfigSource = (): void => {
 
 // Get the available models with the appropriate fallback logic
 export const getAvailableModels = (): Array<{ id: string; name: string }> => {
+  // Default models if environment variable is not available
   const defaultModels = [
     { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1 24B' },
     { id: 'deepseek/deepseek-r1-zero:free', name: 'Deepseek R1 Zero' },
-    { id: 'meta-llama/llama-3.2-3b-instruct:free', name: 'Llama 3.2 3B' }
+    { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B' }
   ];
 
   const modelsString = window.RUNTIME_CONFIG?.REACT_APP_AVAILABLE_MODELS || 
