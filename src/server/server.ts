@@ -294,17 +294,12 @@ app.get('*', (req, res) => {
       // Read the index.html file
       const htmlContent = fs.readFileSync(path.join(publicPath, 'index.html'), 'utf-8');
       
-      // Get the available models from environment
-      const availableModels = process.env.REACT_APP_AVAILABLE_MODELS || '';
-      
       // Create the runtime config script
       const runtimeConfigScript = `
         <script>
-          // Runtime model configuration from server environment
+          // Runtime model configuration - hardcoded values
           window.RUNTIME_CONFIG = {
-            REACT_APP_DEFAULT_MODEL_NAME: "${process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Llama-3.1-8B'}",
-            REACT_APP_DEFAULT_MODEL_ID: "${process.env.REACT_APP_DEFAULT_MODEL_ID || 'meta-llama/llama-3.3-70b-instruct'}",
-            REACT_APP_AVAILABLE_MODELS: "${availableModels.replace(/"/g, '\\"')}"
+            REACT_APP_AVAILABLE_MODELS: "mistralai/mistral-small-3.1-24b-instruct:free|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero:free|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct:free|Llama 3.3 70B"
           };
           console.log("[RUNTIME] Injected runtime model config:", window.RUNTIME_CONFIG);
         </script>

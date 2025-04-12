@@ -17,7 +17,6 @@ import {
   subscribeToApiKeyChanges
 } from '@/lib/api/apiKeyService';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { getModelId, getModelName, getAvailableModels, logConfigSource } from '@/lib/config/runtime-config';
 import { Helmet } from 'react-helmet';
 import axios from 'axios';
 
@@ -28,20 +27,17 @@ interface ApiKey {
   isActive: boolean;
 }
 
-// Get model configuration using the runtime-config helper
-const DEFAULT_MODEL_ID = getModelId();
-const DEFAULT_MODEL_NAME = getModelName();
-const availableModels = getAvailableModels();
-
-// Add the default model to the beginning of the list if it's not already included
+// Hardcoded models from .env REACT_APP_AVAILABLE_MODELS
 const models = [
-  { id: DEFAULT_MODEL_ID, name: DEFAULT_MODEL_NAME },
-  ...availableModels.filter(model => model.id !== DEFAULT_MODEL_ID)
+  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1 24B' },
+  { id: 'deepseek/deepseek-r1-zero:free', name: 'Deepseek R1 Zero' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B' }
 ];
+
+const DEFAULT_MODEL_ID = 'mistralai/mistral-small-3.1-24b-instruct:free';
 
 console.log('[API_PLAYGROUND] Initial model config:', {
   DEFAULT_MODEL_ID,
-  DEFAULT_MODEL_NAME,
   models
 });
 

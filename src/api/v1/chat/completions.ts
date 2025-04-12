@@ -11,7 +11,6 @@ dotenv.config();
 const NFA_PROXY_URL = API_BASE_URL;
 const SECONDARY_ENDPOINT_URL = process.env.SECONDARY_ENDPOINT_URL;
 const SECONDARY_ENDPOINT_TOKEN = process.env.SECONDARY_ENDPOINT_TOKEN;
-const SECONDARY_ENDPOINT_MODEL = process.env.SECONDARY_ENDPOINT_MODEL || 'openrouter/auto';
 const CONSUMER_API_URL = process.env.CONSUMER_API_URL;
 const USE_FALLBACK_AS_PRIMARY = process.env.USE_FALLBACK_AS_PRIMARY === 'true';
 
@@ -23,7 +22,6 @@ const OPENROUTER_APP_VERSION = process.env.OPENROUTER_APP_VERSION || '1.0.0';
 // Initialize these values at startup
 console.log(chalk.cyan(`[API] Primary endpoint URL: ${USE_FALLBACK_AS_PRIMARY ? SECONDARY_ENDPOINT_URL : NFA_PROXY_URL}`));
 console.log(chalk.cyan(`[API] Secondary endpoint URL: ${USE_FALLBACK_AS_PRIMARY ? NFA_PROXY_URL : SECONDARY_ENDPOINT_URL || 'Not configured'}`));
-console.log(chalk.cyan(`[API] Secondary endpoint model: ${SECONDARY_ENDPOINT_MODEL}`));
 console.log(chalk.cyan(`[API] Consumer API URL: ${CONSUMER_API_URL || 'Not configured'}`));
 console.log(chalk.cyan(`[API] Using fallback as primary: ${USE_FALLBACK_AS_PRIMARY ? 'YES' : 'NO'}`));
 
@@ -311,7 +309,7 @@ async function fallbackToSecondaryEndpoint(requestBody: any, isStreaming: boolea
   console.log(chalk.blue(`[API] Original request body:`, JSON.stringify(requestBody, null, 2)));
   
   // Get the model ID and clean it by removing any quotes
-  const modelId = requestBody.model || SECONDARY_ENDPOINT_MODEL;
+  const modelId = requestBody.model || 'meta-llama/llama-3.3-70b-instruct:free';
   const cleanModelId = modelId.replace(/['"]/g, '');
   
   // Create a copy of the request body and modify for OpenRouter
