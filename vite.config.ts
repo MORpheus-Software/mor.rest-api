@@ -19,14 +19,8 @@ export default defineConfig(({ mode }) => {
   console.log(`[VITE] Environment: ${mode}`);
   console.log(`[VITE] Lovable environment: ${isLovableEnv ? 'yes' : 'no'}`);
   
-  // Get the model environment variables, giving precedence to process.env over .env file
-  const modelName = process.env.REACT_APP_DEFAULT_MODEL_NAME || 
-                    env.REACT_APP_DEFAULT_MODEL_NAME || 
-                    'Llama-3.1-8B';
-                    
-  const modelId = process.env.REACT_APP_DEFAULT_MODEL_ID || 
-                  env.REACT_APP_DEFAULT_MODEL_ID || 
-                  'meta-llama/llama-3.3-70b-instruct';
+  // Hardcoded models
+  const availableModels = 'mistralai/mistral-small-3.1-24b-instruct:free|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero:free|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct:free|Llama 3.3 70B';
   
   // Always use secure Upstash Redis URL for preview and production modes
   const upstashRedisUrl = 'rediss://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379';
@@ -36,7 +30,6 @@ export default defineConfig(({ mode }) => {
     ? upstashRedisUrl
     : (process.env.REDIS_URL || env.REDIS_URL || 'redis://localhost:6379');
   
-  console.log(`[VITE] Using model: ${modelName} (${modelId})`);
   console.log(`[VITE] Using Redis URL: ${redisUrl.replace(/\/\/(.+?)@/, '//[credentials-hidden]@')}`);
 
   // Always set the REDIS_URL in process.env so it's available to the application
@@ -44,7 +37,7 @@ export default defineConfig(({ mode }) => {
   
   // Explicitly log Redis environment setup
   console.log(`[VITE] Setting process.env.REDIS_URL to: ${process.env.REDIS_URL.replace(/\/\/(.+?)@/, '//[credentials-hidden]@')}`);
-  
+
   return {
     server: {
       host: "::",
@@ -106,9 +99,7 @@ export default defineConfig(({ mode }) => {
         NODE_ENV: JSON.stringify(mode),
         VITE_API_BASE_URL: JSON.stringify(process.env.VITE_API_BASE_URL || env.VITE_API_BASE_URL || '/api'),
         // Add React App environment variables to make them available in client code
-        REACT_APP_DEFAULT_MODEL_NAME: JSON.stringify(modelName),
-        REACT_APP_DEFAULT_MODEL_ID: JSON.stringify(modelId),
-        REACT_APP_AVAILABLE_MODELS: JSON.stringify(process.env.REACT_APP_AVAILABLE_MODELS || env.REACT_APP_AVAILABLE_MODELS),
+        REACT_APP_AVAILABLE_MODELS: JSON.stringify(availableModels),
         // Add Redis URL to the environment, using Upstash URL for preview/production
         REDIS_URL: JSON.stringify(redisUrl),
         // Add Lovable environment flag

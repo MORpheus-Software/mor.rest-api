@@ -16,6 +16,7 @@ ARG SECONDARY_ENDPOINT_URL
 ARG SECONDARY_ENDPOINT_MODEL
 ARG USE_FALLBACK_AS_PRIMARY
 ARG CONSUMER_API_URL
+ARG REACT_APP_AVAILABLE_MODELS
 
 # Write environment variables to .env file
 RUN echo "REACT_APP_DEFAULT_MODEL_NAME=${REACT_APP_DEFAULT_MODEL_NAME:-Llama-3.1-8B}" >> .env
@@ -25,6 +26,8 @@ RUN echo "SECONDARY_ENDPOINT_URL=${SECONDARY_ENDPOINT_URL:-https://openrouter.ai
 RUN echo "SECONDARY_ENDPOINT_MODEL=${SECONDARY_ENDPOINT_MODEL:-openrouter/auto}" >> .env
 RUN echo "USE_FALLBACK_AS_PRIMARY=${USE_FALLBACK_AS_PRIMARY:-false}" >> .env
 RUN echo "CONSUMER_API_URL=${CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}" >> .env
+# Use printf to handle special characters in the model list
+RUN printf "REACT_APP_AVAILABLE_MODELS=%s\n" "${REACT_APP_AVAILABLE_MODELS:-mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B}" >> .env
 
 # Log environment variables for build
 RUN echo "Generated .env file:" && cat .env | sort
@@ -143,6 +146,10 @@ RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'if [ ! -z "$CONSUMER_API_URL" ]; then' >> /app/start.sh && \
     echo '  echo "CONSUMER_API_URL=$CONSUMER_API_URL" >> /app/.env.runtime' >> /app/start.sh && \
     echo '  echo "Using runtime consumer API URL: $CONSUMER_API_URL"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo 'if [ ! -z "$REACT_APP_AVAILABLE_MODELS" ]; then' >> /app/start.sh && \
+    echo '  echo "REACT_APP_AVAILABLE_MODELS=$REACT_APP_AVAILABLE_MODELS" >> /app/.env.runtime' >> /app/start.sh && \
+    echo '  echo "Using runtime available models: $REACT_APP_AVAILABLE_MODELS"' >> /app/start.sh && \
     echo 'fi' >> /app/start.sh && \
     echo 'if [ ! -z "$OPENROUTER_HTTP_REFERER" ]; then' >> /app/start.sh && \
     echo '  echo "OPENROUTER_HTTP_REFERER=$OPENROUTER_HTTP_REFERER" >> /app/.env.runtime' >> /app/start.sh && \

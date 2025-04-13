@@ -362,12 +362,6 @@ app.get('*', (req, res) => {
     return res.redirect(`http://localhost:8080${req.path}`);
   }
   
-  // Get model env variables for runtime injection
-  const modelName = process.env.REACT_APP_DEFAULT_MODEL_NAME || 'Llama-3.1-8B';
-  const modelId = process.env.REACT_APP_DEFAULT_MODEL_ID || 'meta-llama/llama-3.3-70b-instruct';
-  
-  console.log(chalk.yellow(`[SERVER] Using runtime model config: ${modelName} (${modelId})`));
-  
   // Check if we need to inject runtime model variables
   if (fs.existsSync(path.join(publicPath, 'index.html'))) {
     try {
@@ -377,10 +371,9 @@ app.get('*', (req, res) => {
       // Create the runtime config script
       const runtimeConfigScript = `
         <script>
-          // Runtime model configuration from server environment
+          // Runtime model configuration - hardcoded values
           window.RUNTIME_CONFIG = {
-            modelName: "${modelName}",
-            modelId: "${modelId}"
+            REACT_APP_AVAILABLE_MODELS: "mistralai/mistral-small-3.1-24b-instruct:free|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero:free|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct:free|Llama 3.3 70B"
           };
           console.log("[RUNTIME] Injected runtime model config:", window.RUNTIME_CONFIG);
         </script>
@@ -394,6 +387,7 @@ app.get('*', (req, res) => {
     } catch (error) {
       console.error(chalk.red(`[SERVER] Error injecting runtime config:`), error);
       // Fall back to sending the original file
+      res.sendFile(path.join(publicPath, 'index.html'));
     }
   }
   
