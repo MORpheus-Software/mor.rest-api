@@ -11,7 +11,7 @@
     "dev": "REDIS_URL=redis://localhost:6379 concurrently \"npm run server:dev\" \"vite\"",
     "dev:frontend": "vite",
     "build:dev": "vite build --mode development",
-    "build": "tsc && npx tsc-alias && vite build",
+    "build": "tsc -p tsconfig.build.json && npx tsc-alias -p tsconfig.build.json && vite build",
     "build:prod": "node scripts/apply-fixes-for-production.js && tsc && npx tsc-alias && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",

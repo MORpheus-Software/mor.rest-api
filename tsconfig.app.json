@@ -24,7 +24,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    
+    /* Output directory for compiled files */
+    "outDir": "dist"
   },
   "include": ["src"]
 }
