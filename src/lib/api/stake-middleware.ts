@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { getRedisClient } from '../../server/setupRedis';
-import { StakeStatus } from '../../staking/StakeStatusTracker';
+import { getRedisClient } from '../../server/setupRedis.js';
+import { StakeStatus } from '../../staking/StakeStatusTracker.js';
 import { AuthenticatedRequest } from './auth-middleware';
 import chalk from 'chalk';
 

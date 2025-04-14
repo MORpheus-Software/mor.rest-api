@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import chalk from 'chalk';
-import { initializeStakeStatusTracking } from '../staking/initStakeStatus';
-import { getRedisClient } from './setupRedis';
+import { initializeStakeStatusTracking } from '../staking/initStakeStatus.js';
+import { getRedisClient } from './setupRedis.js';
 import dotenv from 'dotenv';
 
 // Load environment variables

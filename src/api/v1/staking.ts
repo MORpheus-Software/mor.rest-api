@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { getRedisClient } from '../../server/setupRedis';
-import { StakeStatus } from '../../staking/StakeStatusTracker';
+import { getRedisClient } from '../../server/setupRedis.js';
+import { StakeStatus } from '../../staking/StakeStatusTracker.js';
 import chalk from 'chalk';
 
 // Redis key prefix for stake status

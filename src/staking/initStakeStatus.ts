@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import { Redis } from 'ioredis';
-import { BuildersClient } from './BuildersClient';
-import { StakeStatusTracker } from './StakeStatusTracker';
+import { BuildersClient } from './BuildersClient.js';
+import { StakeStatusTracker } from './StakeStatusTracker.js';
 import chalk from 'chalk';
 
 /**
