@@ -156,6 +156,10 @@ jobs:
         echo "Cleaning build cache..."
         rm -rf dist node_modules/.vite
         
+        # Ensure ESM import fix scripts are executable
+        echo "Making fix scripts executable..."
+        chmod +x scripts/fix-esm-imports.js scripts/apply-fixes-for-production.js
+        
         # Generate unique build ID (timestamp + git short hash)
         BUILD_ID="$(date +%s)-$(git rev-parse --short HEAD)"
         echo "Using BUILD_ID: $BUILD_ID for cache control"
@@ -502,3 +506,12 @@ jobs:
         SLACK_MESSAGE: "MorSaaS (${{ env.SERVICE_NAME }}) deployed to Cloud Run! :rocket: \n${{ steps.deploy.outputs.url }}"
         SLACK_TITLE: "Deployment Successful - ${{ github.ref_name }} environment"
         SLACK_USERNAME: GitHub Actions 
+
+# Copy source files
+COPY . .
+
+# Ensure scripts are executable
+RUN if [ -d "scripts" ]; then chmod +x scripts/*.js; fi
+
+# Disable Vite's transform cache for HTML files to ensure fresh builds
+ENV VITE_DISABLE_TRANSFORM_CACHE=true 

@@ -59,6 +59,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
 
+# Install tsc-alias for resolving path aliases
+RUN npm install --save-dev tsc-alias
+
 # Copy environment configuration
 COPY --from=frontend-builder /app/.env ./
 
@@ -68,14 +71,20 @@ COPY tsconfig*.json ./
 # Copy source files
 COPY src ./src
 COPY vite.config.ts ./
+COPY scripts ./scripts
+
+# Make scripts executable
+RUN chmod +x scripts/fix-esm-imports.js scripts/apply-fixes-for-production.js
 
 # Add a runtime check to environment.d.ts to declare Vite types properly
 RUN mkdir -p src/types && \
     echo "/// <reference types=\"vite/client\" />\n\ninterface ImportMeta {\n  readonly env: Record<string, any>;\n}" > src/types/environment.d.ts
 
-# Make a safer build
-RUN echo "Compiling TypeScript to JavaScript..." && \
-    npx tsc --project tsconfig.build.json || echo "TypeScript compilation had errors, but continuing build"
+# Apply fixes and compile with proper path alias resolution
+RUN echo "Applying fixes and compiling TypeScript to JavaScript..." && \
+    node scripts/apply-fixes-for-production.js && \
+    npx tsc --project tsconfig.build.json && \
+    npx tsc-alias --project tsconfig.build.json
 
 # Create package.json to mark the dist directory as ES module
 RUN echo '{ "type": "module" }' > dist/package.json
