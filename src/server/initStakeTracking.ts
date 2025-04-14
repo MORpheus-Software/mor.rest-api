@@ -29,7 +29,7 @@ export async function initializeStakeTrackingSystem(): Promise<void> {
     console.log(chalk.blue(`[STAKE_TRACKER] Using RPC URL: ${rpcUrl.includes('/v2/') ? rpcUrl.split('/v2/')[0] + '/v2/[API-KEY-HIDDEN]' : rpcUrl}`));
     
     // Create provider
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
     
     // Test provider connection
     try {

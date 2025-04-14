@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ethers } from 'ethers';
 import { switchNetwork } from '../services/ethService';
+import Web3Modal from 'web3modal';
 
 // Network configurations
 export const NETWORKS = {
@@ -18,6 +19,22 @@ export const NETWORKS = {
   }
 };
 
+// Initialize Web3Modal
+const providerOptions = {
+  // WalletConnect removed due to compatibility issues
+};
+
+let web3Modal: Web3Modal;
+// Initialize outside of component to avoid SSR issues
+if (typeof window !== 'undefined') {
+  web3Modal = new Web3Modal({
+    network: "arbitrum",
+    cacheProvider: true,
+    providerOptions,
+    theme: "light"
+  });
+}
+
 // Interface for the wallet context
 interface WalletContextType {
   provider: ethers.Provider | null;
@@ -29,7 +46,7 @@ interface WalletContextType {
   network: string | null;
   networkType: 'testnet' | 'mainnet';
   connectWallet: () => Promise<void>;
-  disconnectWallet: () => void;
+  disconnectWallet: () => Promise<void>;
   switchToNetwork: (networkType: 'testnet' | 'mainnet') => Promise<boolean>;
 }
 
@@ -44,7 +61,7 @@ const WalletContext = createContext<WalletContextType>({
   network: null,
   networkType: 'testnet',
   connectWallet: async () => {},
-  disconnectWallet: () => {},
+  disconnectWallet: async () => {},
   switchToNetwork: async () => false,
 });
 
@@ -69,14 +86,15 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children, networ
   const [error, setError] = useState<string | null>(null);
   const [network, setNetwork] = useState<string | null>(null);
   const [currentNetworkType, setCurrentNetworkType] = useState<'testnet' | 'mainnet'>(networkType);
+  const [web3Provider, setWeb3Provider] = useState<any>(null);
 
   // Check for existing connection on mount
   useEffect(() => {
     const checkConnection = async () => {
-      // Check if we should auto-connect
-      const shouldAutoConnect = localStorage.getItem(LOCAL_STORAGE_KEY) === 'true';
+      if (typeof window === 'undefined') return;
       
-      if (shouldAutoConnect) {
+      // Check if provider is cached
+      if (web3Modal.cachedProvider) {
         connectWallet();
       }
     };
@@ -92,34 +110,103 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children, networ
     setCurrentNetworkType(networkType);
   }, [networkType, isConnected]);
 
+  // Setup event listeners for the provider
+  const setupProviderEvents = (provider: any) => {
+    if (!provider.on) {
+      return;
+    }
+
+    // Remove any existing listeners first to prevent duplicates
+    provider.removeListener("accountsChanged", handleAccountsChanged);
+    provider.removeListener("chainChanged", handleChainChanged);
+    provider.removeListener("disconnect", disconnectWallet);
+
+    // Add listeners
+    provider.on("accountsChanged", handleAccountsChanged);
+    provider.on("chainChanged", handleChainChanged);
+    provider.on("disconnect", disconnectWallet);
+
+    console.log("Wallet event listeners set up successfully");
+  };
+
   // Switch to a specific network
   const switchToNetwork = async (networkType: 'testnet' | 'mainnet'): Promise<boolean> => {
-    if (!window.ethereum) {
-      console.error("No Ethereum provider found");
+    if (!web3Provider) {
+      console.error("No web3 provider found");
       return false;
     }
     
     try {
       const networkName = networkType === 'testnet' ? 'sepolia' : 'mainnet';
-      const success = await switchNetwork(networkName);
+      const targetChainId = NETWORKS[networkType].chainId;
       
-      if (success) {
-        setCurrentNetworkType(networkType);
-        
-        // Refresh provider and signer
-        const ethersProvider = new ethers.BrowserProvider(window.ethereum);
-        const ethersSigner = await ethersProvider.getSigner();
-        
-        setProvider(ethersProvider);
-        setSigner(ethersSigner);
-        
-        // Update network display name
-        const networkInfo = await ethersProvider.getNetwork();
-        const chainName = networkInfo.name === 'arbitrum-sepolia' ? 'Arbitrum Sepolia' : 'Arbitrum One';
-        setNetwork(chainName);
+      // Check current chain
+      const currentChainId = await web3Provider.request({ method: 'eth_chainId' });
+      
+      if (currentChainId !== targetChainId) {
+        // Request chain switch
+        try {
+          await web3Provider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: targetChainId }],
+          });
+        } catch (switchError: any) {
+          // Chain doesn't exist, add it
+          if (switchError.code === 4902) {
+            try {
+              await web3Provider.request({
+                method: 'wallet_addEthereumChain',
+                params: [
+                  {
+                    chainId: targetChainId,
+                    chainName: NETWORKS[networkType].name,
+                    rpcUrls: [NETWORKS[networkType].rpcUrl],
+                    blockExplorerUrls: [NETWORKS[networkType].explorerUrl],
+                    nativeCurrency: {
+                      name: 'ETH',
+                      symbol: 'ETH',
+                      decimals: 18
+                    }
+                  },
+                ],
+              });
+            } catch (addError) {
+              console.error('Error adding chain:', addError);
+              return false;
+            }
+          } else {
+            console.error('Error switching chain:', switchError);
+            return false;
+          }
+        }
       }
       
-      return success;
+      setCurrentNetworkType(networkType);
+      
+      // Refresh provider and signer
+      const ethersProvider = new ethers.providers.Web3Provider(web3Provider);
+      const ethersSigner = ethersProvider.getSigner();
+      
+      setProvider(ethersProvider);
+      setSigner(ethersSigner);
+      
+      // Get the network
+      const networkInfo = await ethersProvider.getNetwork();
+      let chainName = networkInfo.name;
+      
+      // Handle special case for Arbitrum networks
+      if (networkInfo.chainId === 421614) { // Arbitrum Sepolia
+        chainName = 'Arbitrum Sepolia';
+        setCurrentNetworkType('testnet');
+      } else if (networkInfo.chainId === 42161) { // Arbitrum One
+        chainName = 'Arbitrum One';
+        setCurrentNetworkType('mainnet');
+      }
+      
+      // Update state
+      setNetwork(chainName);
+      
+      return true;
     } catch (error) {
       console.error("Error switching network:", error);
       return false;
@@ -132,32 +219,40 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children, networ
       setIsConnecting(true);
       setError(null);
       
-      // Check if MetaMask is installed
-      if (!window.ethereum) {
-        throw new Error('MetaMask is not installed. Please install MetaMask to connect.');
+      if (typeof window === 'undefined') {
+        throw new Error('Browser window not available');
       }
 
-      // Request account access
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      // Check if MetaMask is installed
+      if (!window.ethereum || !window.ethereum.isMetaMask) {
+        throw new Error('MetaMask is not installed. Please install MetaMask to continue.');
+      }
+
+      // Prompt user to select a wallet
+      const instance = await web3Modal.connect();
+      setWeb3Provider(instance);
       
-      // Create a provider
-      const ethersProvider = new ethers.BrowserProvider(window.ethereum);
+      // Setup event listeners
+      setupProviderEvents(instance);
+      
+      // Create ethers provider
+      const ethersProvider = new ethers.providers.Web3Provider(instance);
       
       // Get the network
       const networkInfo = await ethersProvider.getNetwork();
       let chainName = networkInfo.name;
       
       // Handle special case for Arbitrum networks
-      if (networkInfo.name === 'arbitrum-sepolia') {
+      if (networkInfo.chainId === 421614) { // Arbitrum Sepolia
         chainName = 'Arbitrum Sepolia';
         setCurrentNetworkType('testnet');
-      } else if (networkInfo.chainId === BigInt(parseInt('0xa4b1', 16))) {
+      } else if (networkInfo.chainId === 42161) { // Arbitrum One
         chainName = 'Arbitrum One';
         setCurrentNetworkType('mainnet');
       }
       
-      // Get the signer
-      const ethersSigner = await ethersProvider.getSigner();
+      // Get the signer and address
+      const ethersSigner = ethersProvider.getSigner();
       const signerAddress = await ethersSigner.getAddress();
       
       // Update state
@@ -167,16 +262,9 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children, networ
       setNetwork(chainName);
       setIsConnected(true);
       
-      // Remember connection in local storage
-      localStorage.setItem(LOCAL_STORAGE_KEY, 'true');
-      
-      // Setup account change listener
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      window.ethereum.on('chainChanged', handleChainChanged);
-      
       // Switch to the required network if needed
       const targetChainId = NETWORKS[currentNetworkType].chainId;
-      const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+      const currentChainId = await instance.request({ method: 'eth_chainId' });
       
       if (currentChainId !== targetChainId) {
         await switchToNetwork(currentNetworkType);
@@ -191,18 +279,71 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children, networ
   };
 
   // Disconnect from wallet
-  const disconnectWallet = () => {
-    setProvider(null);
-    setSigner(null);
-    setAddress(null);
-    setIsConnected(false);
-    setNetwork(null);
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-    
-    // Remove listeners
-    if (window.ethereum) {
-      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-      window.ethereum.removeListener('chainChanged', handleChainChanged);
+  const disconnectWallet = async () => {
+    try {
+      // Try to directly disconnect MetaMask using permissions API
+      if (web3Provider && web3Provider.isMetaMask) {
+        try {
+          // This will revoke all permissions and force MetaMask to prompt for connection again
+          await web3Provider.request({
+            method: 'wallet_revokePermissions',
+            params: [{
+              eth_accounts: {}
+            }]
+          });
+          console.log('MetaMask permissions revoked successfully');
+        } catch (revokeError) {
+          console.warn('Could not revoke MetaMask permissions:', revokeError);
+          // Fallback to alternative method - force permission request again
+          try {
+            await web3Provider.request({
+              method: 'wallet_requestPermissions',
+              params: [{ eth_accounts: {} }]
+            });
+          } catch (permError) {
+            console.warn('Failed to reset permissions:', permError);
+          }
+        }
+      }
+      
+      // Remove event listeners if provider supports it
+      if (web3Provider && web3Provider.removeListener) {
+        web3Provider.removeListener("accountsChanged", handleAccountsChanged);
+        web3Provider.removeListener("chainChanged", handleChainChanged);
+        web3Provider.removeListener("disconnect", disconnectWallet);
+      }
+      
+      // Clear web3modal cache
+      if (web3Modal) {
+        web3Modal.clearCachedProvider();
+      }
+      
+      // Close WalletConnect session if active
+      if (web3Provider && web3Provider.close) {
+        await web3Provider.close();
+      }
+      
+      // Reset all state variables
+      setWeb3Provider(null);
+      setProvider(null);
+      setSigner(null);
+      setAddress(null);
+      setIsConnected(false);
+      setNetwork(null);
+      
+      console.log('Wallet disconnected successfully');
+      
+      // For MetaMask specifically, we need to clear local storage that might
+      // be keeping connection state
+      localStorage.removeItem('walletconnect');
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      
+      // Force page reload to completely reset connection
+      window.location.reload();
+    } catch (error) {
+      console.error('Error disconnecting wallet:', error);
+      // Even if there's an error, try to force reload
+      window.location.reload();
     }
   };
 
@@ -211,74 +352,66 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children, networ
     try {
       if (accounts.length === 0) {
         // User disconnected their wallet
-        disconnectWallet();
+        await disconnectWallet();
         return;
       }
 
       const newAddress = accounts[0];
       
-      // Create a new provider and signer for the new account
-      const ethersProvider = new ethers.BrowserProvider(window.ethereum);
-      const ethersSigner = await ethersProvider.getSigner();
-      
-      // Get the network
-      const networkInfo = await ethersProvider.getNetwork();
-      let chainName = networkInfo.name;
-      
-      // Handle special case for Arbitrum networks
-      if (networkInfo.name === 'arbitrum-sepolia') {
-        chainName = 'Arbitrum Sepolia';
-        setCurrentNetworkType('testnet');
-      } else if (networkInfo.chainId === BigInt(parseInt('0xa4b1', 16))) {
-        chainName = 'Arbitrum One';
-        setCurrentNetworkType('mainnet');
-      }
-      
-      // Update state with new account info
-      setProvider(ethersProvider);
-      setSigner(ethersSigner);
-      setAddress(newAddress);
-      setNetwork(chainName);
-      setIsConnected(true);
-      
-      // Switch to the required network if needed
-      const targetChainId = NETWORKS[currentNetworkType].chainId;
-      const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-      
-      if (currentChainId !== targetChainId) {
-        await switchToNetwork(currentNetworkType);
+      if (web3Provider) {
+        // Create a new provider and signer for the new account
+        const ethersProvider = new ethers.providers.Web3Provider(web3Provider);
+        const ethersSigner = ethersProvider.getSigner();
+        
+        // Get the network
+        const networkInfo = await ethersProvider.getNetwork();
+        let chainName = networkInfo.name;
+        
+        // Handle special case for Arbitrum networks
+        if (networkInfo.chainId === 421614) { // Arbitrum Sepolia
+          chainName = 'Arbitrum Sepolia';
+          setCurrentNetworkType('testnet');
+        } else if (networkInfo.chainId === 42161) { // Arbitrum One
+          chainName = 'Arbitrum One';
+          setCurrentNetworkType('mainnet');
+        }
+        
+        // Update state with new account info
+        setProvider(ethersProvider);
+        setSigner(ethersSigner);
+        setAddress(newAddress);
+        setNetwork(chainName);
+        setIsConnected(true);
       }
     } catch (error) {
       console.error('Error handling account change:', error);
       setError('Failed to connect to new wallet account');
-      disconnectWallet();
+      await disconnectWallet();
     }
   };
 
   // Handle network changes
-  const handleChainChanged = async () => {
-    if (!window.ethereum) return;
-    
+  const handleChainChanged = async (chainId: string) => {
     try {
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      
-      // Update network type based on chain ID
-      if (chainId === NETWORKS.testnet.chainId) {
-        setCurrentNetworkType('testnet');
-        setNetwork('Arbitrum Sepolia');
-      } else if (chainId === NETWORKS.mainnet.chainId) {
-        setCurrentNetworkType('mainnet');
-        setNetwork('Arbitrum One');
-      } else {
-        setNetwork('Unsupported Network');
+      if (web3Provider) {
+        // Update network type based on chain ID
+        if (chainId === NETWORKS.testnet.chainId) {
+          setCurrentNetworkType('testnet');
+          setNetwork('Arbitrum Sepolia');
+        } else if (chainId === NETWORKS.mainnet.chainId) {
+          setCurrentNetworkType('mainnet');
+          setNetwork('Arbitrum One');
+        } else {
+          setNetwork('Unsupported Network');
+        }
+        
+        // Refresh provider and signer
+        const ethersProvider = new ethers.providers.Web3Provider(web3Provider);
+        const ethersSigner = ethersProvider.getSigner();
+        
+        setProvider(ethersProvider);
+        setSigner(ethersSigner);
       }
-      
-      // Refresh provider and signer
-      const ethersProvider = new ethers.BrowserProvider(window.ethereum);
-      const ethersSigner = await ethersProvider.getSigner();
-      
-      setProvider(ethersProvider);
-      setSigner(ethersSigner);
     } catch (error) {
       console.error("Error handling chain change:", error);
     }

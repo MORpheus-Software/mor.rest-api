@@ -283,7 +283,7 @@ async function main() {
     const formattedBalance = ethers.formatEther(balance);
     console.log(`MOR Balance: ${formattedBalance} MOR`);
     
-    const amountToStakeWei = ethers.parseEther(stakeAmount);
+    const amountToStakeWei = ethers.utils.parseEther(stakeAmount);
     if (balance < amountToStakeWei) {
       console.error(`❌ Insufficient MOR token balance. You need at least ${stakeAmount} MOR.`);
       rl.close();

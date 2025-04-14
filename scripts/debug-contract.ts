@@ -104,12 +104,12 @@ async function main() {
     console.log(`Current balance: ${ethers.formatEther(balance)} MOR`);
 
     // Check if allowance is sufficient for at least 10 MOR
-    const requiredAmount = ethers.parseEther('10');
+    const requiredAmount = ethers.utils.parseEther('10');
     
     if (allowance < requiredAmount) {
       console.log('\n🔄 Approving tokens for the contract...');
       // Approve 100 MOR to be used by the contract
-      const approvalAmount = ethers.parseEther('100');
+      const approvalAmount = ethers.utils.parseEther('100');
       const approveTx = await morToken.approve(TESTNET_BUILDERS_CONTRACT, approvalAmount);
       console.log(`⏳ Approval transaction submitted: ${approveTx.hash}`);
       await approveTx.wait();

@@ -19,6 +19,7 @@ import {
 import { combinedStakeCheckMiddleware } from '../lib/api/staking-middleware.js';
 import fs from 'fs';
 import { initializeStakeTrackingSystem } from './initStakeTracking.js';
+import { getRedisClient } from './setupRedis.js';
 
 // Load environment variables
 dotenv.config();
@@ -149,6 +150,108 @@ appManagementRouter.get('/metrics', requireAuth, (req, res) => {
   metricsHandlers.getMetrics(req, res);
 });
 
+// Add staking status check endpoint for the frontend
+appManagementRouter.get('/staking/check-status', requireAuth, async (req, res) => {
+  try {
+    const authReq = req as any;
+    const userId = authReq.userId;
+    
+    if (!userId) {
+      return res.status(401).json({
+        error: {
+          message: 'User not authenticated',
+          code: 'NOT_AUTHENTICATED'
+        }
+      });
+    }
+    
+    // Import needed functions - need to do dynamic import since they're ESM modules
+    const stakingMiddlewarePath = '../lib/api/staking-middleware.js';
+    const ethersPath = 'ethers';
+    
+    // Get the required functions
+    const stakingModule = await import(stakingMiddlewarePath);
+    const ethersModule = await import(ethersPath);
+    
+    // Get user's wallet address
+    const walletAddress = await stakingModule.getUserWalletAddress(userId);
+    
+    if (!walletAddress) {
+      return res.status(403).json({
+        error: {
+          message: 'No wallet address associated with this user',
+          code: 'NO_WALLET_ADDRESS',
+        },
+        data: {
+          userId,
+          pools: [],
+          hasMinimumStake: false
+        }
+      });
+    }
+    
+    // Get pool ID
+    const DEFAULT_POOL_ID = process.env.DEFAULT_POOL_ID || ethersModule.ethers.utils.id("mor.rest");
+    
+    // Get all pools
+    const redisClient = await getRedisClient();
+    const pools = await redisClient.smembers('stake:pools');
+    
+    // If no pools are defined, use the default pool
+    const poolsToCheck = pools.length > 0 ? pools : [DEFAULT_POOL_ID];
+    
+    // Check stake status for each pool
+    const poolResults = await Promise.all(poolsToCheck.map(async (poolId) => {
+      try {
+        const hasStake = await stakingModule.hasMinimumStake(walletAddress, poolId);
+        
+        // Check if the stake is locked
+        const statusKey = `stake:status:${walletAddress.toLowerCase()}:${poolId}`;
+        const status = await redisClient.get(statusKey) || 'UNLOCKED';
+        const isLocked = status === 'LOCKED';
+        
+        return {
+          poolId,
+          hasMinimumStake: hasStake,
+          isLocked
+        };
+      } catch (error) {
+        console.error(`Error checking stake for pool ${poolId}:`, error);
+        return {
+          poolId,
+          hasMinimumStake: false,
+          isLocked: false,
+          error: 'Failed to check stake status'
+        };
+      }
+    }));
+    
+    // Determine if the user has minimum stake in any pool
+    const hasMinimumStake = poolResults.some(pool => pool.hasMinimumStake);
+    
+    return res.json({
+      success: true,
+      data: {
+        userId,
+        walletAddress,
+        pools: poolResults,
+        hasMinimumStake
+      }
+    });
+  } catch (error) {
+    console.error(chalk.red(`[SERVER] Error checking stake status: ${error}`));
+    return res.status(500).json({
+      error: {
+        message: 'Error checking stake status',
+        code: 'STAKE_CHECK_ERROR'
+      },
+      data: {
+        hasMinimumStake: false
+      }
+    });
+  }
+});
+
 // Mount staking routes
 stakingRouter.get('/status/:userAddress/:poolId', stakingHandlers.getStakeStatus);
 stakingRouter.get('/pools', stakingHandlers.getAllPools);
@@ -205,7 +308,7 @@ nfaServiceRouter.get('/debug/check-stake', requireAuth, async (req, res) => {
     }
     
     // Get pool ID
-    const DEFAULT_POOL_ID = process.env.DEFAULT_POOL_ID || ethersModule.ethers.id("mor.rest");
+    const DEFAULT_POOL_ID = process.env.DEFAULT_POOL_ID || ethersModule.ethers.utils.id("mor.rest");
     
     // Check if user has minimum stake
     const hasStake = await stakingModule.hasMinimumStake(walletAddress, DEFAULT_POOL_ID);
@@ -229,17 +332,20 @@ nfaServiceRouter.get('/debug/check-stake', requireAuth, async (req, res) => {
   }
 });
 
+// Mount all API routes under /api
+app.use('/api', apiRouter);
+
 // Mount auth routes
-app.use('/api/v1/auth', authRouter);
+apiRouter.use('/v1/auth', authRouter);
 
 // Mount app management routes
-app.use('/api/v1/app', appManagementRouter);
+apiRouter.use('/v1/app', appManagementRouter);
 
 // Mount staking routes
-app.use('/api/v1/staking', stakingRouter);
+apiRouter.use('/v1/staking', stakingRouter);
 
-// Mount NFA service proxy routes 
-app.use('/api/v1', nfaServiceRouter);
+// Mount NFA service proxy routes
+apiRouter.use('/v1', nfaServiceRouter);
 
 // Serve static files from the public directory (React app)
 let publicPath = '';

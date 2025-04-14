@@ -76,12 +76,12 @@ class BuildersClient {
     }
     
     async approveMorTokens(amount: string) {
-        const amountWei = ethers.parseEther(amount);
+        const amountWei = ethers.utils.parseEther(amount);
         return await this.morToken.approve(this.buildersContract.target, amountWei);
     }
     
     async createBuilderPool(name: string, admin: string, poolStart: number, withdrawLockPeriod: number, claimLockEnd: number, minimalDeposit: string) {
-        const minimalDepositWei = ethers.parseEther(minimalDeposit);
+        const minimalDepositWei = ethers.utils.parseEther(minimalDeposit);
         const tx = await this.buildersContract.createBuilderPool(
             name, admin, poolStart, withdrawLockPeriod, claimLockEnd, minimalDepositWei
         );
@@ -90,7 +90,7 @@ class BuildersClient {
     }
     
     async deposit(poolId: string, amount: string) {
-        const amountWei = ethers.parseEther(amount);
+        const amountWei = ethers.utils.parseEther(amount);
         return await this.buildersContract.deposit(poolId, amountWei);
     }
 }

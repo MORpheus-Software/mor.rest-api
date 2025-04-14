@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -61,10 +62,28 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       isDevelopment && componentTagger(),
+      // Add Node.js polyfills for browser compatibility
+      nodePolyfills({
+        // Whether to polyfill `node:` protocol imports
+        protocolImports: true,
+      }),
     ].filter(Boolean),
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
+        // Add aliases for Node.js built-ins
+        buffer: 'buffer/',
+        process: 'process/browser',
+        stream: 'stream-browserify',
+        util: 'util/'
+      },
+    },
+    optimizeDeps: {
+      esbuildOptions: {
+        // Node.js global to browser globalThis
+        define: {
+          global: 'globalThis',
+        },
       },
     },
     preview: {
@@ -105,6 +124,8 @@ export default defineConfig(({ mode }) => {
         // Add Lovable environment flag
         LOVABLE_ENV: JSON.stringify(isLovableEnv),
       },
+      // Add global to window object for compatibility
+      global: 'window',
     },
   };
 });

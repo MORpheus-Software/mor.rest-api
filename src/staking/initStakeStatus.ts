@@ -24,8 +24,7 @@ export async function initializeStakeStatusTracking(
     console.log(chalk.blue('[STAKE_STATUS] Initializing stake status tracking'));
     
     // Create the BuildersClient - if no signer is provided, we'll use a read-only client
-    const effectiveSigner = signer || new ethers.AbstractSigner(provider);
-    const buildersClient = new BuildersClient(provider, effectiveSigner);
+    const buildersClient = new BuildersClient(provider, signer || provider);
     
     console.log(chalk.blue(`[STAKE_STATUS] Using network: ${buildersClient.getNetworkType()}`));
     

@@ -67,6 +67,8 @@ const NETWORK_SUBNETS = {
 // Define component props
 interface StakingProps {
   networkType?: 'mainnet' | 'testnet';
+  showConnectionButton?: boolean;
+  showConnectionAtTop?: boolean;
 }
 
 // Subnet interface
@@ -89,7 +91,11 @@ interface Subnet {
 }
 
 // Staking component for interacting with MOR builder pools
-export default function Staking({ networkType = 'testnet' }: StakingProps) {
+export default function Staking({ 
+  networkType = 'testnet', 
+  showConnectionButton = true,
+  showConnectionAtTop = false 
+}: StakingProps) {
   // State to track user interactions
   const [selectedPool, setSelectedPool] = useState('');
   const [stakeAmount, setStakeAmount] = useState('');
@@ -103,13 +109,47 @@ export default function Staking({ networkType = 'testnet' }: StakingProps) {
   const [minStakeRequired, setMinStakeRequired] = useState('0');
   const [apiAccessEnabled, setApiAccessEnabled] = useState(false);
   const [blockchainError, setBlockchainError] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
   
   // Access wallet context
-  const { provider, signer, address, isConnected, connectWallet } = useWallet();
+  const { provider, signer, address, isConnected, connectWallet, disconnectWallet } = useWallet();
 
   // Initialize BuildersClient when wallet is connected
   const [buildersClient, setBuildersClient] = useState<BuildersClient | null>(null);
   
+  // Add a flag to track if we've loaded data - needs to be at top level
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  
+  // Function to fetch user data - extract this to be callable from multiple places
+  const fetchUserData = async () => {
+    if (!address || !buildersClient || !selectedPool) return;
+    
+    try {
+      console.log('Fetching user data for address:', address);
+      // Get MOR balance
+      const morBalance = await buildersClient.getMorBalance();
+      setUserBalance(ethers.formatEther(morBalance));
+      
+      // Get staked balance
+      try {
+        const userData = await buildersClient.getUserData(address, selectedPool);
+        console.log('User data loaded:', JSON.stringify(userData, jsonStringifyReplacer, 2));
+        setStakedBalance(userData.deposited.formatted);
+        setApiAccessEnabled(parseFloat(userData.deposited.formatted) >= parseFloat(minStakeRequired));
+      } catch (userDataError: any) {
+        if (userDataError.message && userDataError.message.includes("pool doesn't exist")) {
+          console.warn(`Selected pool ${selectedPool} doesn't exist yet, showing zero balances`);
+          setStakedBalance('0');
+          setApiAccessEnabled(false);
+        } else {
+          console.error("Error fetching user data:", userDataError);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user balances:", error);
+    }
+  };
+
   // Function to fetch a specific subnet by ID
   const fetchSubnetById = async (client: BuildersClient, id: string) => {
     try {
@@ -187,6 +227,14 @@ export default function Staking({ networkType = 'testnet' }: StakingProps) {
           setSelectedPool(networkSubnets[0].id);
           setMinStakeRequired(networkSubnets[0].minimalDeposit.formatted);
           
+          // Important: After client and pool are initialized, immediately attempt to fetch user data
+          // This ensures we don't rely only on dependency changes to trigger data loading
+          if (address) {
+            console.log('Wallet already connected, fetching initial data');
+            // We need to wait for the state update to complete, so use setTimeout
+            setTimeout(fetchUserData, 100);
+          }
+          
         } catch (err) {
           console.error("Error initializing with network:", err);
           setBlockchainError(`Error connecting to ${networkType === 'testnet' ? 'Arbitrum Sepolia' : 'Arbitrum One'}`);
@@ -194,50 +242,73 @@ export default function Staking({ networkType = 'testnet' }: StakingProps) {
           setLoadingPools(false);
         }
       } else {
-        setLoadingPools(false);
+        // Even when wallet is not connected, initialize with network subnets
+        try {
+          // Get configured subnets for the current network
+          const networkSubnets = NETWORK_SUBNETS[networkType] || [];
+          
+          if (networkSubnets.length === 0) {
+            setBlockchainError(`No subnets configured for ${networkType === 'testnet' ? 'Arbitrum Sepolia' : 'Arbitrum One'}`);
+            setLoadingPools(false);
+            return;
+          }
+          
+          // Just load the subnet data without connecting to blockchain
+          setPools(networkSubnets);
+          setSelectedPool(networkSubnets[0].id);
+          setMinStakeRequired(networkSubnets[0].minimalDeposit.formatted);
+          console.log(`Using configured ${networkType} subnet without wallet: ${networkSubnets[0].name}`);
+          
+          // Create a read-only provider to check blockchain status
+          const readOnlyProvider = new ethers.providers.JsonRpcProvider(
+            networkType === 'testnet' 
+              ? 'https://sepolia-rollup.arbitrum.io/rpc'
+              : 'https://arb1.arbitrum.io/rpc'
+          );
+          
+          // Check if we can connect to the blockchain
+          await readOnlyProvider.getBlockNumber();
+          console.log('Blockchain connection verified (read-only)');
+        } catch (err) {
+          console.error("Error checking blockchain status:", err);
+          setBlockchainError(`Error connecting to ${networkType === 'testnet' ? 'Arbitrum Sepolia' : 'Arbitrum One'}`);
+        } finally {
+          setLoadingPools(false);
+        }
       }
     };
     
     initializeWithNetwork();
   }, [isConnected, provider, signer, networkType, address]);
   
-  // Load user MOR balance when wallet is connected
+  // Load user MOR balance when wallet is connected or dependencies change
   useEffect(() => {
-    if (isConnected && address && buildersClient) {
-      const fetchBalances = async () => {
-        try {
-          // Get MOR balance
-          const morBalance = await buildersClient.getMorBalance();
-          setUserBalance(ethers.formatEther(morBalance));
-          
-          // Get staked balance if a pool is selected
-          if (selectedPool) {
-            try {
-              const userData = await buildersClient.getUserData(address, selectedPool);
-              console.log('User data:', JSON.stringify(userData, jsonStringifyReplacer, 2));
-              setStakedBalance(userData.deposited.formatted);
-              setApiAccessEnabled(parseFloat(userData.deposited.formatted) >= parseFloat(minStakeRequired));
-            } catch (userDataError: any) {
-              // Handle the case where the pool doesn't exist yet
-              if (userDataError.message && userDataError.message.includes("pool doesn't exist")) {
-                console.warn(`Selected pool ${selectedPool} doesn't exist yet, showing zero balances`);
-                setStakedBalance('0');
-                setApiAccessEnabled(false);
-              } else {
-                console.error("Error fetching user data:", userDataError);
-                // Don't update the state if there's an error, keep previous values
-              }
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching balances:", error);
+    if (isConnected && address && buildersClient && selectedPool) {
+      console.log('Dependencies changed, fetching user balances');
+      fetchUserData();
+      setInitialLoadDone(true);
+    }
+  }, [isConnected, address, buildersClient, selectedPool, minStakeRequired]);
+
+  // Also ensure we fetch data when coming back to the page
+  useEffect(() => {
+    if (isConnected && buildersClient && selectedPool && address && initialLoadDone) {
+      // This helps when the page was hidden and becomes visible again
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          console.log('Page became visible, refreshing balances');
+          fetchUserData();
         }
       };
       
-      fetchBalances();
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
-  }, [isConnected, address, buildersClient, selectedPool, minStakeRequired]);
-  
+  }, [isConnected, buildersClient, selectedPool, address, initialLoadDone]);
+
   // Handle staking MOR tokens
   const handleStake = async () => {
     setLoading(true);
@@ -287,7 +358,7 @@ export default function Staking({ networkType = 'testnet' }: StakingProps) {
       // Perform approval first
       console.log('Checking allowance...');
       const allowance = await buildersClient.getMorAllowance();
-      const amountToStakeWei = ethers.parseEther(stakeAmount);
+      const amountToStakeWei = ethers.utils.parseEther(stakeAmount);
       
       if (allowance < amountToStakeWei) {
         setSuccess('Approving tokens for staking...');
@@ -378,7 +449,7 @@ export default function Staking({ networkType = 'testnet' }: StakingProps) {
         }
         
         // Check if the amount to withdraw is within bounds
-        const withdrawAmount = ethers.parseEther(stakeAmount);
+        const withdrawAmount = ethers.utils.parseEther(stakeAmount);
         if (withdrawAmount > userData.deposited.wei) {
           setError(`You cannot withdraw more than your staked amount (${userData.deposited.formatted} MOR)`);
           setLoading(false);
@@ -479,19 +550,78 @@ export default function Staking({ networkType = 'testnet' }: StakingProps) {
   // Get the currently selected subnet
   const selectedSubnet = pools.find(pool => pool.id === selectedPool);
   
+  // Handle wallet disconnect with loading state
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      await disconnectWallet();
+      // Note: The page will reload after disconnectWallet, so this code won't run
+      // But we'll keep it for safety
+      setSuccess('Wallet disconnected successfully');
+      
+      // Reset state variables related to wallet connection
+      setUserBalance('0');
+      setStakedBalance('0');
+      setApiAccessEnabled(false);
+      
+      console.log('Wallet disconnected from Staking component');
+    } catch (error: any) {
+      console.error("Error disconnecting wallet:", error);
+      setError('Failed to disconnect wallet automatically. Please disconnect manually from MetaMask by clicking on the MetaMask extension, then "Connected" → three dots → "Disconnect".');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  // Handle wallet connect
+  const handleConnect = async () => {
+    try {
+      await connectWallet();
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">MOR Staking</h1>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+        <h1 className="text-2xl font-bold">MOR Staking</h1>
+        
+        {showConnectionButton && showConnectionAtTop && isConnected && (
+          <div className="md:text-right mt-4 md:mt-0 flex items-center justify-end">
+            {address && (
+              <div className="mr-3 text-sm text-gray-600">
+                Connected: {address.slice(0, 6)}...{address.slice(-4)}
+              </div>
+            )}
+            <button
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className="px-4 py-2 rounded text-white bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400"
+            >
+              {disconnecting ? 'Disconnecting...' : 'Disconnect Wallet'}
+            </button>
+          </div>
+        )}
+      </div>
       
       {!isConnected ? (
         <div className="bg-blue-50 p-4 rounded-lg">
           <p className="mb-4">Please connect your wallet to stake/unstake MOR tokens.</p>
-          <button 
-            onClick={connectWallet}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-          >
-            Connect Wallet
-          </button>
+          {showConnectionButton && (
+            <button 
+              onClick={handleConnect}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v5h-2V5H5v10h4v2H4a1 1 0 01-1-1V4zm12.293 5.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L16.586 13H9a1 1 0 110-2h7.586l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+              Connect Wallet
+            </button>
+          )}
         </div>
       ) : (
         <div>
@@ -509,54 +639,74 @@ export default function Staking({ networkType = 'testnet' }: StakingProps) {
             <>
               {selectedSubnet && (
                 <div className="bg-white p-4 rounded-lg border border-gray-200 mb-6">
-                  <h2 className="text-lg font-semibold">{selectedSubnet.name}</h2>
-                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-center">
                     <div>
-                      <span className="text-gray-600">Network:</span>
-                      <span className="ml-2 font-medium">{networkType === 'testnet' ? 'Arbitrum Sepolia' : 'Arbitrum One'}</span>
+                      <h2 className="text-lg font-semibold">{selectedSubnet.name}</h2>
+                      <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Network:</span>
+                          <span className="ml-2 font-medium">{networkType === 'testnet' ? 'Arbitrum Sepolia' : 'Arbitrum One'}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Minimum Stake:</span>
+                          <span className="ml-2 font-medium">{selectedSubnet.minimalDeposit.formatted} MOR</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Status:</span>
+                          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${selectedSubnet.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                            {selectedSubnet.active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-600">Minimum Stake:</span>
-                      <span className="ml-2 font-medium">{selectedSubnet.minimalDeposit.formatted} MOR</span>
+                    {showConnectionButton && !showConnectionAtTop && (
+                      <div className="md:text-right mt-4 md:mt-0 flex items-center justify-end">
+                        {address && (
+                          <div className="mr-3 text-sm text-gray-600">
+                            Connected: {address.slice(0, 6)}...{address.slice(-4)}
+                          </div>
+                        )}
+                        <button
+                          onClick={handleDisconnect}
+                          disabled={disconnecting}
+                          className="px-4 py-2 rounded text-white bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400"
+                        >
+                          {disconnecting ? 'Disconnecting...' : 'Disconnect Wallet'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-gray-100 grid gap-6 md:grid-cols-2">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h2 className="text-lg font-semibold mb-2">Your MOR balance</h2>
+                      <p className="text-xl">{userBalance} MOR</p>
                     </div>
-                    <div>
-                      <span className="text-gray-600">Status:</span>
-                      <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${selectedSubnet.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                        {selectedSubnet.active ? 'Active' : 'Inactive'}
-                      </span>
+                    
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h2 className="text-lg font-semibold mb-2">Your Staked MOR</h2>
+                      <p className="text-xl">{stakedBalance} MOR</p>
+                      <p className="text-sm text-gray-600 mt-1">Minimum Required: {minStakeRequired} MOR</p>
+                      
+                      <div className="mt-3">
+                        <div className="w-full bg-gray-200 rounded-full h-4">
+                          <div 
+                            className={`h-4 rounded-full ${progressPercentage >= 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+                            style={{ width: `${progressPercentage}%` }}
+                          ></div>
+                        </div>
+                        <div className="flex justify-between mt-1">
+                          <span className="text-xs text-gray-600">{progressPercentage}% complete</span>
+                          {apiAccessEnabled && (
+                            <span className="text-xs text-green-600 font-semibold">API Access Enabled</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="grid gap-6 md:grid-cols-2 mb-6">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h2 className="text-lg font-semibold mb-2">Your MOR balance</h2>
-                  <p className="text-xl">{userBalance} MOR</p>
-                </div>
-                
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h2 className="text-lg font-semibold mb-2">Your Staked MOR</h2>
-                  <p className="text-xl">{stakedBalance} MOR</p>
-                  <p className="text-sm text-gray-600 mt-1">Minimum Required: {minStakeRequired} MOR</p>
-                  
-                  <div className="mt-3">
-                    <div className="w-full bg-gray-200 rounded-full h-4">
-                      <div 
-                        className={`h-4 rounded-full ${progressPercentage >= 100 ? 'bg-green-500' : 'bg-blue-500'}`}
-                        style={{ width: `${progressPercentage}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between mt-1">
-                      <span className="text-xs text-gray-600">{progressPercentage}% complete</span>
-                      {apiAccessEnabled && (
-                        <span className="text-xs text-green-600 font-semibold">API Access Enabled</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
               <div className="bg-white p-6 rounded-lg border border-gray-200 mb-6">
                 <h2 className="text-lg font-semibold mb-4">Stake/Unstake MOR</h2>
                 
@@ -610,12 +760,19 @@ export default function Staking({ networkType = 'testnet' }: StakingProps) {
                   </div>
                 )}
                 
-                <div className="mt-4 p-3 bg-blue-50 text-blue-700 rounded-md text-xs">
-                  <p>
-                    <strong>Note:</strong> This is a demo application using the {networkType === 'testnet' ? 'Arbitrum Sepolia testnet' : 'Arbitrum One mainnet'}.
-                    {networkType === 'testnet' && ' No real assets are at risk.'}
-                  </p>
-                </div>
+                {networkType === 'testnet' ? (
+                  <div className="mt-4 p-3 bg-blue-50 text-blue-700 rounded-md text-xs">
+                    <p>
+                      <strong>Note:</strong> You are using the Arbitrum Sepolia testnet for demo purposes. No real assets are at risk.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-4 p-3 bg-amber-50 text-amber-700 rounded-md text-xs">
+                    <p>
+                      <strong>Warning:</strong> You are using Arbitrum One mainnet with real assets. Please stake responsibly.
+                    </p>
+                  </div>
+                )}
               </div>
               
               {apiAccessEnabled && (
@@ -626,7 +783,7 @@ export default function Staking({ networkType = 'testnet' }: StakingProps) {
                   </p>
                   <button
                     className="mt-3 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                    onClick={() => window.location.href = '/api-keys'}
+                    onClick={() => window.location.href = '/tokens'}
                   >
                     Manage API Keys
                   </button>

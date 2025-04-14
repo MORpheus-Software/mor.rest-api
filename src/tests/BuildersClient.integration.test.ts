@@ -99,7 +99,7 @@ describe('BuildersClient Integration Tests', () => {
       const balance = await provider.getBalance(userAddress);
       console.log(`💰 Wallet balance: ${ethers.formatEther(balance)} ETH`);
       
-      if (balance < ethers.parseEther('0.01')) {
+      if (balance < ethers.utils.parseEther('0.01')) {
         console.warn('⚠️ Wallet has low ETH balance. Tests may fail due to insufficient gas.');
       }
       
@@ -143,7 +143,7 @@ describe('BuildersClient Integration Tests', () => {
         const morBalance = await buildersClient.getMorBalance();
         console.log(`💰 MOR token balance: ${ethers.formatEther(morBalance)} MOR`);
         
-        if (morBalance < ethers.parseEther(minDepositAmount)) {
+        if (morBalance < ethers.utils.parseEther(minDepositAmount)) {
           console.warn(`⚠️ Wallet does not have enough MOR tokens for testing (has ${ethers.formatEther(morBalance)}, needs at least ${minDepositAmount}).`);
           console.warn('⚠️ You will need to acquire testnet MOR tokens to run all tests successfully.');
         }
@@ -338,7 +338,7 @@ describe('BuildersClient Integration Tests', () => {
       console.log(`New MOR allowance: ${ethers.formatEther(allowance)} MOR`);
       
       // Should be at least the approved amount
-      expect(allowance >= ethers.parseEther(approveAmount)).toBe(true);
+      expect(allowance >= ethers.utils.parseEther(approveAmount)).toBe(true);
       
     } catch (error) {
       console.error('Error approving tokens:', error);
@@ -362,7 +362,7 @@ describe('BuildersClient Integration Tests', () => {
       
       // Check allowance before depositing
       const allowance = await buildersClient.getMorAllowance();
-      if (allowance < ethers.parseEther(depositAmount)) {
+      if (allowance < ethers.utils.parseEther(depositAmount)) {
         console.log(`Insufficient allowance, approving ${depositAmount} MOR first`);
         await (await buildersClient.approveMorTokens(depositAmount)).wait();
       }
@@ -424,7 +424,7 @@ describe('BuildersClient Integration Tests', () => {
       
       // Calculate expected deposit amount
       const initialDepositWei = initialUserData.deposited.wei;
-      const depositAmountWei = ethers.parseEther(depositAmount);
+      const depositAmountWei = ethers.utils.parseEther(depositAmount);
       const expectedDepositWei = initialDepositWei + depositAmountWei;
       
       // Verify deposit was recorded

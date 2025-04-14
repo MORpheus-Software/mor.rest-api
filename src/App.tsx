@@ -13,6 +13,7 @@ import Documentation from "./pages/Documentation";
 import Tokens from "./pages/Tokens";
 import Staking from "./pages/Staking";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import StakeProtectedRoute from "./components/auth/StakeProtectedRoute";
 import AuthCheck from "./components/auth/AuthCheck";
 import DebugPage from "./pages/Debug";
 import { isAuthenticated, login } from "./lib/auth";
@@ -72,13 +73,15 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/debug" element={<DebugPage />} />
             
-            {/* Protected routes */}
+            {/* Protected routes - require authentication only */}
             <Route path="/dashboard" element={<Navigate to="/playground" replace />} />
-            <Route path="/tokens" element={<ProtectedRoute><Tokens /></ProtectedRoute>} />
-            <Route path="/playground" element={<ProtectedRoute><ApiPlayground /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/staking" element={<ProtectedRoute><Staking /></ProtectedRoute>} />
             <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+            
+            {/* Protected routes - require authentication AND staking */}
+            <Route path="/tokens" element={<StakeProtectedRoute><Tokens /></StakeProtectedRoute>} />
+            <Route path="/playground" element={<StakeProtectedRoute><ApiPlayground /></StakeProtectedRoute>} />
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

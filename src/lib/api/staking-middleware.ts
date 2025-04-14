@@ -13,7 +13,7 @@ dotenv.config();
 
 // Default pool ID from environment variable or fallback to a default value
 const DEFAULT_POOL_ID = process.env.DEFAULT_POOL_ID || 
-                         ethers.id("mor.rest"); // Generate ID from name if not provided
+                         ethers.utils.id("mor.rest"); // Generate ID from name if not provided
 
 // Ethereum provider URL
 const ETHEREUM_RPC_URL = process.env.ETHEREUM_RPC_URL || 
@@ -23,8 +23,8 @@ const ETHEREUM_RPC_URL = process.env.ETHEREUM_RPC_URL ||
 
 // Redis cache key for user stake status
 const USER_STAKE_PREFIX = 'stake:amount:';
-// Cache expiration time for stake checks (1 hour)
-const STAKE_CACHE_TTL = 60 * 60;
+// Cache expiration time for stake checks (5 minutes)
+const STAKE_CACHE_TTL = 5 * 60;
 
 // Redis key prefix for stake status
 const STAKE_STATUS_PREFIX = 'stake:status:';
@@ -71,40 +71,58 @@ export async function hasMinimumStake(userAddress: string, poolId: string): Prom
     const cacheKey = `${USER_STAKE_PREFIX}${userAddress.toLowerCase()}:${poolId}`;
     const cachedResult = await redisClient.get(cacheKey);
     
-    if (cachedResult) {
-      const isStaked = cachedResult === 'true';
-      console.log(chalk.blue(`[STAKE_CHECK] Using cached result: ${isStaked ? 'Has minimum stake' : 'Does not have minimum stake'}`));
-      return isStaked;
+    // For development, always check the blockchain to ensure we have the latest data
+    if (process.env.NODE_ENV !== 'production' || !cachedResult) {
+      console.log(chalk.blue(`[STAKE_CHECK] Checking blockchain for latest stake data`));
+      
+      // Create provider
+      const provider = new ethers.providers.JsonRpcProvider(ETHEREUM_RPC_URL);
+      
+      // Create BuildersClient
+      const buildersClient = new BuildersClient(
+        provider,
+        provider
+      );
+      
+      try {
+        // Get pool info to determine minimum stake
+        const poolInfo = await buildersClient.getPoolInfo(poolId);
+        const minStakeRequired = poolInfo.minimalDeposit.formatted;
+        
+        // Get user's stake amount
+        const userData = await buildersClient.getUserData(userAddress, poolId);
+        const userStake = userData.deposited.formatted;
+        
+        console.log(chalk.blue(`[STAKE_CHECK] User ${userAddress} has staked ${userStake} (minimum: ${minStakeRequired})`));
+        
+        // Compare stake amount with minimum requirement
+        const stakeAmount = parseFloat(userStake);
+        const minRequired = parseFloat(minStakeRequired);
+        const hasStake = stakeAmount >= minRequired;
+        
+        // Cache the result
+        await redisClient.set(cacheKey, hasStake ? 'true' : 'false', 'EX', STAKE_CACHE_TTL);
+        
+        return hasStake;
+      } catch (error) {
+        console.error(chalk.red(`[STAKE_CHECK] Error checking blockchain: ${error}`));
+        
+        // If blockchain check fails but we have a cached result, use it
+        if (cachedResult) {
+          const isStaked = cachedResult === 'true';
+          console.log(chalk.yellow(`[STAKE_CHECK] Fallback to cached result: ${isStaked ? 'Has minimum stake' : 'Does not have minimum stake'}`));
+          return isStaked;
+        }
+        
+        // In case of error with no cached result, default to denying access
+        return false;
+      }
     }
     
-    // Create provider
-    const provider = new ethers.JsonRpcProvider(ETHEREUM_RPC_URL);
-    
-    // Create BuildersClient
-    const buildersClient = new BuildersClient(
-      provider,
-      new ethers.AbstractSigner(provider) // Read-only signer
-    );
-    
-    // Get pool info to determine minimum stake
-    const poolInfo = await buildersClient.getPoolInfo(poolId);
-    const minStakeRequired = poolInfo.minimalDeposit.formatted;
-    
-    // Get user's stake amount
-    const userData = await buildersClient.getUserData(userAddress, poolId);
-    const userStake = userData.deposited.formatted;
-    
-    console.log(chalk.blue(`[STAKE_CHECK] User ${userAddress} has staked ${userStake} (minimum: ${minStakeRequired})`));
-    
-    // Compare stake amount with minimum requirement
-    const stakeAmount = parseFloat(userStake);
-    const minRequired = parseFloat(minStakeRequired);
-    const hasStake = stakeAmount >= minRequired;
-    
-    // Cache the result
-    await redisClient.set(cacheKey, hasStake ? 'true' : 'false', 'EX', STAKE_CACHE_TTL);
-    
-    return hasStake;
+    // Use cached result if available and we're in production
+    const isStaked = cachedResult === 'true';
+    console.log(chalk.blue(`[STAKE_CHECK] Using cached result: ${isStaked ? 'Has minimum stake' : 'Does not have minimum stake'}`));
+    return isStaked;
   } catch (error) {
     console.error(chalk.red(`[STAKE_CHECK] Error checking minimum stake: ${error}`));
     // In case of error, default to denying access
@@ -393,12 +411,12 @@ export async function combinedStakeCheckMiddleware(req: Request, res: Response, 
 async function checkBlockchainStakeStatus(walletAddress: string, poolId: string): Promise<{hasMinimumStake: boolean, isLocked: boolean}> {
   try {
     // Create provider
-    const provider = new ethers.JsonRpcProvider(ETHEREUM_RPC_URL);
+    const provider = new ethers.providers.JsonRpcProvider(ETHEREUM_RPC_URL);
     
     // Create BuildersClient
     const buildersClient = new BuildersClient(
       provider,
-      new ethers.AbstractSigner(provider) // Read-only signer
+      provider
     );
     
     // Get pool info

@@ -22,7 +22,7 @@ export function getChecksumAddress(address: string): string {
     }
     
     // Apply checksum using ethers.js
-    return ethers.getAddress(address);
+    return ethers.utils.getAddress(address);
   } catch (error) {
     console.error(`Invalid Ethereum address: ${address}`);
     throw error;

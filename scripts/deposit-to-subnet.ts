@@ -147,7 +147,7 @@ async function depositToSubnet() {
         console.log(`💰 MOR Token Balance: ${ethers.formatEther(morBalance)} MOR`);
         
         // Check if balance is sufficient
-        if (morBalance < ethers.parseEther(depositAmount)) {
+        if (morBalance < ethers.utils.parseEther(depositAmount)) {
             console.error(`❌ Insufficient MOR balance. You have ${ethers.formatEther(morBalance)} MOR, but trying to deposit ${depositAmount} MOR`);
             return;
         }
@@ -156,7 +156,7 @@ async function depositToSubnet() {
         const allowance = await buildersClient.getMorAllowance();
         console.log(`🔓 Current MOR allowance for builders contract: ${ethers.formatEther(allowance)} MOR`);
         
-        if (allowance < ethers.parseEther(depositAmount)) {
+        if (allowance < ethers.utils.parseEther(depositAmount)) {
             console.log(`\n🔄 Approving MOR token usage...`);
             const approveTx = await buildersClient.approveMorTokens("1000.0"); // Approve a large amount to avoid future approvals
             console.log(`✅ Approval transaction sent: ${approveTx.hash}`);

@@ -11,7 +11,7 @@ declare global {
 const getChecksumAddress = (address: string): string => {
   if (!address) return "";
   try {
-    return ethers.getAddress(address.toLowerCase());
+    return ethers.utils.getAddress(address.toLowerCase());
   } catch (error) {
     console.error("Invalid address format:", error);
     // Return the original address if conversion fails
@@ -121,8 +121,8 @@ const getBuildersClient = async (contractAddress?: string) => {
     throw new Error("MetaMask is not installed");
   }
   
-  const provider = new ethers.BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
+  const provider = new ethers.providers.Web3Provider(window.ethereum);
+  const signer = provider.getSigner();
   
   // If contract address is provided, use it; otherwise get the address for the current network
   let buildersContractAddress = contractAddress;
@@ -289,7 +289,7 @@ export const stakeTokens = async (amount: number, poolId: string, buildersAddres
     const buildersClient = await getBuildersClient(buildersContractAddress);
     
     // Convert amount to wei
-    const amountWei = ethers.parseEther(amount.toString());
+    const amountWei = ethers.utils.parseEther(amount.toString());
     
     // Check allowance
     const allowance = await buildersClient.getMorAllowance();

@@ -54,7 +54,6 @@ export function getCurrentUser(debug: boolean = false): any | null {
 
 /**
  * Get the auth token from localStorage
- * (Previously deprecated, now used for auth token creation)
  */
 export function getAuthToken(debug: boolean = false): string | null {
   if (debug) console.log('[AUTH] Getting auth token');
@@ -64,10 +63,18 @@ export function getAuthToken(debug: boolean = false): string | null {
     return null;
   }
   
-  const user = getCurrentUser();
+  // Try to get token from localStorage first
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    return token;
+  }
   
+  // If no token in localStorage, create a temporary one from user ID
+  const user = getCurrentUser();
   if (user) {
-    return `user-${user.id}-${Date.now()}`;
+    const newToken = `user-${user.id}-${Date.now()}`;
+    localStorage.setItem('authToken', newToken);
+    return newToken;
   }
   
   return null;
@@ -208,4 +215,26 @@ function emitAuthChangeEvent(isAuthenticated: boolean): void {
  */
 export function notifyAuthChange(): void {
   emitAuthChangeEvent(isAuthenticated());
+}
+
+/**
+ * Get authentication data from localStorage
+ * This is an alias for getCurrentUser for clarity
+ */
+export function getAuthData(): any | null {
+  return getCurrentUser();
+}
+
+/**
+ * Get the current user ID from the authentication state
+ * @returns User ID string or null if not authenticated
+ */
+export function getCurrentUserId(): string | null {
+  try {
+    const authData = getAuthData();
+    return authData?.id || null;
+  } catch (error) {
+    console.error('Error getting current user ID:', error);
+    return null;
+  }
 }

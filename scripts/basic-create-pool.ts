@@ -53,7 +53,7 @@ async function main() {
     const poolStart = Math.floor(Date.now() / 1000) + 60; // 1 minute from now
     const withdrawLockPeriod = 1800; // 30 minutes
     const claimLockEnd = 0; // No staking of rewards
-    const minimalDeposit = ethers.parseEther("1.0"); // 1 MOR
+    const minimalDeposit = ethers.utils.parseEther("1.0"); // 1 MOR
 
     // Calculate the pool ID
     const contractReadOnly = new ethers.Contract(
@@ -86,7 +86,7 @@ async function main() {
     
     if (allowance < minimalDeposit) {
       console.log('🔄 Approving MOR tokens...');
-      const approveTx = await morToken.approve(TESTNET_BUILDERS_CONTRACT, ethers.parseEther("100.0"));
+      const approveTx = await morToken.approve(TESTNET_BUILDERS_CONTRACT, ethers.utils.parseEther("100.0"));
       console.log(`⏳ Approval transaction submitted: ${approveTx.hash}`);
       await approveTx.wait();
       console.log('✅ Approval confirmed');

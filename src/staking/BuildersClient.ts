@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 const getChecksumAddress = (address: string): string => {
     if (!address) return "";
     try {
-        return ethers.getAddress(address.toLowerCase());
+        return ethers.utils.getAddress(address.toLowerCase());
     } catch (error) {
         console.error("Invalid address format:", error);
         // Return the original address if conversion fails
@@ -200,12 +200,8 @@ export class BuildersClient {
      * @returns Pool ID (bytes32 hex string)
      */
     getPoolId(name: string): string {
-        try {
-            return ethers.id(name);
-        } catch (error) {
-            console.error("Error generating pool ID:", error);
-            throw error;
-        }
+        // Hash the name using keccak256 to generate a bytes32 pool ID
+        return ethers.utils.id(name);
     }
 
     /**
@@ -228,7 +224,7 @@ export class BuildersClient {
     ) {
         try {
             // Convert minDeposit to wei
-            const minDepositWei = ethers.parseEther(minDeposit);
+            const minDepositWei = ethers.utils.parseEther(minDeposit);
             
             // Create the BuilderPool struct
             const builderPool = {
@@ -278,17 +274,17 @@ export class BuildersClient {
                 },
                 minimalDeposit: {
                     wei: poolInfo.minimalDeposit,
-                    formatted: ethers.formatEther(poolInfo.minimalDeposit)
+                    formatted: ethers.utils.formatEther(poolInfo.minimalDeposit)
                 },
                 poolData: {
                     lastDeposit: Number(poolData.lastDeposit),
                     deposited: {
                         wei: poolData.deposited,
-                        formatted: ethers.formatEther(poolData.deposited)
+                        formatted: ethers.utils.formatEther(poolData.deposited)
                     },
                     virtualDeposited: {
                         wei: poolData.virtualDeposited,
-                        formatted: ethers.formatEther(poolData.virtualDeposited)
+                        formatted: ethers.utils.formatEther(poolData.virtualDeposited)
                     },
                     rate: poolData.rate,
                     pendingRewards: poolData.pendingRewards
@@ -307,7 +303,7 @@ export class BuildersClient {
      */
     async approveMorTokens(amount: string) {
         try {
-            const amountWei = ethers.parseEther(amount);
+            const amountWei = ethers.utils.parseEther(amount);
             const tx = await this.morToken.approve(this.contractAddress, amountWei);
             return tx;
         } catch (error) {
@@ -355,7 +351,7 @@ export class BuildersClient {
     async deposit(poolId: string, amount: string) {
         try {
             // Convert amount to wei
-            const amountWei = ethers.parseEther(amount);
+            const amountWei = ethers.utils.parseEther(amount);
             
             // Submit deposit transaction
             const tx = await this.buildersContract.deposit(poolId, amountWei);
@@ -376,7 +372,7 @@ export class BuildersClient {
     async withdraw(poolId: string, amount: string) {
         try {
             // Convert amount to wei
-            const amountWei = ethers.parseEther(amount);
+            const amountWei = ethers.utils.parseEther(amount);
             
             // Submit withdraw transaction
             const tx = await this.buildersContract.withdraw(poolId, amountWei);
@@ -409,11 +405,11 @@ export class BuildersClient {
                 },
                 deposited: {
                     wei: userData.deposited,
-                    formatted: ethers.formatEther(userData.deposited)
+                    formatted: ethers.utils.formatEther(userData.deposited)
                 },
                 virtualDeposited: {
                     wei: userData.virtualDeposited,
-                    formatted: ethers.formatEther(userData.virtualDeposited)
+                    formatted: ethers.utils.formatEther(userData.virtualDeposited)
                 }
             };
         } catch (error) {
@@ -430,7 +426,7 @@ export class BuildersClient {
     async getCurrentBuilderReward(poolId: string): Promise<string> {
         try {
             const rewardWei = await this.buildersContract.getCurrentBuilderReward(poolId);
-            return ethers.formatEther(rewardWei);
+            return ethers.utils.formatEther(rewardWei);
         } catch (error) {
             console.error("Error getting current builder reward:", error);
             throw error;
@@ -473,7 +469,7 @@ export class BuildersClient {
     ) {
         try {
             // Convert minDeposit to wei
-            const minDepositWei = ethers.parseEther(minDeposit);
+            const minDepositWei = ethers.utils.parseEther(minDeposit);
             
             // Create the BuilderPool struct
             const builderPool = {
@@ -538,12 +534,12 @@ export class BuildersClient {
             return {
                 totalVirtualDeposited: {
                     wei: totalData.totalVirtualDeposited,
-                    formatted: ethers.formatEther(totalData.totalVirtualDeposited)
+                    formatted: ethers.utils.formatEther(totalData.totalVirtualDeposited)
                 },
                 rate: totalData.rate,
                 distributedRewards: {
                     wei: totalData.distributedRewards,
-                    formatted: ethers.formatEther(totalData.distributedRewards)
+                    formatted: ethers.utils.formatEther(totalData.distributedRewards)
                 }
             };
         } catch (error) {
@@ -553,27 +549,26 @@ export class BuildersClient {
     }
 
     /**
-     * Get the fee for a specific operation
-     * @param operation The operation type (usually a string converted to bytes32)
-     * @returns Fee information including amount and treasury address
+     * Get fee for an operation
+     * @param operation Operation name
+     * @returns Promise resolving to fee amount and treasury address
      */
     async getOperationFee(operation: string) {
+        if (!this.feeConfig) {
+            return { fee: "0", treasury: this.treasuryAddress };
+        }
+        
         try {
-            if (!this.feeConfig) {
-                throw new Error("FeeConfig contract not initialized");
-            }
-            
             const address = await this.signer.getAddress();
-            const result = await this.feeConfig.getUserFee(address, ethers.id(operation));
+            const result = await this.feeConfig.getUserFee(address, ethers.utils.id(operation));
             
             return {
-                fee: result.fee,
-                feeFormatted: ethers.formatEther(result.fee),
+                fee: ethers.utils.formatEther(result.fee),
                 treasury: result.treasury
             };
         } catch (error) {
             console.error("Error getting operation fee:", error);
-            throw error;
+            return { fee: "0", treasury: this.treasuryAddress };
         }
     }
 
@@ -588,7 +583,7 @@ export class BuildersClient {
             }
             
             const totalRewards = await this.buildersTreasury.getAllRewards();
-            return ethers.formatEther(totalRewards);
+            return ethers.utils.formatEther(totalRewards);
         } catch (error) {
             console.error("Error getting total treasury rewards:", error);
             return "0";
@@ -606,7 +601,7 @@ export class BuildersClient {
                 throw new Error("BuildersTreasury contract not initialized");
             }
             
-            const amountWei = ethers.parseEther(amount);
+            const amountWei = ethers.utils.parseEther(amount);
             
             // First approve the treasury to spend tokens
             const approveTx = await this.morToken.approve(this.treasuryAddress, amountWei);
@@ -639,7 +634,7 @@ export class BuildersClient {
             const balance = await this.morToken.balanceOf(safeAddress);
             totalStaked = balance;
             
-            return ethers.formatEther(totalStaked);
+            return ethers.utils.formatEther(totalStaked);
         } catch (error) {
             console.error("Error getting total staked amount:", error);
             return "0";

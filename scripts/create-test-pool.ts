@@ -83,7 +83,7 @@ async function main() {
     const balance = await buildersClient.getMorBalance();
     console.log(`\n💰 MOR token balance: ${ethers.formatEther(balance)} MOR`);
     
-    if (balance < ethers.parseEther(initialDeposit)) {
+    if (balance < ethers.utils.parseEther(initialDeposit)) {
       console.error(`❌ Insufficient MOR tokens. Need at least ${initialDeposit} MOR.`);
       return;
     }
@@ -95,7 +95,7 @@ async function main() {
     // The deposit amount we'll use for testing
     const depositAmount = initialDeposit;
     
-    if (allowance < ethers.parseEther(depositAmount)) {
+    if (allowance < ethers.utils.parseEther(depositAmount)) {
       console.log(`🔄 Approving exactly ${depositAmount} MOR tokens...`);
       const approveTx = await buildersClient.approveMorTokens(depositAmount);
       console.log(`⏳ Approval transaction submitted: ${approveTx.hash}`);
