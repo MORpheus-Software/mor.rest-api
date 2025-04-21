@@ -110,6 +110,8 @@ export default function Staking({
   const [apiAccessEnabled, setApiAccessEnabled] = useState(false);
   const [blockchainError, setBlockchainError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Access wallet context
   const { provider, signer, address, isConnected, connectWallet, disconnectWallet } = useWallet();
@@ -124,11 +126,20 @@ export default function Staking({
   const fetchUserData = async () => {
     if (!address || !buildersClient || !selectedPool) return;
     
+    console.log('Fetching user data for address:', address);
+    console.log('Selected pool:', selectedPool);
+    setIsRefreshing(true);
+    
     try {
-      console.log('Fetching user data for address:', address);
       // Get MOR balance
-      const morBalance = await buildersClient.getMorBalance();
-      setUserBalance(ethers.formatEther(morBalance));
+      try {
+        const morBalance = await buildersClient.getMorBalance();
+        console.log('MOR balance:', morBalance.toString());
+        // Fix: Use formatEther from utils
+        setUserBalance(ethers.utils.formatEther(morBalance));
+      } catch (balanceError) {
+        console.error("Error fetching MOR balance:", balanceError);
+      }
       
       // Get staked balance
       try {
@@ -145,8 +156,14 @@ export default function Staking({
           console.error("Error fetching user data:", userDataError);
         }
       }
+      
+      // Record successful fetch time
+      setLastFetchTime(Date.now());
+      setInitialLoadDone(true);
     } catch (error) {
-      console.error("Error fetching user balances:", error);
+      console.error("Error in fetchUserData:", error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -178,6 +195,7 @@ export default function Staking({
   
   // Reset states when network changes
   useEffect(() => {
+    console.log('Network changed to:', networkType);
     // Clear errors and reset UI state when network changes
     setBlockchainError(null);
     setError('');
@@ -187,11 +205,16 @@ export default function Staking({
     setSelectedPool('');
     setMinStakeRequired('0');
     setApiAccessEnabled(false);
+    setInitialLoadDone(false);
+    setLastFetchTime(0);
   }, [networkType]);
   
   // Load builder pools when component mounts or network changes
   useEffect(() => {
     const initializeWithNetwork = async () => {
+      console.log('Initializing with network:', networkType);
+      console.log('Wallet connected:', isConnected);
+      
       // Clear previous data
       setPools([]);
       setLoadingPools(true);
@@ -200,6 +223,7 @@ export default function Staking({
       // Initialize client when wallet is connected
       if (isConnected && signer && provider) {
         try {
+          console.log('Creating BuildersClient with connected wallet');
           const addresses = CONTRACT_ADDRESSES[networkType];
           const client = new BuildersClient(
             provider, 
@@ -227,12 +251,14 @@ export default function Staking({
           setSelectedPool(networkSubnets[0].id);
           setMinStakeRequired(networkSubnets[0].minimalDeposit.formatted);
           
-          // Important: After client and pool are initialized, immediately attempt to fetch user data
-          // This ensures we don't rely only on dependency changes to trigger data loading
+          // Important: After client and pool are initialized, wait for state updates to complete
+          // then fetch user data if we have an address
           if (address) {
-            console.log('Wallet already connected, fetching initial data');
-            // We need to wait for the state update to complete, so use setTimeout
-            setTimeout(fetchUserData, 100);
+            console.log('Wallet already connected, queueing initial data fetch');
+            setTimeout(() => {
+              console.log('Executing delayed fetch');
+              fetchUserData();
+            }, 300);
           }
           
         } catch (err) {
@@ -244,6 +270,7 @@ export default function Staking({
       } else {
         // Even when wallet is not connected, initialize with network subnets
         try {
+          console.log('Initializing without connected wallet');
           // Get configured subnets for the current network
           const networkSubnets = NETWORK_SUBNETS[networkType] || [];
           
@@ -279,25 +306,41 @@ export default function Staking({
     };
     
     initializeWithNetwork();
-  }, [isConnected, provider, signer, networkType, address]);
-  
+  }, [isConnected, networkType, provider, signer, address]);
+
   // Load user MOR balance when wallet is connected or dependencies change
   useEffect(() => {
-    if (isConnected && address && buildersClient && selectedPool) {
-      console.log('Dependencies changed, fetching user balances');
+    console.log('Dependency change detected in dataLoading effect');
+    console.log('Connected:', isConnected);
+    console.log('Address:', address);
+    console.log('BuildersClient:', buildersClient ? 'initialized' : 'null');
+    console.log('SelectedPool:', selectedPool);
+    
+    // Check if we need to fetch data
+    const shouldFetchData = 
+      isConnected && 
+      address && 
+      buildersClient && 
+      selectedPool && 
+      (Date.now() - lastFetchTime > 30000 || !initialLoadDone);
+    
+    if (shouldFetchData) {
+      console.log('Dependencies valid, fetching user balances');
       fetchUserData();
-      setInitialLoadDone(true);
     }
-  }, [isConnected, address, buildersClient, selectedPool, minStakeRequired]);
+  }, [isConnected, address, buildersClient, selectedPool, minStakeRequired, lastFetchTime, initialLoadDone]);
 
   // Also ensure we fetch data when coming back to the page
   useEffect(() => {
-    if (isConnected && buildersClient && selectedPool && address && initialLoadDone) {
+    if (isConnected && buildersClient && selectedPool && address) {
       // This helps when the page was hidden and becomes visible again
       const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
           console.log('Page became visible, refreshing balances');
-          fetchUserData();
+          // Only fetch if we haven't fetched recently
+          if (Date.now() - lastFetchTime > 30000) {
+            fetchUserData();
+          }
         }
       };
       
@@ -307,7 +350,7 @@ export default function Staking({
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
     }
-  }, [isConnected, buildersClient, selectedPool, address, initialLoadDone]);
+  }, [isConnected, buildersClient, selectedPool, address, lastFetchTime]);
 
   // Handle staking MOR tokens
   const handleStake = async () => {
@@ -360,7 +403,8 @@ export default function Staking({
       const allowance = await buildersClient.getMorAllowance();
       const amountToStakeWei = ethers.utils.parseEther(stakeAmount);
       
-      if (allowance < amountToStakeWei) {
+      // Fix: Convert BigNumber to BigInt for comparison
+      if (allowance < BigInt(amountToStakeWei.toString())) {
         setSuccess('Approving tokens for staking...');
         const approveTx = await buildersClient.approveMorTokens(stakeAmount);
         await approveTx.wait();
@@ -373,27 +417,8 @@ export default function Staking({
         setSuccess('Transaction submitted. Waiting for confirmation...');
         await tx.wait();
         
-        // Update staked balance
-        if (address) {
-          try {
-            const userData = await buildersClient.getUserData(address, selectedPool);
-            console.log('Updated user data:', JSON.stringify(userData, jsonStringifyReplacer, 2));
-            setStakedBalance(userData.deposited.formatted);
-            
-            // Check if user has met the minimum requirement
-            setApiAccessEnabled(parseFloat(userData.deposited.formatted) >= parseFloat(minStakeRequired));
-          } catch (err) {
-            console.error("Error updating staked balance:", err);
-          }
-          
-          // Update MOR balance
-          try {
-            const morBalance = await buildersClient.getMorBalance();
-            setUserBalance(ethers.formatEther(morBalance));
-          } catch (err) {
-            console.error("Error updating MOR balance:", err);
-          }
-        }
+        // Force a refresh of user data
+        await fetchUserData();
         
         setSuccess(`Successfully staked ${stakeAmount} MOR!`);
         setStakeAmount('');
@@ -483,27 +508,8 @@ export default function Staking({
         setSuccess('Transaction submitted. Waiting for confirmation...');
         await tx.wait();
         
-        // Update staked balance
-        if (address) {
-          try {
-            const userData = await buildersClient.getUserData(address, selectedPool);
-            console.log('Updated user data after withdrawal:', JSON.stringify(userData, jsonStringifyReplacer, 2));
-            setStakedBalance(userData.deposited.formatted);
-            
-            // Check if user has met the minimum requirement
-            setApiAccessEnabled(parseFloat(userData.deposited.formatted) >= parseFloat(minStakeRequired));
-          } catch (err) {
-            console.error("Error updating staked balance:", err);
-          }
-          
-          // Update MOR balance
-          try {
-            const morBalance = await buildersClient.getMorBalance();
-            setUserBalance(ethers.formatEther(morBalance));
-          } catch (err) {
-            console.error("Error updating MOR balance:", err);
-          }
-        }
+        // Force a refresh of user data
+        await fetchUserData();
         
         setSuccess(`Successfully unstaked ${stakeAmount} MOR!`);
         setStakeAmount('');
@@ -582,6 +588,15 @@ export default function Staking({
       await connectWallet();
     } catch (error) {
       console.error("Error connecting wallet:", error);
+    }
+  };
+
+  // Manual refresh function for users to force data reload
+  const handleRefresh = () => {
+    if (isConnected && buildersClient && selectedPool && address) {
+      console.log('Manually refreshing staking data');
+      setLastFetchTime(0);
+      fetchUserData();
     }
   };
 
@@ -679,12 +694,30 @@ export default function Staking({
                   
                   <div className="mt-4 pt-4 border-t border-gray-100 grid gap-6 md:grid-cols-2">
                     <div className="bg-gray-50 p-4 rounded-lg">
-                      <h2 className="text-lg font-semibold mb-2">Your MOR balance</h2>
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-lg font-semibold">Your MOR balance</h2>
+                        <button 
+                          onClick={handleRefresh} 
+                          disabled={isRefreshing}
+                          className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
+                        >
+                          {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                        </button>
+                      </div>
                       <p className="text-xl">{userBalance} MOR</p>
                     </div>
                     
                     <div className="bg-gray-50 p-4 rounded-lg">
-                      <h2 className="text-lg font-semibold mb-2">Your Staked MOR</h2>
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-lg font-semibold">Your Staked MOR</h2>
+                        <button 
+                          onClick={handleRefresh} 
+                          disabled={isRefreshing}
+                          className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
+                        >
+                          {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                        </button>
+                      </div>
                       <p className="text-xl">{stakedBalance} MOR</p>
                       <p className="text-sm text-gray-600 mt-1">Minimum Required: {minStakeRequired} MOR</p>
                       
