@@ -7,6 +7,11 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// Configure chain ID from environment or use sensible defaults (mainnet: 42161, testnet: 421613)
+const CHAIN_ID = process.env.ETHEREUM_CHAIN_ID
+  ? parseInt(process.env.ETHEREUM_CHAIN_ID, 10)
+  : (process.env.NODE_ENV === 'production' ? 42161 : 421613);
+
 /**
  * Initialize the stake status tracking system on server startup
  * @returns Promise that resolves when initialization is complete
@@ -33,7 +38,8 @@ export async function initializeStakeTrackingSystem(): Promise<void> {
     
     // Create provider and test connection
     try {
-      provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+      // Pass explicit chain ID to avoid network autodetection issues
+      provider = new ethers.providers.JsonRpcProvider(rpcUrl, CHAIN_ID);
       blockNumber = await provider.getBlockNumber();
       console.log(chalk.green(`[STAKE_TRACKER] Connected to blockchain. Current block: ${blockNumber}`));
     } catch (error) {

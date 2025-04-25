@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getRedisClient } from '../../server/setupRedis';
 import { StakeStatus } from '../../staking/StakeStatusTracker';
 import chalk from 'chalk';
+import { associateUserWithWallet } from '../../server/setupRedis';
 
 // Redis key prefix for stake status
 const STAKE_STATUS_PREFIX = 'stake:status:';
@@ -129,9 +130,54 @@ export async function getUserStakeStatus(req: Request, res: Response) {
   }
 }
 
+/**
+ * Associate a wallet address with a user account
+ * @param req Request object containing userId and walletAddress
+ * @param res Response object
+ */
+export async function associateWalletWithUser(req: Request, res: Response) {
+  try {
+    const { userId } = req.body;
+    const { walletAddress } = req.body;
+    
+    if (!userId || !walletAddress) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID and wallet address are required'
+      });
+    }
+    
+    // Validate wallet address format
+    if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid wallet address format'
+      });
+    }
+    
+    // Associate user with wallet using the existing Redis helper function
+    await associateUserWithWallet(userId, walletAddress);
+    
+    return res.json({
+      success: true,
+      data: {
+        userId,
+        walletAddress: walletAddress.toLowerCase()
+      }
+    });
+  } catch (error) {
+    console.error(chalk.red('[API] Error associating wallet with user:'), error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to associate wallet with user'
+    });
+  }
+}
+
 // Export all handlers
 export default {
   getStakeStatus,
   getAllPools,
-  getUserStakeStatus
+  getUserStakeStatus,
+  associateWalletWithUser
 }; 

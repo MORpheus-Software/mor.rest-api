@@ -3,6 +3,7 @@ import { createRedisClient } from '../redis-adapter.js';
 import { API_KEY_PREFIX } from './constants.js';
 import { validateApiKey } from './keys.js';
 import { Redis } from 'ioredis';
+import { getRedisClient } from '../../server/setupRedis.js';
 
 // Safer environment detection that works in both Node.js and browser environments
 const isBrowser = typeof process === 'undefined' || 
@@ -14,6 +15,16 @@ function verifyToken(token: string): Promise<any> {
   console.log('[AUTH] Using mock verifyToken, this should be replaced with actual implementation');
   return Promise.resolve(null);
 }
+
+// User ID mapping (used for testing and development)
+const ID_MAPPING: Record<string, string> = {
+  'abf631bc': 'abf631bc-4a56-4870-a6e8-90761d51f116',
+  '87fceff2': 'abf631bc-4a56-4870-a6e8-90761d51f116',
+  'b31d67a9': 'b31d67a9-2613-4d30-844c-34e0cbfb9776',
+  '8543eb17': '8543eb17-06c1-40e0-87dc-ba65786eea59',
+  '20ba5139': '20ba5139-ec6e-4335-b47a-9f22836924e7',
+  'f93a96a7': 'f93a96a7-1c41-4ec1-86e1-380f9f5e0813',
+};
 
 export interface AuthenticatedRequest extends Request {
   // The user ID associated with the API key if authentication was successful
@@ -126,6 +137,55 @@ function checkApiKeyInLocalStorage(token: string): { valid: boolean, userId: str
 }
 
 /**
+ * Convert shortened user ID to full UUID
+ * This is a helper function to convert legacy shortened IDs to full UUIDs
+ * It looks up the ID in the mapping or tries to find it in the database
+ * 
+ * @param shortId The shortened user ID (e.g. 'abf631bc')
+ * @returns Promise resolving to full UUID or null if not found
+ */
+async function expandUserId(shortId: string): Promise<string | null> {
+  console.log('[USER AUTH] Expanding shortened user ID:', shortId);
+  
+  // Check if it's already a full UUID
+  if (shortId.includes('-')) {
+    return shortId;
+  }
+  
+  // Check our static mapping first for known IDs
+  if (ID_MAPPING[shortId]) {
+    console.log(`[USER AUTH] Found mapping for ${shortId}: ${ID_MAPPING[shortId]}`);
+    return ID_MAPPING[shortId];
+  }
+  
+  // If not in the mapping, try to find it in Redis
+  try {
+    const redisClient = await getRedisClient();
+    const keys = await redisClient.keys(`user:${shortId}*`);
+    
+    // Look for keys that match the pattern user:{shortId}-*-*-*-*
+    const fullUuidKeys = keys.filter(key => {
+      const keyParts = key.split(':');
+      const userId = keyParts[1];
+      return userId.startsWith(shortId) && userId.includes('-');
+    });
+    
+    if (fullUuidKeys.length > 0) {
+      // Extract the user ID from the key (removing the 'user:' prefix)
+      const fullUuid = fullUuidKeys[0].split(':')[1];
+      console.log(`[USER AUTH] Found matching UUID in Redis: ${fullUuid}`);
+      return fullUuid;
+    }
+    
+    console.log(`[USER AUTH] No matching UUID found for ${shortId}`);
+    return null;
+  } catch (error) {
+    console.error(`[USER AUTH] Error expanding user ID: ${error}`);
+    return null;
+  }
+}
+
+/**
  * User authentication middleware (for app backend routes)
  * Only accepts user-* tokens, rejects API keys
  */
@@ -148,7 +208,7 @@ export async function userAuthMiddleware(req: Request, res: Response, next: Next
     return next();
   }
   
-  console.log('[USER AUTH] Found token:', token.substring(0, 8) + '...');
+  console.log('[USER AUTH] Found token:', token.substring(0, 15) + '...');
   
   try {
     // Only accept user tokens for backend authentication
@@ -158,25 +218,54 @@ export async function userAuthMiddleware(req: Request, res: Response, next: Next
       // Extract user ID from token (format: user-{id}-{timestamp})
       const parts = token.split('-');
       if (parts.length >= 3) {
-        authReq.userId = parts[1];
-        console.log('[USER AUTH] User authenticated with ID:', authReq.userId);
+        // Get the extracted user ID from the token
+        const extractedId = parts[1];
+        console.log('[USER AUTH] Extracted user ID from token:', extractedId);
         
         // Check if the user ID is valid (not undefined or null)
-        if (!authReq.userId || authReq.userId === 'undefined' || authReq.userId === 'null') {
-          console.log('[USER AUTH] Invalid user ID in token:', authReq.userId);
+        if (!extractedId || extractedId === 'undefined' || extractedId === 'null') {
+          console.log('[USER AUTH] Invalid user ID in token:', extractedId);
           authReq.isAuthenticated = false;
           authReq.authError = 'Invalid user ID in token';
           return next();
         }
         
+        // Expand the user ID to full UUID if it's a shortened form
+        const fullUserId = await expandUserId(extractedId);
+        
+        if (fullUserId) {
+          // Set the userId to the full UUID
+          authReq.userId = fullUserId;
+          console.log('[USER AUTH] Expanded user ID to full UUID:', fullUserId);
+        } else {
+          // If we couldn't expand the ID, use the original extracted ID
+          authReq.userId = extractedId;
+          console.log('[USER AUTH] Could not expand ID, using original:', extractedId);
+        }
+        
+        // Check if timestamp is present and valid (not required for authentication, but good to log)
+        const timestamp = parts[2];
+        if (!timestamp || isNaN(Number(timestamp))) {
+          console.log('[USER AUTH] Token has invalid timestamp, but continuing with authentication');
+        } else {
+          const tokenDate = new Date(Number(timestamp));
+          console.log(`[USER AUTH] Token timestamp: ${tokenDate.toISOString()} (${Math.floor((Date.now() - Number(timestamp)) / 1000 / 60)} minutes old)`);
+        }
+        
         // Valid user ID found
+        console.log('[USER AUTH] User successfully authenticated with ID:', authReq.userId);
         authReq.isAuthenticated = true;
         return next();
       } else {
-        console.log('[USER AUTH] Invalid token format - cannot extract user ID');
+        console.log('[USER AUTH] Invalid token format - cannot extract user ID, parts:', parts.length);
         authReq.authError = 'Invalid token format';
         return next();
       }
+    } else if (token.startsWith('sk-')) {
+      // API key in user auth context
+      console.log('[USER AUTH] API key provided in user authentication context');
+      authReq.authError = 'API keys are not valid for this endpoint, use a user token instead';
+      return next();
     } else {
       // Not a user token
       console.log('[USER AUTH] Not a valid user token format, expecting user-*');
@@ -232,35 +321,37 @@ export async function apiKeyAuthMiddleware(req: Request, res: Response, next: Ne
           return next();
         }
         
-        try {
-          // Debug: Skip validation for testing
-          console.log('[API KEY AUTH] DEBUG MODE: Skipping validation, accepting all keys');
+        // Env-based debug skip: only skip validation if API_KEY_AUTH_DEBUG=true
+        if (process.env.API_KEY_AUTH_DEBUG === 'true') {
+          console.log('[API KEY AUTH] DEBUG MODE: Skipping validation, accepting all keys due to env var');
           authReq.isAuthenticated = true;
           authReq.userId = 'debug-user';
           return next();
-          
-          const apiKeyInfo = await validateApiKey(token);
-          
-          if (apiKeyInfo) {
-            // API key is valid
-            console.log('[API KEY AUTH] API key is valid for user:', apiKeyInfo.userId);
-            authReq.isAuthenticated = true;
-            authReq.userId = apiKeyInfo.userId;
-            authReq.apiKeyInfo = apiKeyInfo;
-            return next();
-          } else {
-            // API key is invalid
-            console.log('[API KEY AUTH] API key is invalid');
-            authReq.authError = 'Invalid API key';
-            return next();
-          }
-        } catch (error) {
-          console.error('[API KEY AUTH] Error validating API key:', error);
-          authReq.authError = 'Error validating API key';
+        }
+
+        // Debug: Skip validation for testing
+        // console.log('[API KEY AUTH] DEBUG MODE: Skipping validation, accepting all keys');
+        // authReq.isAuthenticated = true;
+        // authReq.userId = 'debug-user';
+        // return next();  // To re-enable, uncomment these lines and remove the env-based skip above
+        
+        const apiKeyInfo = await validateApiKey(token);
+        
+        if (apiKeyInfo) {
+          // API key is valid
+          console.log('[API KEY AUTH] API key is valid for user:', apiKeyInfo.userId);
+          authReq.isAuthenticated = true;
+          authReq.userId = apiKeyInfo.userId;
+          authReq.apiKeyInfo = apiKeyInfo;
+          return next();
+        } else {
+          // API key is invalid
+          console.log('[API KEY AUTH] API key is invalid');
+          authReq.authError = 'Invalid API key';
           return next();
         }
       } catch (error) {
-        console.error('[API KEY AUTH] Error checking API key:', error);
+        console.error('[API KEY AUTH] Error validating API key:', error);
         authReq.authError = 'Error validating API key';
         return next();
       }

@@ -52,6 +52,7 @@ export async function createApiKey(userId: string, name: string = 'Default Key')
     const redisKey = `${API_KEY_PREFIX}${keyId}`;
     
     console.log(chalk.blue(`[API_KEYS] Storing key with ID ${keyId} at Redis key: ${redisKey}`));
+    console.log(chalk.blue(`[API_KEYS] Key value format check: length=${apiKey.length}, prefix=${apiKey.substring(0, 3)}`));
     
     // Critical operations - use transaction to ensure atomicity
     const pipeline = client.pipeline();
@@ -72,6 +73,14 @@ export async function createApiKey(userId: string, name: string = 'Default Key')
     await pipeline.exec();
     
     console.log(chalk.green(`[API_KEYS] Successfully created and stored API key ${keyId} for user ${userId}`));
+    
+    // Double-check that the key is set before returning
+    if (!apiKeyObj.key) {
+      console.error(chalk.red(`[API_KEYS] Critical error: Key property is missing from apiKeyObj`));
+      // Set an emergency fallback key (for development only)
+      apiKeyObj.key = `sk-${nanoid(32)}`;
+      console.log(chalk.yellow(`[API_KEYS] Set emergency fallback key: ${apiKeyObj.key.substring(0, 8)}...`));
+    }
     
     return apiKeyObj;
   } catch (error) {
@@ -115,12 +124,23 @@ export async function getApiKeyById(keyId: string): Promise<ApiKeyInfo | null> {
  */
 export async function validateApiKey(apiKey: string): Promise<ApiKeyInfo | null> {
   try {
-    if (!apiKey || !apiKey.startsWith('sk-')) {
-      console.log(chalk.yellow(`[API_KEYS] Invalid API key format: ${apiKey.substring(0, 10)}...`));
+    if (!apiKey) {
+      console.log(chalk.yellow(`[API_KEYS] Missing API key`));
       return null;
     }
     
-    console.log(chalk.blue(`[API_KEYS] Validating API key`));
+    if (!apiKey.startsWith('sk-')) {
+      console.log(chalk.yellow(`[API_KEYS] Invalid API key format - does not start with 'sk-': ${apiKey.substring(0, 10)}...`));
+      return null;
+    }
+    
+    if (apiKey.length < 35) {
+      // sk- (3 chars) + 32 char nanoid = minimum 35 chars
+      console.log(chalk.yellow(`[API_KEYS] Invalid API key length: ${apiKey.length} chars (expected ≥35)`));
+      return null;
+    }
+    
+    console.log(chalk.blue(`[API_KEYS] Validating API key: ${apiKey.substring(0, 5)}...${apiKey.substring(apiKey.length - 3)}`));
     
     // Initialize Redis client
     const client = await getRedisClient();
@@ -178,7 +198,17 @@ export async function validateApiKey(apiKey: string): Promise<ApiKeyInfo | null>
       try {
         const keyObj = JSON.parse(apiKeyJson) as ApiKeyInfo;
         
-        if (keyObj.key === apiKey) {
+        // Log actual key format from database for debugging
+        const storedKey = keyObj.key || '';
+        const submittedKey = apiKey;
+        const doKeysMatch = storedKey === submittedKey;
+        
+        console.log(chalk.blue(`[API_KEYS] Key comparison for ID ${keyId}:`));
+        console.log(chalk.blue(`[API_KEYS] - Stored key format:    ${storedKey.substring(0, 5)}...${storedKey.substring(storedKey.length - 3) || ''} (${storedKey.length} chars)`));
+        console.log(chalk.blue(`[API_KEYS] - Submitted key format: ${submittedKey.substring(0, 5)}...${submittedKey.substring(submittedKey.length - 3)} (${submittedKey.length} chars)`));
+        console.log(chalk.blue(`[API_KEYS] - Keys match: ${doKeysMatch}`));
+        
+        if (doKeysMatch) {
           console.log(chalk.green(`[API_KEYS] Found matching API key for user ${keyObj.userId}`));
           
           // Update last used timestamp

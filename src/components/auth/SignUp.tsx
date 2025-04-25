@@ -86,8 +86,15 @@ export function SignUpForm() {
       const responseData = await response.json();
       console.log('[SIGNUP] Registration parsed response:', responseData);
       
-      // FIXED: Make sure we're accessing the correct path to the user object
-      const user = responseData.data;
+      // Process and store user data
+      const user = {
+        id: responseData.data.id,
+        email: responseData.data.email,
+        name: responseData.data.name || formData.name,
+        company: responseData.data.company || formData.company || '',
+        createdAt: responseData.data.createdAt || new Date().toISOString(),
+        authToken: `user-${responseData.data.id}-${Date.now()}`
+      };
       
       console.log('[SIGNUP] User registration response object structure:', JSON.stringify(responseData, null, 2));
       console.log('[SIGNUP] User data object structure:', JSON.stringify(user, null, 2));

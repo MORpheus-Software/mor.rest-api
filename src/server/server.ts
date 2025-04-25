@@ -10,7 +10,7 @@ import keyHandlers from '../api/v1/keys.js';
 import metricsHandlers from '../api/v1/metrics.js';
 import authHandlers from '../api/v1/auth.js';
 import stakingHandlers from '../api/v1/staking.js';
-import { checkRedisConnection } from './setupRedis.js';
+import { checkRedisConnection, getRedisClient, associateUserWithWallet } from './setupRedis.js';
 import { 
   userAuthMiddleware, 
   apiKeyAuthMiddleware, 
@@ -19,7 +19,8 @@ import {
 import { combinedStakeCheckMiddleware } from '../lib/api/staking-middleware.js';
 import fs from 'fs';
 import { initializeStakeTrackingSystem } from './initStakeTracking.js';
-import { getRedisClient } from './setupRedis.js';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+import { ApiKey } from '../lib/api/api-key-middleware';
 
 // Load environment variables
 dotenv.config();
@@ -256,13 +257,14 @@ appManagementRouter.get('/staking/check-status', requireAuth, async (req, res) =
 stakingRouter.get('/status/:userAddress/:poolId', stakingHandlers.getStakeStatus);
 stakingRouter.get('/pools', stakingHandlers.getAllPools);
 stakingRouter.get('/user/:userAddress', stakingHandlers.getUserStakeStatus);
+stakingRouter.post('/associate-wallet', requireAuth, stakingHandlers.associateWalletWithUser);
 
 // Apply API key authentication to NFA service proxy endpoints
 nfaServiceRouter.use(apiKeyAuthMiddleware);
 
 // NFA service proxy endpoints - require API key authentication and combined stake checking
 // The combined middleware prioritizes blockchain checks with a grace period fallback to database
-nfaServiceRouter.post('/chat/completions', requireAuth, combinedStakeCheckMiddleware, (req, res) => {
+nfaServiceRouter.post('/chat/completions', apiKeyAuthMiddleware, combinedStakeCheckMiddleware, (req, res) => {
   chatCompletionsHandler.postChatCompletion(req, res);
 });
 
@@ -327,6 +329,154 @@ nfaServiceRouter.get('/debug/check-stake', requireAuth, async (req, res) => {
         message: 'Error checking stake status',
         code: 'STAKE_CHECK_ERROR',
         canAccess: false
+      }
+    });
+  }
+});
+
+// Debug endpoint to test wallet association
+nfaServiceRouter.get('/debug/check-wallet-association', requireAuth, async (req, res) => {
+  try {
+    const authReq = req as any;
+    const userId = authReq.userId;
+    
+    if (!userId) {
+      return res.status(401).json({
+        error: {
+          message: 'User not authenticated',
+          code: 'NOT_AUTHENTICATED'
+        }
+      });
+    }
+    
+    // Get Redis client
+    const redisClient = await getRedisClient();
+    
+    // Get user's wallet address
+    const walletAddress = await redisClient.get(`user:wallet:${userId}`);
+    
+    // Also check if there are any users associated with this wallet
+    let walletUsers = [];
+    if (walletAddress) {
+      walletUsers = await redisClient.smembers(`wallet:users:${walletAddress}`);
+    }
+    
+    return res.json({
+      userId,
+      walletAddress,
+      walletUsers,
+      hasWalletAssociation: !!walletAddress,
+      isUserInWalletSet: walletAddress ? walletUsers.includes(userId) : false
+    });
+  } catch (error) {
+    console.error(chalk.red(`[SERVER] Error checking wallet association: ${error}`));
+    return res.status(500).json({
+      error: {
+        message: 'Error checking wallet association',
+        code: 'WALLET_CHECK_ERROR'
+      }
+    });
+  }
+});
+
+// Debug endpoint to manually associate a wallet with a user
+nfaServiceRouter.post('/debug/associate-wallet', requireAuth, async (req, res) => {
+  try {
+    const authReq = req as any;
+    const userId = authReq.userId;
+    
+    if (!userId) {
+      return res.status(401).json({
+        error: {
+          message: 'User not authenticated',
+          code: 'NOT_AUTHENTICATED'
+        }
+      });
+    }
+    
+    const { walletAddress } = req.body;
+    
+    if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+      return res.status(400).json({
+        error: {
+          message: 'Valid wallet address is required',
+          code: 'INVALID_WALLET_ADDRESS'
+        }
+      });
+    }
+    
+    // Use the associateUserWithWallet function from setupRedis
+    await associateUserWithWallet(userId, walletAddress);
+    
+    // Get Redis client for verification
+    const redisClient = await getRedisClient();
+    
+    // Verify the association
+    const storedWalletAddress = await redisClient.get(`user:wallet:${userId}`);
+    const walletUsers = await redisClient.smembers(`wallet:users:${walletAddress.toLowerCase()}`);
+    
+    return res.json({
+      success: true,
+      userId,
+      walletAddress: walletAddress.toLowerCase(),
+      storedWalletAddress,
+      walletUsers,
+      hasWalletAssociation: !!storedWalletAddress,
+      isUserInWalletSet: walletUsers.includes(userId)
+    });
+  } catch (error) {
+    console.error(chalk.red(`[SERVER] Error manually associating wallet: ${error}`));
+    return res.status(500).json({
+      error: {
+        message: 'Error associating wallet',
+        code: 'WALLET_ASSOCIATION_ERROR'
+      }
+    });
+  }
+});
+
+// Debug endpoint to directly associate a wallet with test2 user (no auth required)
+app.post('/api/debug/set-test2-wallet', async (req, res) => {
+  try {
+    const fullUserId = "abf631bc-4a56-4870-a6e8-90761d51f116"; // test2 user ID in full UUID format
+    const { walletAddress } = req.body;
+    
+    if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+      return res.status(400).json({
+        error: {
+          message: 'Valid wallet address is required',
+          code: 'INVALID_WALLET_ADDRESS'
+        }
+      });
+    }
+    
+    console.log(chalk.green(`[DEBUG] Setting wallet ${walletAddress} for test2 user (${fullUserId})`));
+    
+    // Use the associateUserWithWallet function directly with the full UUID
+    await associateUserWithWallet(fullUserId, walletAddress);
+    
+    // Get Redis client for verification
+    const redisClient = await getRedisClient();
+    
+    // Verify the association
+    const storedWalletAddress = await redisClient.get(`user:wallet:${fullUserId}`);
+    const walletUsers = await redisClient.smembers(`wallet:users:${walletAddress.toLowerCase()}`);
+    
+    return res.json({
+      success: true,
+      userId: fullUserId,
+      walletAddress: walletAddress.toLowerCase(),
+      storedWalletAddress,
+      walletUsers,
+      hasWalletAssociation: !!storedWalletAddress,
+      isUserInWalletSet: walletUsers.includes(fullUserId)
+    });
+  } catch (error) {
+    console.error(chalk.red(`[DEBUG] Error setting test2 wallet: ${error}`));
+    return res.status(500).json({
+      error: {
+        message: 'Error setting test2 wallet',
+        code: 'WALLET_ASSOCIATION_ERROR'
       }
     });
   }

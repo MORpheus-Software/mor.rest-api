@@ -55,66 +55,57 @@ const getKeys = async (req: Request, res: Response) => {
 };
 
 // Create a new API key
-const createKey = async (req: Request, res: Response) => {
+export async function createKey(req: Request, res: Response) {
   try {
-    console.log('[API] Creating new API key');
-    
-    const authReq = req as AuthenticatedRequest;
-    
-    if (!authReq.isAuthenticated) {
-      return res.status(401).json({
-        error: {
-          message: 'Unauthorized',
-          type: 'unauthorized'
-        }
-      });
-    }
-    
+    const authReq = req as any;
     const userId = authReq.userId;
     
     if (!userId) {
-      return res.status(400).json({
-        error: {
-          message: 'Missing user ID',
-          type: 'invalid_request_error'
-        }
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
       });
     }
     
+    // Get key name from request
     const { name } = req.body;
     
     if (!name) {
       return res.status(400).json({
-        error: {
-          message: 'Missing API key name',
-          type: 'invalid_request_error'
-        }
+        success: false,
+        error: 'Key name is required'
       });
     }
     
-    const key = await createApiKey(userId, name);
+    // Create API key
+    // createApiKey is imported from '../lib/api/keys.js'
+    const keyInfo = await createApiKey(userId, name);
     
-    console.log(`[API] Created key ${key.key.substring(0, 8)}... for user ${userId}`);
+    console.log(`[API] Created API key ${keyInfo.id} for user ${userId}`);
     
-    return res.status(201).json({
+    // Ensure the API key is included in the response
+    if (!keyInfo.key) {
+      console.error(`[API] Critical error: Created API key ${keyInfo.id} is missing the key property`);
+    }
+    
+    // Return the API key
+    return res.json({
+      success: true,
       data: {
-        id: key.id,
-        name: key.name,
-        created: key.createdAt,
-        key: key.key
+        id: keyInfo.id,
+        key: keyInfo.key, // Make sure this is returned
+        name: keyInfo.name,
+        created_at: keyInfo.createdAt
       }
     });
   } catch (error) {
-    console.error('[API] Error creating key:', error);
-    
+    console.error('[API] Error creating API key:', error);
     return res.status(500).json({
-      error: {
-        message: 'Failed to create API key',
-        type: 'server_error'
-      }
+      success: false,
+      error: 'Failed to create API key'
     });
   }
-};
+}
 
 // Delete an API key
 const deleteKey = async (req: Request, res: Response) => {
@@ -217,3 +208,4 @@ export default {
   deleteKey,
   checkKeys
 };
+

@@ -3,6 +3,8 @@ import { ethers } from 'ethers';
 import { BuildersClient } from '../staking/BuildersClient';
 import { getChecksumAddress } from '../utils/addressUtils';
 import { useWallet } from '../context/WalletContext';
+import { FRONTEND_API_ENDPOINT } from '../lib/api/constants';
+import { useAuth } from '../hooks/useAuth';
 
 // Helper function to properly serialize BigInt values for logging
 const jsonStringifyReplacer = (key: string, value: any) => {
@@ -121,6 +123,9 @@ export default function Staking({
   
   // Add a flag to track if we've loaded data - needs to be at top level
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  
+  // Access auth context to get user information
+  const { userId, token } = useAuth();
   
   // Function to fetch user data - extract this to be callable from multiple places
   const fetchUserData = async () => {
@@ -327,6 +332,12 @@ export default function Staking({
     if (shouldFetchData) {
       console.log('Dependencies valid, fetching user balances');
       fetchUserData();
+      
+      // Associate wallet with user account if this is the first load
+      if (!initialLoadDone) {
+        console.log('First load, associating wallet with user account');
+        associateWalletWithUserAccount();
+      }
     }
   }, [isConnected, address, buildersClient, selectedPool, minStakeRequired, lastFetchTime, initialLoadDone]);
 
@@ -351,6 +362,37 @@ export default function Staking({
       };
     }
   }, [isConnected, buildersClient, selectedPool, address, lastFetchTime]);
+
+  // Helper function to associate wallet with user account
+  const associateWalletWithUserAccount = async () => {
+    if (!address || !userId) return;
+    
+    try {
+      console.log(`Associating wallet ${address} with user ${userId}`);
+      
+      const response = await fetch(`${FRONTEND_API_ENDPOINT}/staking/associate-wallet`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userId,
+          walletAddress: address
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('Successfully associated wallet with user account');
+      } else {
+        console.error('Failed to associate wallet with user account:', data.error);
+      }
+    } catch (error) {
+      console.error('Error associating wallet with user account:', error);
+    }
+  };
 
   // Handle staking MOR tokens
   const handleStake = async () => {
@@ -419,6 +461,9 @@ export default function Staking({
         
         // Force a refresh of user data
         await fetchUserData();
+        
+        // Associate wallet with user account after successful stake
+        await associateWalletWithUserAccount();
         
         setSuccess(`Successfully staked ${stakeAmount} MOR!`);
         setStakeAmount('');
@@ -586,6 +631,13 @@ export default function Staking({
   const handleConnect = async () => {
     try {
       await connectWallet();
+      
+      // After successful connection, try to associate the wallet with the user account
+      // We're doing this in case the wallet address is available immediately after connection
+      if (address && userId) {
+        console.log('Wallet connected, associating wallet with user account');
+        await associateWalletWithUserAccount();
+      }
     } catch (error) {
       console.error("Error connecting wallet:", error);
     }
@@ -599,6 +651,14 @@ export default function Staking({
       fetchUserData();
     }
   };
+
+  // Associate wallet with user account whenever address or userId changes
+  useEffect(() => {
+    if (address && userId) {
+      console.log('Address or userId changed, associating wallet with user account');
+      associateWalletWithUserAccount();
+    }
+  }, [address, userId]);
 
   return (
     <div className="container mx-auto p-4">

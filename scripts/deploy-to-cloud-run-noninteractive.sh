@@ -3,6 +3,20 @@ set -e
 
 # MorSaaS Deployment Script for Google Cloud Run
 # This script automates the deployment of the application to Google Cloud Run
+# It fetches configuration from GitHub (if available) and deploys to the appropriate environment
+# By default, it deploys to the 'dev' environment (morsaas-dev service)
+
+# Load environment variables from .env at the project root if present
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+ENV_FILE="$PROJECT_ROOT/.env"
+if [ -f "$ENV_FILE" ]; then
+  echo "Loading environment variables from $ENV_FILE"
+  set -o allexport
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +o allexport
+fi
 
 # Colors for better readability
 RED='\033[0;31m'
@@ -38,6 +52,8 @@ if [[ "$ENVIRONMENT" == "master" ]]; then
   OPENROUTER_APP_TITLE="${PROD_OPENROUTER_APP_TITLE:-MorSaaS}"
   OPENROUTER_APP_VERSION="${PROD_OPENROUTER_APP_VERSION:-1.0.0}"
   UPSTASH_URL="${PROD_REDIS_URL:-redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379}"
+  ETHEREUM_CHAIN_ID="${PROD_ETHEREUM_CHAIN_ID:-1}"
+  ETHEREUM_RPC_URL="${PROD_ETHEREUM_RPC_URL:-https://eth-mainnet.g.alchemy.com/v2/demo}"
 elif [[ "$ENVIRONMENT" == "staging" ]]; then
   ENVIRONMENT="staging"
   SERVICE_NAME="${SERVICE_NAME:-morsaas-staging}"
@@ -51,6 +67,8 @@ elif [[ "$ENVIRONMENT" == "staging" ]]; then
   OPENROUTER_APP_TITLE="${STAGING_OPENROUTER_APP_TITLE:-MorSaaS-Staging}"
   OPENROUTER_APP_VERSION="${STAGING_OPENROUTER_APP_VERSION:-1.0.0-staging}"
   UPSTASH_URL="${STAGING_REDIS_URL:-redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379}"
+  ETHEREUM_CHAIN_ID="${STAGING_ETHEREUM_CHAIN_ID:-5}"
+  ETHEREUM_RPC_URL="${STAGING_ETHEREUM_RPC_URL:-https://eth-goerli.g.alchemy.com/v2/demo}"
 else
   # Default to dev environment
   ENVIRONMENT="dev"
@@ -65,6 +83,8 @@ else
   OPENROUTER_APP_TITLE="${DEV_OPENROUTER_APP_TITLE:-MorSaaS-Dev}"
   OPENROUTER_APP_VERSION="${DEV_OPENROUTER_APP_VERSION:-1.0.0-dev}"
   UPSTASH_URL="${DEV_REDIS_URL:-redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379}"
+  ETHEREUM_CHAIN_ID="${DEV_ETHEREUM_CHAIN_ID:-5}"
+  ETHEREUM_RPC_URL="${DEV_ETHEREUM_RPC_URL:-https://eth-goerli.g.alchemy.com/v2/demo}"
 fi
 
 # Allow override of all environment variables through explicit environment variables
@@ -76,9 +96,11 @@ OPENROUTER_HTTP_REFERER="${OPENROUTER_HTTP_REFERER:-$OPENROUTER_HTTP_REFERER}"
 OPENROUTER_APP_TITLE="${OPENROUTER_APP_TITLE:-$OPENROUTER_APP_TITLE}"
 OPENROUTER_APP_VERSION="${OPENROUTER_APP_VERSION:-$OPENROUTER_APP_VERSION}"
 UPSTASH_URL="${REDIS_URL:-$UPSTASH_URL}"
+ETHEREUM_CHAIN_ID="${ETHEREUM_CHAIN_ID:-$ETHEREUM_CHAIN_ID}"
+ETHEREUM_RPC_URL="${ETHEREUM_RPC_URL:-$ETHEREUM_RPC_URL}"
 
 # Get project ID from gcloud if possible, otherwise use environment variable
-PROJECT_ID="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo "")}"
+PROJECT_ID="${PROJECT_ID:-${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo "")}}"
 
 # Print the configuration
 echo -e "${BLUE}Deployment Configuration:${NC}"
@@ -87,6 +109,8 @@ echo -e "${YELLOW}Service Name: $SERVICE_NAME${NC}"
 echo -e "${YELLOW}Project ID: $PROJECT_ID${NC}"
 echo -e "${YELLOW}Available Models: $REACT_APP_AVAILABLE_MODELS${NC}"
 echo -e "${YELLOW}Secondary Endpoint URL: $SECONDARY_ENDPOINT_URL${NC}"
+echo -e "${YELLOW}Ethereum Chain ID: $ETHEREUM_CHAIN_ID${NC}"
+echo -e "${YELLOW}Ethereum RPC URL: $ETHEREUM_RPC_URL${NC}"
 
 # Function to display a section header
 section() {
@@ -203,26 +227,157 @@ initialize_gcloud() {
   gcloud auth configure-docker --quiet
 }
 
+# Function to fetch GitHub environment variables
+fetch_github_env_vars() {
+  section "Fetching GitHub Environment Variables"
+  
+  # Check if GitHub CLI is installed
+  if ! command_exists gh; then
+    echo -e "${YELLOW}GitHub CLI (gh) not installed. Using environment variables or defaults.${NC}"
+    return 0
+  fi
+  
+  # Check if authenticated with GitHub
+  if ! gh auth status &>/dev/null; then
+    echo -e "${YELLOW}Not authenticated with GitHub. Using environment variables or defaults.${NC}"
+    return 0
+  fi
+  
+  # Determine which repository to use
+  if [ -z "$GITHUB_REPO" ]; then
+    # Try to get the repository from git remote
+    GITHUB_REPO=$(git remote -v | grep -m 1 origin | awk '{print $2}' | sed 's/.*github.com[:\/]\(.*\)\.git.*/\1/' 2>/dev/null)
+    if [ -z "$GITHUB_REPO" ]; then
+      echo -e "${YELLOW}Could not determine GitHub repository. Using environment variables or defaults.${NC}"
+      return 0
+    fi
+  fi
+  
+  echo -e "${GREEN}Fetching variables for $ENVIRONMENT environment from GitHub repository: $GITHUB_REPO${NC}"
+  
+  # Set environment prefix
+  ENV_PREFIX=""
+  if [[ "$ENVIRONMENT" == "prod" ]]; then
+    ENV_PREFIX="PROD_"
+  elif [[ "$ENVIRONMENT" == "staging" ]]; then
+    ENV_PREFIX="STAGING_"
+  else
+    ENV_PREFIX="DEV_"
+  fi
+  
+  # Fetch variables from GitHub
+  echo -e "${YELLOW}Fetching environment variables from GitHub...${NC}"
+  
+  # Fetch available models
+  FETCHED_AVAILABLE_MODELS=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}AVAILABLE_MODELS" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_AVAILABLE_MODELS" ]; then
+    REACT_APP_AVAILABLE_MODELS="$FETCHED_AVAILABLE_MODELS"
+    echo -e "${GREEN}✓ Fetched available models from GitHub${NC}"
+  fi
+  
+  # Fetch secondary endpoint URL
+  FETCHED_SECONDARY_ENDPOINT_URL=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}SECONDARY_ENDPOINT_URL" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_SECONDARY_ENDPOINT_URL" ]; then
+    SECONDARY_ENDPOINT_URL="$FETCHED_SECONDARY_ENDPOINT_URL"
+    echo -e "${GREEN}✓ Fetched secondary endpoint URL from GitHub${NC}"
+  fi
+  
+  # Fetch consumer API URL
+  FETCHED_CONSUMER_API_URL=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}CONSUMER_API_URL" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_CONSUMER_API_URL" ]; then
+    CONSUMER_API_URL="$FETCHED_CONSUMER_API_URL"
+    echo -e "${GREEN}✓ Fetched consumer API URL from GitHub${NC}"
+  fi
+  
+  # Fetch use fallback as primary
+  FETCHED_USE_FALLBACK_AS_PRIMARY=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}USE_FALLBACK_AS_PRIMARY" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_USE_FALLBACK_AS_PRIMARY" ]; then
+    USE_FALLBACK_AS_PRIMARY="$FETCHED_USE_FALLBACK_AS_PRIMARY"
+    echo -e "${GREEN}✓ Fetched use fallback as primary from GitHub${NC}"
+  fi
+  
+  # Fetch OpenRouter HTTP referer
+  FETCHED_OPENROUTER_HTTP_REFERER=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}OPENROUTER_HTTP_REFERER" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_OPENROUTER_HTTP_REFERER" ]; then
+    OPENROUTER_HTTP_REFERER="$FETCHED_OPENROUTER_HTTP_REFERER"
+    echo -e "${GREEN}✓ Fetched OpenRouter HTTP referer from GitHub${NC}"
+  fi
+  
+  # Fetch OpenRouter app title
+  FETCHED_OPENROUTER_APP_TITLE=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}OPENROUTER_APP_TITLE" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_OPENROUTER_APP_TITLE" ]; then
+    OPENROUTER_APP_TITLE="$FETCHED_OPENROUTER_APP_TITLE"
+    echo -e "${GREEN}✓ Fetched OpenRouter app title from GitHub${NC}"
+  fi
+  
+  # Fetch OpenRouter app version
+  FETCHED_OPENROUTER_APP_VERSION=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}OPENROUTER_APP_VERSION" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_OPENROUTER_APP_VERSION" ]; then
+    OPENROUTER_APP_VERSION="$FETCHED_OPENROUTER_APP_VERSION"
+    echo -e "${GREEN}✓ Fetched OpenRouter app version from GitHub${NC}"
+  fi
+  
+  # Try to fetch secrets indirectly - GitHub doesn't allow direct secret access
+  # Check for Redis URL secret existence
+  if [ -z "$UPSTASH_URL" ] && [ -z "$REDIS_URL" ]; then
+    if gh secret list -R "$GITHUB_REPO" | grep -q "${ENV_PREFIX}REDIS_URL" >/dev/null 2>&1; then
+      echo -e "${YELLOW}Redis URL secret found in GitHub but cannot access value directly.${NC}"
+      echo -e "${YELLOW}Please set ${ENV_PREFIX}REDIS_URL as an environment variable.${NC}"
+    else
+      echo -e "${YELLOW}Could not find Redis URL secret in GitHub.${NC}"
+    fi
+  fi
+  
+  # Fetch Google Cloud Project ID
+  FETCHED_PROJECT_ID=$(gh variable list -R "$GITHUB_REPO" | grep "GCP_PROJECT_ID" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_PROJECT_ID" ]; then
+    PROJECT_ID="$FETCHED_PROJECT_ID"
+    echo -e "${GREEN}✓ Fetched Google Cloud Project ID from GitHub${NC}"
+  fi
+  
+  echo -e "${GREEN}✓ Completed GitHub configuration fetch${NC}"
+  return 0
+}
+
 # Build and tag the Docker image
 build_image() {
   section "Building Docker Image"
   
+  # Use proper path for index.html check
+  local current_dir=$(pwd)
+  local index_path=""
+  
+  if [[ "$current_dir" == *"/scripts" ]]; then
+    # If we're in the scripts directory, check one level up
+    index_path="../index.html"
+  else
+    # If we're already at the root
+    index_path="./index.html"
+  fi
+  
   # Verify index.html exists
   echo "Verifying index.html for build..."
-  if [ ! -f "index.html" ]; then
-    echo -e "${RED}❌ ERROR: index.html not found in the root directory!${NC}"
+  echo "Looking for index.html at: $index_path"
+  if [ ! -f "$index_path" ]; then
+    echo -e "${RED}❌ ERROR: index.html not found!${NC}"
     exit 1
   fi
   
   echo "✅ Found index.html, contents:"
-  grep -n "<meta" index.html || echo "No meta tags found in index.html"
+  grep -n "<meta" "$index_path" || echo "No meta tags found in index.html"
   
   # Clean build cache
   echo "Cleaning build cache..."
-  rm -rf dist node_modules/.vite
+  if [[ "$current_dir" == *"/scripts" ]]; then
+    # If in scripts directory, clean up one level up
+    rm -rf ../dist ../node_modules/.vite
+  else
+    # If at root
+    rm -rf dist node_modules/.vite
+  fi
   
   # Generate unique build ID
-  BUILD_ID="$(date +%s)-$(git rev-parse --short HEAD)"
+  BUILD_ID="$(date +%s)-$(git rev-parse --short HEAD 2>/dev/null || echo 'local')"
   echo "Using BUILD_ID: $BUILD_ID for cache control"
   
   # Sanitize model names to prevent shell script errors
@@ -233,6 +388,11 @@ build_image() {
   echo "Simplified secondary model for Docker build: $SIMPLIFIED_SECONDARY_MODEL"
   
   echo -e "${YELLOW}Building Docker image with model configuration...${NC}"
+  # If we're in the scripts directory, we need to go up one level for the docker build
+  if [[ "$current_dir" == *"/scripts" ]]; then
+    cd ..
+  fi
+  
   docker build \
     --build-arg BUILD_ID="$BUILD_ID" \
     --build-arg REACT_APP_AVAILABLE_MODELS="$SIMPLIFIED_MODELS" \
@@ -242,6 +402,11 @@ build_image() {
     --build-arg USE_FALLBACK_AS_PRIMARY="${USE_FALLBACK_AS_PRIMARY}" \
     --build-arg CONSUMER_API_URL="${CONSUMER_API_URL}" \
     -t "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest" .
+  
+  # If we changed directory, go back to the original directory
+  if [[ "$current_dir" == *"/scripts" ]]; then
+    cd scripts
+  fi
   
   echo -e "${GREEN}✓ Docker image built successfully with model: $SIMPLIFIED_MODELS${NC}"
 }
@@ -260,8 +425,14 @@ push_image() {
 configure_yaml() {
   section "Configuring Cloud Run YAML"
   
-  # Copy the template YAML
-  cp ./scripts/cloud-run-config-template.yaml cloud-run-deploy-config.yaml
+  # Copy the template YAML - handle different directory positions
+  local current_dir=$(pwd)
+  if [[ "$current_dir" == *"/scripts" ]]; then
+    cp ./cloud-run-config-template.yaml ../cloud-run-deploy-config.yaml
+    cd ..
+  else
+    cp ./scripts/cloud-run-config-template.yaml ./cloud-run-deploy-config.yaml
+  fi
   
   # Update service name in the YAML
   sed -i.bak "s|morsaas|$SERVICE_NAME|g" cloud-run-deploy-config.yaml
@@ -324,8 +495,17 @@ configure_yaml() {
   sed -i.bak "s|OPENROUTER_APP_TITLE_VALUE|$OPENROUTER_APP_TITLE|g" cloud-run-deploy-config.yaml
   sed -i.bak "s|OPENROUTER_APP_VERSION_VALUE|$OPENROUTER_APP_VERSION|g" cloud-run-deploy-config.yaml
   
+  # Update Ethereum configuration
+  ESCAPED_ETH_RPC_URL=$(escape_sed_value "$ETHEREUM_RPC_URL")
+  sed -i.bak "s|ETHEREUM_RPC_URL_VALUE|$ESCAPED_ETH_RPC_URL|g" cloud-run-deploy-config.yaml
+  
   # Clean up backup files
   rm -f cloud-run-deploy-config.yaml.bak
+  
+  # Return to scripts directory if we were there
+  if [[ "$current_dir" == *"/scripts" ]]; then
+    cd scripts
+  fi
   
   echo -e "${GREEN}✓ Cloud Run YAML configured for $ENVIRONMENT environment${NC}"
 }
@@ -338,8 +518,18 @@ deploy_to_cloud_run() {
   echo -e "${YELLOW}Environment: $ENVIRONMENT${NC}"
   echo -e "${YELLOW}Service: $SERVICE_NAME${NC}"
   
+  # Make sure we're in the right directory
+  local current_dir=$(pwd)
+  local yaml_path=""
+  
+  if [[ "$current_dir" == *"/scripts" ]]; then
+    yaml_path="../cloud-run-deploy-config.yaml"
+  else
+    yaml_path="./cloud-run-deploy-config.yaml"
+  fi
+  
   # Deploy using the YAML configuration for extended startup timeout
-  if gcloud run services replace cloud-run-deploy-config.yaml --region="$REGION"; then
+  if gcloud run services replace "$yaml_path" --region="$REGION"; then
     echo -e "${GREEN}✅ Deployment successful!${NC}"
     
     # Get the deployed service URL
@@ -441,9 +631,35 @@ check_health() {
 
 # Main execution
 main() {
+  # Show all environment variables that would be used
   echo -e "${GREEN}==================================================${NC}"
-  echo -e "${GREEN}   MorSaaS Deployment to Google Cloud Run (Dev)   ${NC}"
+  echo -e "${GREEN}   MorSaaS Deployment to Google Cloud Run (${ENVIRONMENT})   ${NC}"
   echo -e "${GREEN}==================================================${NC}"
+  
+  echo -e "${YELLOW}Initial Environment Configuration:${NC}"
+  echo -e "${BLUE}Environment Variables:${NC}"
+  echo -e "DEPLOY_ENVIRONMENT=${DEPLOY_ENVIRONMENT:-dev}"
+  echo -e "SERVICE_NAME=${SERVICE_NAME:-morsaas-dev}"
+  echo -e "REGION=${REGION:-us-west1}"
+  echo -e "GCP_PROJECT_ID=${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo 'not-set')}"
+  
+  # First fetch variables from GitHub
+  fetch_github_env_vars
+  
+  # Print the final configuration
+  echo -e "\n${BLUE}Final Deployment Configuration:${NC}"
+  echo -e "${YELLOW}Environment: $ENVIRONMENT${NC}"
+  echo -e "${YELLOW}Service Name: $SERVICE_NAME${NC}"
+  echo -e "${YELLOW}Project ID: $PROJECT_ID${NC}"
+  echo -e "${YELLOW}Available Models: $REACT_APP_AVAILABLE_MODELS${NC}"
+  echo -e "${YELLOW}Secondary Endpoint URL: $SECONDARY_ENDPOINT_URL${NC}"
+  echo -e "${YELLOW}Ethereum Chain ID: $ETHEREUM_CHAIN_ID${NC}"
+  echo -e "${YELLOW}Ethereum RPC URL: $ETHEREUM_RPC_URL${NC}"
+  echo -e "${YELLOW}Consumer API URL: $CONSUMER_API_URL${NC}"
+  echo -e "${YELLOW}Use Fallback as Primary: $USE_FALLBACK_AS_PRIMARY${NC}"
+  echo -e "${YELLOW}OpenRouter HTTP Referer: $OPENROUTER_HTTP_REFERER${NC}"
+  echo -e "${YELLOW}OpenRouter App Title: $OPENROUTER_APP_TITLE${NC}"
+  echo -e "${YELLOW}OpenRouter App Version: $OPENROUTER_APP_VERSION${NC}"
   
   check_requirements
   initialize_gcloud
@@ -461,6 +677,7 @@ main() {
   
   echo -e "${GREEN}==================================================${NC}"
   echo -e "${GREEN}   Deployment process completed successfully!   ${NC}"
+  echo -e "${GREEN}   The demo script deployed to: $SERVICE_NAME   ${NC}"
   echo -e "${GREEN}==================================================${NC}"
 }
 

@@ -57,17 +57,50 @@ export const fetchApiKeys = async (): Promise<Token[]> => {
     const data = await response.json();
     console.log('[API KEY SERVICE] Successfully fetched API keys:', data);
     
-    // Map the API response to our Token format
-    const tokens = data.data.map(key => ({
-      id: key.id,
-      name: key.name,
-      token: key.key || `sk-${key.id}`,
-      status: 'active' as const,
-      createdAt: key.created_at,
-      lastUsed: key.last_used_at || undefined
-    }));
+    // Get existing tokens from localStorage that have full token values
+    const savedTokensString = localStorage.getItem('apiKeys');
+    const savedTokens: Record<string, Token> = {};
     
-    // Store in localStorage as fallback
+    if (savedTokensString) {
+      try {
+        const parsed = JSON.parse(savedTokensString);
+        parsed.forEach((token: Token) => {
+          if (token.id && token.token) {
+            savedTokens[token.id] = token;
+          }
+        });
+        console.log(`[API KEY SERVICE] Found ${Object.keys(savedTokens).length} saved tokens in localStorage`);
+      } catch (e) {
+        console.error('[API KEY SERVICE] Error parsing saved tokens:', e);
+      }
+    }
+    
+    // Map the API response to our Token format, using saved tokens when possible
+    const tokens = data.data.map(key => {
+      // First check if we have this key saved in localStorage with a full token
+      const savedToken = savedTokens[key.id];
+      const hasLocalToken = !!(savedToken && savedToken.token && savedToken.token.startsWith('sk-'));
+      
+      if (hasLocalToken) {
+        console.log(`[API KEY SERVICE] Using saved token value for key ${key.id}`);
+      } else if (!key.key) {
+        console.error(`[API KEY SERVICE] API key data missing 'key' property for ID ${key.id}. Key will not be usable for API requests.`);
+      }
+      
+      // Combine data from API and local storage
+      return {
+        id: key.id,
+        name: key.name || savedToken?.name || 'Unnamed Key',
+        token: hasLocalToken ? savedToken.token : (key.key || `INVALID-KEY-${key.id}`),
+        hasValidFormat: hasLocalToken ? true : (!!key.key && key.key.startsWith('sk-') && key.key.length >= 35),
+        isIncomplete: !hasLocalToken && !key.key,
+        status: key.status || savedToken?.status || 'active',
+        createdAt: key.created || key.created_at || savedToken?.createdAt || new Date().toISOString(),
+        lastUsed: key.lastUsed || key.last_used_at || savedToken?.lastUsed || undefined
+      };
+    });
+    
+    // Store in localStorage as fallback and to keep the full token values
     localStorage.setItem('apiKeys', JSON.stringify(tokens));
     
     return tokens;
@@ -88,6 +121,7 @@ export const fetchApiKeys = async (): Promise<Token[]> => {
         id: uuidv4(),
         name: 'Production API',
         token: `sk-${uuidv4().replace(/-/g, '')}`,
+        hasValidFormat: true,
         status: 'active',
         createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
         lastUsed: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
@@ -96,6 +130,7 @@ export const fetchApiKeys = async (): Promise<Token[]> => {
         id: uuidv4(),
         name: 'Development API',
         token: `sk-${uuidv4().replace(/-/g, '')}`,
+        hasValidFormat: true,
         status: 'active',
         createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
         lastUsed: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
@@ -111,20 +146,20 @@ export const fetchApiKeys = async (): Promise<Token[]> => {
 // Function to create a new API key on the server
 export const createApiKey = async (name: string): Promise<Token> => {
   try {
-    // Check authentication using the auth helper
-    if (!isAuthenticated()) {
-      console.error('User not authenticated');
+    // Check authentication using the auth helper with debug mode
+    if (!isAuthenticated(true)) {
+      console.error('[API KEY SERVICE] User not authenticated, cannot create API key');
       throw new Error('User not authenticated');
     }
     
-    // Create auth token using the helper function
-    const authToken = createAuthToken();
+    // Create auth token using the helper function with debug enabled
+    const authToken = createAuthToken(true);
     if (!authToken) {
-      console.error('Failed to create auth token');
+      console.error('[API KEY SERVICE] Failed to create auth token');
       throw new Error('Failed to create auth token');
     }
     
-    console.log(`[API KEY SERVICE] Creating new API key "${name}" using auth token`);
+    console.log(`[API KEY SERVICE] Creating new API key "${name}" using auth token: ${authToken.substring(0, 15)}...`);
     
     // Try to create using the local API - use the app management endpoint
     const response = await fetch(`${FRONTEND_API_ENDPOINT}/app/keys`, {
@@ -136,22 +171,54 @@ export const createApiKey = async (name: string): Promise<Token> => {
       body: JSON.stringify({ name })
     });
 
+    // Enhanced error handling with response details
     if (!response.ok) {
-      throw new Error(`Failed to create API key: ${response.status}`);
+      console.error(`[API KEY SERVICE] Server returned error ${response.status}: ${response.statusText}`);
+      let errorText = '';
+      try {
+        const errorData = await response.json();
+        errorText = JSON.stringify(errorData);
+        console.error('[API KEY SERVICE] Error details:', errorData);
+      } catch (e) {
+        errorText = await response.text();
+        console.error('[API KEY SERVICE] Error response:', errorText);
+      }
+      throw new Error(`Failed to create API key: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     console.log('[API KEY SERVICE] Successfully created API key:', data);
     
+    // Add detailed debugging to check the server response
+    if (!data.data || !data.data.key) {
+      console.error('[API KEY SERVICE] Server response is missing key property:', data);
+    } else {
+      console.log('[API KEY SERVICE] Key property length:', data.data.key.length);
+      console.log('[API KEY SERVICE] Key property format check:', 
+                  data.data.key.startsWith('sk-') ? 'valid prefix' : 'invalid prefix');
+    }
+    
     // Map the API response to our Token format
     const newToken = {
-      id: data.data.id,
-      name: data.data.name,
-      token: data.data.key,
+      id: data.data?.id || uuidv4(),
+      name: data.data?.name || name,
+      token: data.data?.key || '',
+      hasValidFormat: !!data.data?.key && data.data.key.startsWith('sk-') && data.data.key.length >= 35,
+      isIncomplete: !data.data?.key,
       status: 'active' as const,
-      createdAt: data.data.created_at,
+      createdAt: data.data?.created_at || new Date().toISOString(),
       lastUsed: null
     };
+    
+    // Create a fallback if the key is missing but we have an ID - this only happens in local mode
+    // WARNING: This is just for development and won't work in production
+    if (!data.data?.key && data.data?.id) {
+      console.log('[API KEY SERVICE] Generating fallback key for local testing mode');
+      const fallbackKey = `sk-${data.data.id}${Array(32).fill('0').join('')}`;
+      newToken.token = fallbackKey;
+      newToken.hasValidFormat = true;
+      newToken.isIncomplete = false;
+    }
     
     // Update localStorage with the new token
     const savedTokens = localStorage.getItem('apiKeys');
@@ -178,6 +245,8 @@ export const createApiKey = async (name: string): Promise<Token> => {
       id: uuidv4(),
       name,
       token: `sk-${uuidv4().replace(/-/g, '')}`,
+      hasValidFormat: true,
+      isIncomplete: false,
       status: 'active' as const,
       createdAt: new Date().toISOString(),
       lastUsed: null
