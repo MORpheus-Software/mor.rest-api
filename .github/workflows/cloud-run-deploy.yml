@@ -2,7 +2,7 @@ name: Deploy to Cloud Run
 
 on:
   push:
-    branches: [ dev, staging, master ]
+    branches-ignore: [ staging, master, main ]
   workflow_dispatch:
     inputs:
       environment:
@@ -23,7 +23,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || github.ref_name }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || github.ref_name == 'staging' && 'staging' || github.ref_name == 'master' && 'prod' || github.ref_name == 'main' && 'prod' || 'dev' }}
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -35,7 +35,7 @@ jobs:
     - name: Set environment variables
       run: |
         # Set service name based on branch/environment
-        if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
+        if [[ "${{ github.ref_name }}" == "master" || "${{ github.ref_name }}" == "main" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
           echo "SERVICE_NAME=morsaas" >> $GITHUB_ENV
           echo "Deploying to production environment: morsaas"
           echo "IS_PROD=true" >> $GITHUB_ENV
@@ -214,7 +214,7 @@ jobs:
         sed -i "s|namespace: default|namespace: ${{ env.PROJECT_ID }}|g" cloud-run-deploy-config.yaml
         
         # Update environment labels with actual environment name
-        if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
+        if [[ "${{ github.ref_name }}" == "master" || "${{ github.ref_name }}" == "main" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
           sed -i "s|ENVIRONMENT_NAME|prod|g" cloud-run-deploy-config.yaml
         elif [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
           sed -i "s|ENVIRONMENT_NAME|staging|g" cloud-run-deploy-config.yaml
@@ -296,7 +296,7 @@ jobs:
         fi
         
         # Update OpenRouter configuration
-        if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
+        if [[ "${{ github.ref_name }}" == "master" || "${{ github.ref_name }}" == "main" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
           # Escape values for sed
           ESCAPED_URL=$(./scripts/escape-sed-value.sh "${{ vars.PROD_OPENROUTER_HTTP_REFERER || 'https://morsaas.com' }}")
           sed -i "s|OPENROUTER_HTTP_REFERER_VALUE|${ESCAPED_URL}|g" cloud-run-deploy-config.yaml

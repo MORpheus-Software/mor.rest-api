@@ -7,13 +7,18 @@ import chalk from 'chalk';
 import { AuthenticatedRequest } from './auth-middleware.js';
 import { StakeStatus } from '../../staking/StakeStatusTracker.js';
 import dotenv from 'dotenv';
+import { normalizeUserId } from '../utils/userId';
 
 // Load environment variables
 dotenv.config();
 
+// Configure chain ID from environment or use sensible defaults (mainnet: 42161, testnet: 421613)
+const CHAIN_ID = process.env.ETHEREUM_CHAIN_ID
+  ? parseInt(process.env.ETHEREUM_CHAIN_ID, 10)
+  : (process.env.NODE_ENV === 'production' ? 42161 : 421613);
+
 // Default pool ID from environment variable or fallback to a default value
-const DEFAULT_POOL_ID = process.env.DEFAULT_POOL_ID || 
-                         ethers.utils.id("mor.rest"); // Generate ID from name if not provided
+const DEFAULT_POOL_ID = process.env.DEFAULT_POOL_ID || "mor.rest"; // Store as a string for now, will hash when needed
 
 // Ethereum provider URL
 const ETHEREUM_RPC_URL = process.env.ETHEREUM_RPC_URL || 
@@ -31,26 +36,158 @@ const STAKE_STATUS_PREFIX = 'stake:status:';
 // Redis key for tracking all pools
 const ALL_POOLS_KEY = 'stake:pools';
 
+// Redis client for caching
+let redisClient: Redis | null = null;
+
+/**
+ * Normalize a pool ID to the format expected by the blockchain
+ * If the pool ID is already a valid hex value (starts with 0x and has 66 chars), 
+ * assume it's already normalized. Otherwise, hash it with ethers.utils.id
+ */
+function normalizePoolId(poolId: string): string {
+  // Check if it's already a valid bytes32 hash
+  if (poolId.startsWith('0x') && poolId.length === 66) {
+    return poolId;
+  }
+  
+  // Otherwise hash it
+  const hashedId = ethers.utils.id(poolId);
+  console.log(chalk.blue(`[STAKE_CHECK] Normalized pool ID from "${poolId}" to "${hashedId}"`));
+  return hashedId;
+}
+
+/**
+ * Set Redis client for caching stake checks
+ */
+export function setRedisClientForStakeCheck(client: Redis) {
+  redisClient = client;
+  console.log(chalk.green('[STAKE_CHECK] Redis client set for stake caching'));
+}
+
+/**
+ * Get all user IDs associated with a wallet address
+ * @param walletAddress Ethereum wallet address
+ * @returns Promise resolving to array of user IDs or empty array if none found
+ */
+export async function getUserIdsFromWallet(walletAddress: string): Promise<string[]> {
+  try {
+    const redisClient = await getRedisClient();
+    const normalizedAddress = walletAddress.toLowerCase();
+    const userIds = await redisClient.smembers(`wallet:users:${normalizedAddress}`);
+    
+    if (userIds.length === 0) {
+      console.warn(chalk.yellow(`[STAKE_CHECK] No user IDs found for wallet ${normalizedAddress}`));
+      return [];
+    }
+    
+    return userIds;
+  } catch (error) {
+    console.error(chalk.red(`[STAKE_CHECK] Error fetching user IDs for wallet: ${error}`));
+    return [];
+  }
+}
+
+/**
+ * Get a user ID associated with a wallet address
+ * Note: If multiple users are associated with this wallet, returns the first one
+ * @param walletAddress Ethereum wallet address
+ * @returns Promise resolving to user ID or null if not found
+ */
+export async function getUserIdFromWallet(walletAddress: string): Promise<string | null> {
+  try {
+    const userIds = await getUserIdsFromWallet(walletAddress);
+    
+    if (userIds.length > 0) {
+      if (userIds.length > 1) {
+        console.warn(chalk.yellow(`[STAKE_CHECK] Multiple users (${userIds.length}) found for wallet ${walletAddress}, returning first one: ${userIds[0]}`));
+      }
+      return userIds[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(chalk.red(`[STAKE_CHECK] Error fetching user ID for wallet: ${error}`));
+    return null;
+  }
+}
+
 /**
  * Get the user's wallet address from their user ID
  * In a real implementation, this would query a database
  * @param userId User ID from authentication
  * @returns Promise resolving to user's wallet address or null
+ * @throws Error if the user ID is not a valid UUID
  */
 export async function getUserWalletAddress(userId: string): Promise<string | null> {
+  if (!userId) {
+    console.warn(chalk.yellow(`[STAKE_CHECK] No user ID provided`));
+    return null;
+  }
+
+  // First try to get the wallet with the original user ID
   try {
-    // In a real implementation, query the user's wallet address from a database
-    // For now, we'll use a simple Redis key to store this mapping
-    const redisClient = await getRedisClient();
-    const walletAddress = await redisClient.get(`user:wallet:${userId}`);
+    // Validate that the userId is a properly formatted UUID
+    const validatedUserId = normalizeUserId(userId);
     
-    if (!walletAddress) {
-      console.warn(chalk.yellow(`[STAKE_CHECK] No wallet address found for user ${userId}`));
-      return null;
+    // Get the user's wallet address from Redis
+    const redisClient = await getRedisClient();
+    const walletAddress = await redisClient.get(`user:wallet:${validatedUserId}`);
+    
+    if (walletAddress) {
+      console.log(chalk.green(`[STAKE_CHECK] Found wallet address ${walletAddress} for user ${validatedUserId}`));
+      return walletAddress;
     }
     
-    return walletAddress;
+    console.warn(chalk.yellow(`[STAKE_CHECK] No wallet address found for user ${validatedUserId}`));
+    return null;
   } catch (error) {
+    // If we get a UUID format error, try to handle it gracefully
+    if (error instanceof Error && error.message.includes('Invalid user ID format')) {
+      console.warn(chalk.yellow(`[STAKE_CHECK] Received non-UUID format: ${userId}, attempting to find matching wallet anyway`));
+      
+      try {
+        // Try looking up with the original ID format anyway in case it's stored that way
+        const redisClient = await getRedisClient();
+        
+        // First, check if there's a direct mapping for this ID format
+        const directWallet = await redisClient.get(`user:wallet:${userId}`);
+        if (directWallet) {
+          console.log(chalk.green(`[STAKE_CHECK] Found direct wallet mapping for non-UUID: ${userId}`));
+          return directWallet;
+        }
+        
+        // Next, search for user keys that start with this ID
+        if (userId.length >= 8) {
+          const prefix = userId.substring(0, 8);
+          const potentialUuids = await redisClient.keys(`user:${prefix}*`);
+          
+          // Filter to find full UUIDs that start with this prefix
+          const matchingUuids = potentialUuids.filter(key => {
+            const parts = key.split(':');
+            return parts.length >= 2 && parts[1].startsWith(prefix) && parts[1].includes('-');
+          });
+          
+          if (matchingUuids.length > 0) {
+            // Extract the full UUID and check if it has a wallet
+            const fullUuid = matchingUuids[0].split(':')[1];
+            console.log(chalk.blue(`[STAKE_CHECK] Found potential full UUID match: ${fullUuid}`));
+            
+            const walletAddress = await redisClient.get(`user:wallet:${fullUuid}`);
+            if (walletAddress) {
+              console.log(chalk.green(`[STAKE_CHECK] Found wallet address by UUID prefix: ${walletAddress}`));
+              return walletAddress;
+            }
+          }
+        }
+        
+        console.warn(chalk.yellow(`[STAKE_CHECK] Could not find wallet for non-UUID: ${userId}`));
+        return null;
+      } catch (lookupError) {
+        console.error(chalk.red(`[STAKE_CHECK] Error in fallback wallet lookup: ${lookupError}`));
+        return null;
+      }
+    }
+    
     console.error(chalk.red(`[STAKE_CHECK] Error fetching user wallet address: ${error}`));
     return null;
   }
@@ -76,21 +213,32 @@ export async function hasMinimumStake(userAddress: string, poolId: string): Prom
       console.log(chalk.blue(`[STAKE_CHECK] Checking blockchain for latest stake data`));
       
       // Create provider
-      const provider = new ethers.providers.JsonRpcProvider(ETHEREUM_RPC_URL);
+      const provider = new ethers.providers.JsonRpcProvider(ETHEREUM_RPC_URL, CHAIN_ID);
       
-      // Create BuildersClient
+      // Create BuildersClient with provider as both provider and signer
+      // Note: This is read-only mode, we won't be sending transactions
       const buildersClient = new BuildersClient(
         provider,
-        provider
+        provider as unknown as ethers.Signer  // Type cast for read-only operations
       );
       
       try {
+        // Normalize the pool ID before passing to blockchain methods
+        const normalizedPoolId = normalizePoolId(poolId);
+        console.log(chalk.blue(`[STAKE_CHECK] Using normalized pool ID: ${normalizedPoolId}`));
+        
+        // Get pool information to determine minimum stake
+        const poolInfo = await buildersClient.getPoolInfo(normalizedPoolId);
+        console.log(chalk.blue('[STAKE_CHECK]'), `Pool info for ${poolId}: minStake=${poolInfo.minimalDeposit.formatted}`);
+        
+        // Get user staking data
+        const userData = await buildersClient.getUserData(userAddress, normalizedPoolId);
+        console.log(chalk.blue('[STAKE_CHECK] User data for'), userAddress, ':', 'amount=', userData.deposited.formatted);
+        
         // Get pool info to determine minimum stake
-        const poolInfo = await buildersClient.getPoolInfo(poolId);
         const minStakeRequired = poolInfo.minimalDeposit.formatted;
         
         // Get user's stake amount
-        const userData = await buildersClient.getUserData(userAddress, poolId);
         const userStake = userData.deposited.formatted;
         
         console.log(chalk.blue(`[STAKE_CHECK] User ${userAddress} has staked ${userStake} (minimum: ${minStakeRequired})`));
@@ -327,7 +475,7 @@ export async function combinedStakeCheckMiddleware(req: Request, res: Response, 
     
     // If blockchain result is available, use it
     if (usedBlockchainResult) {
-      if (!blockchainResult.hasMinimumStake) {
+      if (!blockchainResult.hasMinStake) {
         console.warn(chalk.yellow(`[STAKE_CHECK] Blockchain check: User ${authReq.userId} does not have minimum stake, blocking access`));
         return res.status(403).json({
           error: {
@@ -350,7 +498,7 @@ export async function combinedStakeCheckMiddleware(req: Request, res: Response, 
       }
       
       // Update database in background if it differs from blockchain
-      if (blockchainResult.hasMinimumStake !== dbResult.hasMinimumStake || 
+      if (blockchainResult.hasMinStake !== dbResult.hasMinimumStake || 
           blockchainResult.isLocked !== dbResult.isLocked) {
         updateDatabaseFromBlockchain(walletAddress, blockchainResult, redisClient).catch(err => {
           console.error(chalk.red(`[STAKE_CHECK] Error updating database from blockchain: ${err}`));
@@ -382,7 +530,7 @@ export async function combinedStakeCheckMiddleware(req: Request, res: Response, 
       
       // Continue blockchain check in background and update database if needed
       blockchainPromise.then(blockchainResult => {
-        if (blockchainResult.hasMinimumStake !== dbResult.hasMinimumStake || 
+        if (blockchainResult.hasMinStake !== dbResult.hasMinimumStake || 
             blockchainResult.isLocked !== dbResult.isLocked) {
           console.log(chalk.blue(`[STAKE_CHECK] Background update: Blockchain check completed, updating database`));
           updateDatabaseFromBlockchain(walletAddress, blockchainResult, redisClient).catch(err => {
@@ -406,45 +554,48 @@ export async function combinedStakeCheckMiddleware(req: Request, res: Response, 
 }
 
 /**
- * Check stake status directly from the blockchain
+ * Check if a user has met the minimum staking requirement on the blockchain
  */
-async function checkBlockchainStakeStatus(walletAddress: string, poolId: string): Promise<{hasMinimumStake: boolean, isLocked: boolean}> {
+async function checkBlockchainStakeStatus(
+  walletAddress: string, 
+  poolId: string = DEFAULT_POOL_ID
+): Promise<{ hasMinStake: boolean, isLocked: boolean }> {
   try {
-    // Create provider
-    const provider = new ethers.providers.JsonRpcProvider(ETHEREUM_RPC_URL);
+    // Normalize the pool ID before making blockchain calls
+    const normalizedPoolId = normalizePoolId(poolId);
+    console.log(chalk.blue(`[STAKE_CHECK] Checking blockchain stake status for wallet ${walletAddress} in pool ${poolId} (normalized: ${normalizedPoolId})`));
     
-    // Create BuildersClient
+    // Create provider and client for read-only operations
+    const provider = new ethers.providers.JsonRpcProvider(ETHEREUM_RPC_URL);
     const buildersClient = new BuildersClient(
       provider,
-      provider
+      provider as unknown as ethers.Signer  // Type cast for read-only operations
     );
+
+    // Get pool information to determine minimum stake
+    const poolInfo = await buildersClient.getPoolInfo(normalizedPoolId);
+    console.log(chalk.blue('[STAKE_CHECK]'), `Pool info for ${poolId}: minStake=${poolInfo.minimalDeposit.formatted}`);
+
+    // Get user staking data
+    const userData = await buildersClient.getUserData(walletAddress, normalizedPoolId);
+    console.log(chalk.blue('[STAKE_CHECK] User data for'), walletAddress, ':', 'amount=', userData.deposited.formatted);
+
+    // Check if user has minimum stake and if it's locked
+    const userStake = parseFloat(userData.deposited.formatted);
+    const minRequired = parseFloat(poolInfo.minimalDeposit.formatted);
+    const hasMinStake = userStake >= minRequired;
     
-    // Get pool info
-    const poolInfo = await buildersClient.getPoolInfo(poolId);
-    const minStakeRequired = poolInfo.minimalDeposit.formatted;
-    
-    // Get user's stake data
-    const userData = await buildersClient.getUserData(walletAddress, poolId);
-    const userStake = userData.deposited.formatted;
-    
-    // Check minimum stake
-    const stakeAmount = parseFloat(userStake);
-    const minRequired = parseFloat(minStakeRequired);
-    const hasMinimumStake = stakeAmount >= minRequired;
-    
-    // Check if locked
+    // Check if locked based on claimLockStart timestamp
+    // If claimLockStart is in the future, the stake is locked
     const now = Math.floor(Date.now() / 1000);
-    const lockExpiry = Number(userData.lastDeposit.timestamp) + 
-                       Number(poolInfo.withdrawLockPeriodAfterDeposit);
-    const isLocked = now < lockExpiry;
-    
-    console.log(chalk.blue(`[STAKE_CHECK] Blockchain check for ${walletAddress}: hasMinimumStake=${hasMinimumStake}, isLocked=${isLocked}`));
-    
-    return { hasMinimumStake, isLocked };
+    const isLocked = userData.claimLockStart.timestamp > now;
+
+    console.log(chalk.blue(`[STAKE_CHECK] Blockchain check results: hasMinStake=${hasMinStake}, isLocked=${isLocked}`));
+    return { hasMinStake, isLocked };
   } catch (error) {
     console.error(chalk.red(`[STAKE_CHECK] Error checking blockchain stake status: ${error}`));
-    // Default to false for both in case of error
-    return { hasMinimumStake: false, isLocked: false };
+    // Default to false for both checks in case of error
+    return { hasMinStake: false, isLocked: false };
   }
 }
 
@@ -478,13 +629,13 @@ async function checkDatabaseStakeStatus(walletAddress: string, redisClient: Redi
  */
 async function updateDatabaseFromBlockchain(
   walletAddress: string, 
-  blockchainResult: {hasMinimumStake: boolean, isLocked: boolean},
+  blockchainResult: {hasMinStake: boolean, isLocked: boolean},
   redisClient: Redis
 ): Promise<void> {
   try {
     // Update minimum stake status
     const stakeCacheKey = `${USER_STAKE_PREFIX}${walletAddress.toLowerCase()}:${DEFAULT_POOL_ID}`;
-    await redisClient.set(stakeCacheKey, blockchainResult.hasMinimumStake ? 'true' : 'false', 'EX', STAKE_CACHE_TTL);
+    await redisClient.set(stakeCacheKey, blockchainResult.hasMinStake ? 'true' : 'false', 'EX', STAKE_CACHE_TTL);
     
     // Update locked status
     const statusKey = `${STAKE_STATUS_PREFIX}${walletAddress.toLowerCase()}:${DEFAULT_POOL_ID}`;

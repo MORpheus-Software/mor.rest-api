@@ -9,6 +9,7 @@
   "scripts": {
     "start": "concurrently \"npm run server\" \"vite start\"",
     "dev": "REDIS_URL=redis://localhost:6379 concurrently \"npm run server:dev\" \"vite\"",
+    "dev:mock-blockchain": "REDIS_URL=redis://localhost:6379 MOCK_BLOCKCHAIN=true concurrently \"npm run server:dev\" \"vite\"",
     "dev:frontend": "vite",
     "build:dev": "vite build --mode development",
     "build": "tsc -p tsconfig.build.json && npx tsc-alias -p tsconfig.build.json && vite build",

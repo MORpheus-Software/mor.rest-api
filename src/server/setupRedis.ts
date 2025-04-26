@@ -1,6 +1,8 @@
 import Redis from 'ioredis';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
+import { getRedisClient } from './redisClient';
+import { normalizeUserId } from '../lib/utils/userId';
 
 // Load environment variables
 dotenv.config();
@@ -74,15 +76,90 @@ export async function checkRedisConnection(): Promise<boolean> {
  * @param userId User ID
  * @param walletAddress Ethereum wallet address
  * @returns Promise resolving when the association is complete
+ * @throws Error if the user ID is not a valid UUID
  */
 export async function associateUserWithWallet(userId: string, walletAddress: string): Promise<void> {
   try {
-    console.log(chalk.blue(`[REDIS] Associating user ${userId} with wallet ${walletAddress}`));
+    // Validate that the userId is in the correct UUID format
+    const normalizedUserId = normalizeUserId(userId);
+    const normalizedWalletAddress = walletAddress.toLowerCase();
+    
+    console.log(chalk.blue(`[REDIS] Associating user ${normalizedUserId} with wallet ${normalizedWalletAddress}`));
     const client = await getRedisClient();
-    await client.set(`user:wallet:${userId}`, walletAddress.toLowerCase());
-    console.log(chalk.green(`[REDIS] Successfully associated user ${userId} with wallet ${walletAddress}`));
+    
+    // Check if this wallet is already associated with this user
+    const existingWalletForUser = await client.get(`user:wallet:${normalizedUserId}`);
+    if (existingWalletForUser === normalizedWalletAddress) {
+      console.log(chalk.yellow(`[REDIS] User ${normalizedUserId} is already associated with wallet ${normalizedWalletAddress}. Skipping.`));
+      return;
+    }
+    
+    // If the user had a different wallet before, remove that association
+    if (existingWalletForUser && existingWalletForUser !== normalizedWalletAddress) {
+      console.log(chalk.yellow(`[REDIS] User ${normalizedUserId} was previously associated with wallet ${existingWalletForUser}, updating to ${normalizedWalletAddress}`));
+      
+      // Remove user from the old wallet's users set
+      await client.srem(`wallet:users:${existingWalletForUser}`, normalizedUserId);
+      
+      // If the old wallet has no more users, clean up
+      const oldWalletUsers = await client.smembers(`wallet:users:${existingWalletForUser}`);
+      if (oldWalletUsers.length === 0) {
+        console.log(chalk.yellow(`[REDIS] Removing empty wallet users set for ${existingWalletForUser}`));
+        await client.del(`wallet:users:${existingWalletForUser}`);
+      }
+    }
+    
+    // Store the association both ways
+    // 1. User to wallet (one-to-one)
+    await client.set(`user:wallet:${normalizedUserId}`, normalizedWalletAddress);
+    
+    // 2. Wallet to users (one-to-many using a Redis set)
+    await client.sadd(`wallet:users:${normalizedWalletAddress}`, normalizedUserId);
+    
+    console.log(chalk.green(`[REDIS] Successfully associated user ${normalizedUserId} with wallet ${normalizedWalletAddress}`));
   } catch (error) {
     console.error(chalk.red(`[REDIS] Error associating user with wallet: ${error}`));
+    throw error;
+  }
+}
+
+/**
+ * Clear any wallet association for a user
+ * @param userId User ID
+ * @returns Promise resolving when the association is cleared
+ * @throws Error if the user ID is not a valid UUID
+ */
+export async function clearUserWalletAssociation(userId: string): Promise<void> {
+  try {
+    // Validate that the userId is in the correct UUID format
+    const normalizedUserId = normalizeUserId(userId);
+    
+    console.log(chalk.blue(`[REDIS] Clearing wallet association for user ${normalizedUserId}`));
+    const client = await getRedisClient();
+    
+    // Get the current wallet associated with this user
+    const existingWallet = await client.get(`user:wallet:${normalizedUserId}`);
+    
+    if (existingWallet) {
+      // Remove the user from the wallet's users set
+      await client.srem(`wallet:users:${existingWallet}`, normalizedUserId);
+      
+      // If the wallet has no more users, clean up the empty set
+      const remainingUsers = await client.smembers(`wallet:users:${existingWallet}`);
+      if (remainingUsers.length === 0) {
+        console.log(chalk.yellow(`[REDIS] Removing empty wallet users set for ${existingWallet}`));
+        await client.del(`wallet:users:${existingWallet}`);
+      }
+      
+      // Remove the user's wallet mapping
+      await client.del(`user:wallet:${normalizedUserId}`);
+      
+      console.log(chalk.green(`[REDIS] Successfully cleared wallet association for user ${normalizedUserId}`));
+    } else {
+      console.log(chalk.yellow(`[REDIS] No wallet association found for user ${normalizedUserId}`));
+    }
+  } catch (error) {
+    console.error(chalk.red(`[REDIS] Error clearing user wallet association: ${error}`));
     throw error;
   }
 }
@@ -107,5 +184,58 @@ export async function setCachedStakingStatus(
   } catch (error) {
     console.error(chalk.red(`[REDIS] Error setting cached staking status: ${error}`));
     throw error;
+  }
+}
+
+/**
+ * Check if a wallet is associated with any users
+ * @param walletAddress Wallet address to check
+ * @returns Promise resolving to array of user IDs, empty if none
+ */
+export async function getWalletUsers(walletAddress: string): Promise<string[]> {
+  try {
+    const normalizedWalletAddress = walletAddress.toLowerCase();
+    console.log(chalk.blue(`[REDIS] Checking users associated with wallet ${normalizedWalletAddress}`));
+    const client = await getRedisClient();
+    
+    const userIds = await client.smembers(`wallet:users:${normalizedWalletAddress}`);
+    
+    if (userIds.length > 0) {
+      console.log(chalk.yellow(`[REDIS] Wallet ${normalizedWalletAddress} is associated with ${userIds.length} users: ${userIds.join(', ')}`));
+      return userIds;
+    } else {
+      console.log(chalk.green(`[REDIS] Wallet ${normalizedWalletAddress} is not associated with any users`));
+      return [];
+    }
+  } catch (error) {
+    console.error(chalk.red(`[REDIS] Error checking wallet associations: ${error}`));
+    return [];
+  }
+}
+
+/**
+ * Check if a specific wallet and user are associated
+ * @param walletAddress Wallet address to check
+ * @param userId User ID to check
+ * @returns Promise resolving to boolean indicating if association exists
+ */
+export async function isWalletAssociatedWithUser(walletAddress: string, userId: string): Promise<boolean> {
+  try {
+    const normalizedWalletAddress = walletAddress.toLowerCase();
+    console.log(chalk.blue(`[REDIS] Checking if wallet ${normalizedWalletAddress} is associated with user ${userId}`));
+    const client = await getRedisClient();
+    
+    const isMember = await client.sismember(`wallet:users:${normalizedWalletAddress}`, userId);
+    
+    if (isMember === 1) {
+      console.log(chalk.yellow(`[REDIS] Wallet ${normalizedWalletAddress} is associated with user ${userId}`));
+      return true;
+    } else {
+      console.log(chalk.green(`[REDIS] Wallet ${normalizedWalletAddress} is not associated with user ${userId}`));
+      return false;
+    }
+  } catch (error) {
+    console.error(chalk.red(`[REDIS] Error checking wallet user association: ${error}`));
+    return false;
   }
 }

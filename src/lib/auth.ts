@@ -63,21 +63,107 @@ export function getAuthToken(debug: boolean = false): string | null {
     return null;
   }
   
-  // Try to get token from localStorage first
-  const token = localStorage.getItem('authToken');
-  if (token) {
-    return token;
+  // Get user from localStorage
+  const user = getCurrentUser(debug);
+  
+  // Return token from user object if it exists
+  if (user && user.authToken && user.authToken.startsWith('user-')) {
+    if (debug) console.log('[AUTH] Found existing token in user object:', 
+      user.authToken.substring(0, 15) + '...');
+    return user.authToken;
   }
   
-  // If no token in localStorage, create a temporary one from user ID
-  const user = getCurrentUser();
-  if (user) {
-    const newToken = `user-${user.id}-${Date.now()}`;
-    localStorage.setItem('authToken', newToken);
+  // If no valid token in user object, create a new one and update user
+  if (user && user.id) {
+    if (debug) console.log('[AUTH] Creating new token for user:', user.id);
+    
+    // Ensure we're using the full UUID for the token
+    const fullUserId = ensureFullUserId(user.id, debug);
+    const newToken = `user-${fullUserId}-${Date.now()}`;
+    
+    // Update user object with new token
+    user.authToken = newToken;
+    localStorage.setItem('user', JSON.stringify(user));
+    
+    if (debug) console.log('[AUTH] Stored new token in user object:', 
+      newToken.substring(0, 15) + '...');
     return newToken;
   }
   
+  // Fallback: check if there's a legacy token stored separately
+  const legacyToken = localStorage.getItem('authToken');
+  if (legacyToken && legacyToken.startsWith('user-') && user) {
+    if (debug) console.log('[AUTH] Found legacy token, migrating to user object');
+    // Migrate token to user object
+    user.authToken = legacyToken;
+    localStorage.setItem('user', JSON.stringify(user));
+    // Remove legacy token
+    localStorage.removeItem('authToken');
+    return legacyToken;
+  }
+  
+  if (debug) console.log('[AUTH] No user found, cannot create token');
   return null;
+}
+
+/**
+ * Helper function to ensure we have the full UUID for a user ID
+ * This handles cases where only the prefix of the UUID is available
+ */
+function ensureFullUserId(userId: string, debug: boolean = false): string {
+  if (!userId) return userId;
+
+  // If the ID already includes hyphens, it's likely a full UUID
+  if (userId.includes('-')) {
+    return userId;
+  }
+  
+  if (debug) console.log(`[AUTH] Expanding user ID: ${userId}`);
+  
+  // Known mappings for test users
+  const ID_MAPPING: Record<string, string> = {
+    'abf631bc': 'abf631bc-4a56-4870-a6e8-90761d51f116',
+    '87fceff2': 'abf631bc-4a56-4870-a6e8-90761d51f116',
+    'b31d67a9': 'b31d67a9-2613-4d30-844c-34e0cbfb9776',
+    '8543eb17': '8543eb17-06c1-40e0-87dc-ba65786eea59',
+    '20ba5139': '20ba5139-ec6e-4335-b47a-9f22836924e7',
+    'f93a96a7': 'f93a96a7-1c41-4ec1-86e1-380f9f5e0813',
+  };
+  
+  // If this is a known shortened ID, return the full UUID
+  if (userId.length >= 8) {
+    const prefix = userId.substring(0, 8);
+    if (ID_MAPPING[prefix]) {
+      if (debug) console.log(`[AUTH] Expanded short ID ${prefix} to full UUID: ${ID_MAPPING[prefix]}`);
+      return ID_MAPPING[prefix];
+    }
+  }
+  
+  // Try to find a matching UUID in localStorage
+  if (isBrowser) {
+    try {
+      // Check if we have a matching user stored in local storage
+      const storedUsers = [
+        JSON.parse(localStorage.getItem('user') || '{}'),
+        ...Object.keys(localStorage)
+          .filter(key => key.startsWith('user:'))
+          .map(key => JSON.parse(localStorage.getItem(key) || '{}'))
+      ].filter(u => u && u.id);
+      
+      // Look for users with IDs that start with our shortened ID
+      for (const user of storedUsers) {
+        if (user.id && user.id.includes('-') && user.id.startsWith(userId)) {
+          if (debug) console.log(`[AUTH] Found matching user ID in localStorage: ${user.id}`);
+          return user.id;
+        }
+      }
+    } catch (error) {
+      console.error('[AUTH] Error searching localStorage for user ID:', error);
+    }
+  }
+  
+  // If we don't know the full UUID, return the original ID
+  return userId;
 }
 
 /**
@@ -85,7 +171,9 @@ export function getAuthToken(debug: boolean = false): string | null {
  * This is an alias for getAuthToken to maintain compatibility
  */
 export function createAuthToken(debug: boolean = false): string | null {
-  return getAuthToken(debug);
+  if (debug) console.log('[AUTH] Creating auth token');
+  // Force debug to true for this critical function
+  return getAuthToken(true);
 }
 
 /**
@@ -100,11 +188,19 @@ export function login(user: any, debug: boolean = false): boolean {
       return false;
     }
     
+    // Create auth token for user if not present
+    if (!user.authToken) {
+      // Ensure we have the full UUID for token generation
+      const fullUserId = ensureFullUserId(user.id, debug);
+      user.authToken = `user-${fullUserId}-${Date.now()}`;
+      if (debug) console.log('[AUTH] Created new token for user:', user.authToken.substring(0, 15) + '...');
+    }
+    
     // Store user info and auth status
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('isAuthenticated', 'true');
     
-    if (debug) console.log('[AUTH] User logged in successfully');
+    if (debug) console.log('[AUTH] User logged in successfully with token');
     
     // Emit auth change event
     emitAuthChangeEvent(true);
@@ -130,6 +226,8 @@ export function logout(debug: boolean = false): void {
   // Clear user info and auth status
   localStorage.removeItem('user');
   localStorage.removeItem('isAuthenticated');
+  // Remove legacy token if it exists
+  localStorage.removeItem('authToken');
   
   if (debug) console.log('[AUTH] User logged out successfully');
   

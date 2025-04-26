@@ -22,6 +22,7 @@ export interface User {
   updatedAt?: string;
   avatar?: string | null;
   company?: string;
+  authToken?: string; // Auth token stored with user data
 }
 
 /**

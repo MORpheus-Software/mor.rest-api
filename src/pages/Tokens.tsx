@@ -5,6 +5,7 @@ import { TokensTable, Token } from '@/components/dashboard/TokensTable';
 import { CreateTokenDialog } from '@/components/dashboard/CreateTokenDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Plus } from 'lucide-react';
+import { isAuthenticated } from '@/lib/auth';
 import { 
   fetchApiKeys, 
   createApiKey, 
@@ -52,29 +53,104 @@ const TokensPage = () => {
   
   const handleCreateToken = async (tokenData: { name: string }) => {
     try {
+      // First check if user is authenticated
+      if (!isAuthenticated(true)) {
+        console.error('[TOKENS] User not authenticated when attempting to create API key');
+        toast({
+          title: "Authentication error",
+          description: "Please sign in again to create API keys",
+          variant: "destructive"
+        });
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          window.location.href = '/signin';
+        }, 2000);
+        return;
+      }
+      
       // Create token using the service
-      await createApiKey(tokenData.name);
+      console.log(`[TOKENS] Creating new API key "${tokenData.name}"`);
+      const newToken = await createApiKey(tokenData.name);
       
-      // Toast notification
-      toast({
-        title: "API key created",
-        description: "Your new API key has been created successfully",
-      });
+      // Validate new token
+      if (!newToken.token || !newToken.token.startsWith('sk-') || newToken.token.length < 35) {
+        console.error('[TOKENS] Created API key has invalid format:', newToken);
+        
+        // Still show success but warn about potential issues
+        toast({
+          title: "API key created with warnings",
+          description: "Your API key was created but may have validation issues. Check the console for details.",
+          variant: "warning"
+        });
+      } else {
+        // Success toast and emit the token to the dialog
+        toast({
+          title: "API key created",
+          description: "Your new API key has been created successfully",
+        });
+        
+        // Emit custom event with token data for the dialog to capture
+        const tokenEvent = new CustomEvent('tokenCreated', { 
+          detail: { token: newToken },
+          bubbles: true
+        });
+        window.dispatchEvent(tokenEvent);
+        console.log('[TOKENS] Emitted tokenCreated event with new token');
+      }
       
-      // Close the dialog
-      setIsCreateDialogOpen(false);
+      // Force reload tokens to make sure we have the latest data
+      await loadTokens();
+      
+      // Don't close the dialog here - let the user close it after seeing the key
+      // The dialog will stay open to display the new key
     } catch (error) {
-      console.error('Error creating token:', error);
+      console.error('[TOKENS] Error creating token:', error);
+      
+      // Provide more specific error messages based on the error
+      let errorMessage = "Please try again later";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('User not authenticated')) {
+          errorMessage = "Authentication error - please sign in again";
+          // Redirect to login after a short delay
+          setTimeout(() => {
+            window.location.href = '/signin';
+          }, 2000);
+        } else if (error.message.includes('Failed to create auth token')) {
+          errorMessage = "Authentication token error - please sign in again";
+        } else if (error.message.includes('Failed to fetch')) {
+          errorMessage = "Network error - please check your connection";
+        } else {
+          // Include part of the error message for debugging
+          const safeMessage = error.message.substring(0, 100);
+          errorMessage = `Server error: ${safeMessage}`;
+        }
+      }
+      
       toast({
         title: "Failed to create API key",
-        description: "Please try again later",
+        description: errorMessage,
         variant: "destructive"
       });
+      
+      // Close dialog on error
+      setIsCreateDialogOpen(false);
     }
   };
   
   const handleActivateToken = async (id: string) => {
     try {
+      const token = tokens.find(t => t.id === id);
+      
+      if (token?.isIncomplete) {
+        toast({
+          title: "Cannot activate invalid key",
+          description: "This key has missing data. Please delete and create a new key.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // Activate token using the service
       await updateApiKeyStatus(id, 'active');
       
@@ -142,10 +218,32 @@ const TokensPage = () => {
   const handleTestToken = (id: string) => {
     const token = tokens.find(t => t.id === id);
     
-    if (token?.status === 'inactive') {
+    if (!token) {
+      return;
+    }
+    
+    if (token.isIncomplete) {
+      toast({
+        title: "Cannot test invalid key",
+        description: "This key has missing data. Please delete and create a new key.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (token.status === 'inactive') {
       toast({
         title: "Cannot test inactive key",
         description: "Please activate the key before testing",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (token.hasValidFormat === false) {
+      toast({
+        title: "Invalid key format",
+        description: "This key has an invalid format. Please delete and create a new key.",
         variant: "destructive",
       });
       return;

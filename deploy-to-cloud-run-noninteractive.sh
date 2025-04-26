@@ -3,6 +3,7 @@ set -e
 
 # MorSaaS Deployment Script for Google Cloud Run
 # This script automates the deployment of the application to Google Cloud Run
+# and fetches configuration from GitHub
 
 # Colors for better readability
 RED='\033[0;31m'
@@ -14,11 +15,11 @@ NC='\033[0m' # No Color
 # Configuration Variables
 PROJECT_NAME="morsaas"
 IMAGE_NAME="morsaas-app"
-REGION="${REGION:-us-west1}"  # Use env var or default to us-west1
+REGION="${REGION:-us-west1}"
 MEMORY="2Gi"
 CPU="1"
 CONCURRENCY="80"
-MIN_INSTANCES="1"  # Changed from 0 to 1 to ensure an instance is always ready
+MIN_INSTANCES="1"
 MAX_INSTANCES="10"
 TIMEOUT="600s"
 
@@ -29,64 +30,16 @@ if [[ "$ENVIRONMENT" == "master" ]]; then
   ENVIRONMENT="prod"
   SERVICE_NAME="${SERVICE_NAME:-morsaas}"
   IS_PROD="true"
-  # Production model config & endpoints from GitHub
-  REACT_APP_AVAILABLE_MODELS="${PROD_AVAILABLE_MODELS:-mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B}"
-  SECONDARY_ENDPOINT_URL="${PROD_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
-  CONSUMER_API_URL="${PROD_CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}"
-  USE_FALLBACK_AS_PRIMARY="${PROD_USE_FALLBACK_AS_PRIMARY:-false}"
-  OPENROUTER_HTTP_REFERER="${PROD_OPENROUTER_HTTP_REFERER:-https://morsaas.com}"
-  OPENROUTER_APP_TITLE="${PROD_OPENROUTER_APP_TITLE:-MorSaaS}"
-  OPENROUTER_APP_VERSION="${PROD_OPENROUTER_APP_VERSION:-1.0.0}"
-  UPSTASH_URL="${PROD_REDIS_URL:-redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379}"
 elif [[ "$ENVIRONMENT" == "staging" ]]; then
   ENVIRONMENT="staging"
   SERVICE_NAME="${SERVICE_NAME:-morsaas-staging}"
   IS_PROD="false"
-  # Staging model config & endpoints from GitHub
-  REACT_APP_AVAILABLE_MODELS="${STAGING_AVAILABLE_MODELS:-mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B}"
-  SECONDARY_ENDPOINT_URL="${STAGING_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
-  CONSUMER_API_URL="${STAGING_CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}"
-  USE_FALLBACK_AS_PRIMARY="${STAGING_USE_FALLBACK_AS_PRIMARY:-false}"
-  OPENROUTER_HTTP_REFERER="${STAGING_OPENROUTER_HTTP_REFERER:-https://staging.morsaas.com}"
-  OPENROUTER_APP_TITLE="${STAGING_OPENROUTER_APP_TITLE:-MorSaaS-Staging}"
-  OPENROUTER_APP_VERSION="${STAGING_OPENROUTER_APP_VERSION:-1.0.0-staging}"
-  UPSTASH_URL="${STAGING_REDIS_URL:-redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379}"
 else
   # Default to dev environment
   ENVIRONMENT="dev"
   SERVICE_NAME="${SERVICE_NAME:-morsaas-dev}"
   IS_PROD="false"
-  # Development model config & endpoints from GitHub
-  REACT_APP_AVAILABLE_MODELS="${DEV_AVAILABLE_MODELS:-mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B}"
-  SECONDARY_ENDPOINT_URL="${DEV_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
-  CONSUMER_API_URL="${DEV_CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}"
-  USE_FALLBACK_AS_PRIMARY="${DEV_USE_FALLBACK_AS_PRIMARY:-false}"
-  OPENROUTER_HTTP_REFERER="${DEV_OPENROUTER_HTTP_REFERER:-https://dev.morsaas.com}"
-  OPENROUTER_APP_TITLE="${DEV_OPENROUTER_APP_TITLE:-MorSaaS-Dev}"
-  OPENROUTER_APP_VERSION="${DEV_OPENROUTER_APP_VERSION:-1.0.0-dev}"
-  UPSTASH_URL="${DEV_REDIS_URL:-redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379}"
 fi
-
-# Allow override of all environment variables through explicit environment variables
-REACT_APP_AVAILABLE_MODELS="${REACT_APP_AVAILABLE_MODELS:-$REACT_APP_AVAILABLE_MODELS}"
-SECONDARY_ENDPOINT_URL="${SECONDARY_ENDPOINT_URL:-$SECONDARY_ENDPOINT_URL}"
-CONSUMER_API_URL="${CONSUMER_API_URL:-$CONSUMER_API_URL}"
-USE_FALLBACK_AS_PRIMARY="${USE_FALLBACK_AS_PRIMARY:-$USE_FALLBACK_AS_PRIMARY}"
-OPENROUTER_HTTP_REFERER="${OPENROUTER_HTTP_REFERER:-$OPENROUTER_HTTP_REFERER}"
-OPENROUTER_APP_TITLE="${OPENROUTER_APP_TITLE:-$OPENROUTER_APP_TITLE}"
-OPENROUTER_APP_VERSION="${OPENROUTER_APP_VERSION:-$OPENROUTER_APP_VERSION}"
-UPSTASH_URL="${REDIS_URL:-$UPSTASH_URL}"
-
-# Get project ID from gcloud if possible, otherwise use environment variable
-PROJECT_ID="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo "")}"
-
-# Print the configuration
-echo -e "${BLUE}Deployment Configuration:${NC}"
-echo -e "${YELLOW}Environment: $ENVIRONMENT${NC}"
-echo -e "${YELLOW}Service Name: $SERVICE_NAME${NC}"
-echo -e "${YELLOW}Project ID: $PROJECT_ID${NC}"
-echo -e "${YELLOW}Available Models: $REACT_APP_AVAILABLE_MODELS${NC}"
-echo -e "${YELLOW}Secondary Endpoint URL: $SECONDARY_ENDPOINT_URL${NC}"
 
 # Function to display a section header
 section() {
@@ -121,6 +74,214 @@ is_authenticated() {
   else
     return 1  # Not authenticated
   fi
+}
+
+# Function to fetch GitHub environment variables
+fetch_github_env_vars() {
+  section "Fetching GitHub Environment Variables"
+  
+  # Check if GitHub CLI is installed
+  if ! command_exists gh; then
+    echo -e "${YELLOW}GitHub CLI (gh) not installed. Will use local environment variables or defaults.${NC}"
+    echo -e "${YELLOW}To fetch values from GitHub, install GitHub CLI from: https://cli.github.com/${NC}"
+    return 1
+  fi
+  
+  # Check if authenticated with GitHub
+  if ! gh auth status &>/dev/null; then
+    echo -e "${YELLOW}Not authenticated with GitHub. Please run 'gh auth login' first.${NC}"
+    echo -e "${YELLOW}Will use local environment variables or defaults.${NC}"
+    return 1
+  fi
+  
+  # Determine which repository to use
+  if [ -z "$GITHUB_REPO" ]; then
+    # Try to get the repository from git remote
+    GITHUB_REPO=$(git remote -v | grep -m 1 origin | awk '{print $2}' | sed 's/.*github.com[:\/]\(.*\)\.git.*/\1/')
+    if [ -z "$GITHUB_REPO" ]; then
+      echo -e "${YELLOW}Could not determine GitHub repository. Please set GITHUB_REPO environment variable.${NC}"
+      echo -e "${YELLOW}Will use local environment variables or defaults.${NC}"
+      return 1
+    fi
+  fi
+  
+  echo -e "${GREEN}Fetching variables for $ENVIRONMENT environment from GitHub repository: $GITHUB_REPO${NC}"
+  
+  # Fetch environment variables from GitHub
+  ENV_PREFIX=""
+  if [[ "$ENVIRONMENT" == "prod" ]]; then
+    ENV_PREFIX="PROD_"
+  elif [[ "$ENVIRONMENT" == "staging" ]]; then
+    ENV_PREFIX="STAGING_"
+  else
+    ENV_PREFIX="DEV_"
+  fi
+  
+  # Try to fetch variables and secrets from GitHub
+  echo -e "${YELLOW}Fetching environment variables from GitHub...${NC}"
+  
+  # Fetch available models
+  FETCHED_AVAILABLE_MODELS=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}AVAILABLE_MODELS" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_AVAILABLE_MODELS" ]; then
+    REACT_APP_AVAILABLE_MODELS="$FETCHED_AVAILABLE_MODELS"
+    echo -e "${GREEN}✓ Fetched available models from GitHub${NC}"
+  else
+    REACT_APP_AVAILABLE_MODELS="${REACT_APP_AVAILABLE_MODELS:-mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B}"
+    echo -e "${YELLOW}Could not fetch available models from GitHub. Using default.${NC}"
+  fi
+  
+  # Fetch secondary endpoint URL
+  FETCHED_SECONDARY_ENDPOINT_URL=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}SECONDARY_ENDPOINT_URL" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_SECONDARY_ENDPOINT_URL" ]; then
+    SECONDARY_ENDPOINT_URL="$FETCHED_SECONDARY_ENDPOINT_URL"
+    echo -e "${GREEN}✓ Fetched secondary endpoint URL from GitHub${NC}"
+  else
+    SECONDARY_ENDPOINT_URL="${SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
+    echo -e "${YELLOW}Could not fetch secondary endpoint URL from GitHub. Using default.${NC}"
+  fi
+  
+  # Fetch consumer API URL
+  FETCHED_CONSUMER_API_URL=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}CONSUMER_API_URL" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_CONSUMER_API_URL" ]; then
+    CONSUMER_API_URL="$FETCHED_CONSUMER_API_URL"
+    echo -e "${GREEN}✓ Fetched consumer API URL from GitHub${NC}"
+  else
+    CONSUMER_API_URL="${CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}"
+    echo -e "${YELLOW}Could not fetch consumer API URL from GitHub. Using default.${NC}"
+  fi
+  
+  # Fetch use fallback as primary
+  FETCHED_USE_FALLBACK_AS_PRIMARY=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}USE_FALLBACK_AS_PRIMARY" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_USE_FALLBACK_AS_PRIMARY" ]; then
+    USE_FALLBACK_AS_PRIMARY="$FETCHED_USE_FALLBACK_AS_PRIMARY"
+    echo -e "${GREEN}✓ Fetched use fallback as primary from GitHub${NC}"
+  else
+    USE_FALLBACK_AS_PRIMARY="${USE_FALLBACK_AS_PRIMARY:-false}"
+    echo -e "${YELLOW}Could not fetch use fallback as primary from GitHub. Using default.${NC}"
+  fi
+  
+  # Fetch OpenRouter HTTP referer
+  FETCHED_OPENROUTER_HTTP_REFERER=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}OPENROUTER_HTTP_REFERER" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_OPENROUTER_HTTP_REFERER" ]; then
+    OPENROUTER_HTTP_REFERER="$FETCHED_OPENROUTER_HTTP_REFERER"
+    echo -e "${GREEN}✓ Fetched OpenRouter HTTP referer from GitHub${NC}"
+  else
+    if [[ "$ENVIRONMENT" == "prod" ]]; then
+      OPENROUTER_HTTP_REFERER="${OPENROUTER_HTTP_REFERER:-https://morsaas.com}"
+    elif [[ "$ENVIRONMENT" == "staging" ]]; then
+      OPENROUTER_HTTP_REFERER="${OPENROUTER_HTTP_REFERER:-https://staging.morsaas.com}"
+    else
+      OPENROUTER_HTTP_REFERER="${OPENROUTER_HTTP_REFERER:-https://dev.morsaas.com}"
+    fi
+    echo -e "${YELLOW}Could not fetch OpenRouter HTTP referer from GitHub. Using default.${NC}"
+  fi
+  
+  # Fetch OpenRouter app title
+  FETCHED_OPENROUTER_APP_TITLE=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}OPENROUTER_APP_TITLE" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_OPENROUTER_APP_TITLE" ]; then
+    OPENROUTER_APP_TITLE="$FETCHED_OPENROUTER_APP_TITLE"
+    echo -e "${GREEN}✓ Fetched OpenRouter app title from GitHub${NC}"
+  else
+    if [[ "$ENVIRONMENT" == "prod" ]]; then
+      OPENROUTER_APP_TITLE="${OPENROUTER_APP_TITLE:-MorSaaS}"
+    elif [[ "$ENVIRONMENT" == "staging" ]]; then
+      OPENROUTER_APP_TITLE="${OPENROUTER_APP_TITLE:-MorSaaS-Staging}"
+    else
+      OPENROUTER_APP_TITLE="${OPENROUTER_APP_TITLE:-MorSaaS-Dev}"
+    fi
+    echo -e "${YELLOW}Could not fetch OpenRouter app title from GitHub. Using default.${NC}"
+  fi
+  
+  # Fetch OpenRouter app version
+  FETCHED_OPENROUTER_APP_VERSION=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}OPENROUTER_APP_VERSION" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_OPENROUTER_APP_VERSION" ]; then
+    OPENROUTER_APP_VERSION="$FETCHED_OPENROUTER_APP_VERSION"
+    echo -e "${GREEN}✓ Fetched OpenRouter app version from GitHub${NC}"
+  else
+    if [[ "$ENVIRONMENT" == "prod" ]]; then
+      OPENROUTER_APP_VERSION="${OPENROUTER_APP_VERSION:-1.0.0}"
+    elif [[ "$ENVIRONMENT" == "staging" ]]; then
+      OPENROUTER_APP_VERSION="${OPENROUTER_APP_VERSION:-1.0.0-staging}"
+    else
+      OPENROUTER_APP_VERSION="${OPENROUTER_APP_VERSION:-1.0.0-dev}"
+    fi
+    echo -e "${YELLOW}Could not fetch OpenRouter app version from GitHub. Using default.${NC}"
+  fi
+  
+  # Try to fetch secrets (this may not work depending on GitHub permissions)
+  echo -e "${YELLOW}Fetching secrets from GitHub...${NC}"
+  
+  # Fetch Redis URL (as secret)
+  if [ -z "$UPSTASH_URL" ]; then
+    # Note: This will only work with proper permissions and may not be possible for all users
+    echo -e "${YELLOW}Attempting to fetch Redis URL secret from GitHub...${NC}"
+    
+    # Attempt to fetch the secret (may not work due to GitHub security)
+    if gh secret list -R "$GITHUB_REPO" | grep -q "${ENV_PREFIX}REDIS_URL" >/dev/null 2>&1; then
+      echo -e "${GREEN}Redis URL secret found in GitHub. Note that GitHub doesn't allow direct access to secret values.${NC}"
+      echo -e "${YELLOW}Please set REDIS_URL or ${ENV_PREFIX}REDIS_URL as an environment variable before running this script.${NC}"
+    else
+      echo -e "${YELLOW}Could not find Redis URL secret in GitHub. Please provide it manually.${NC}"
+    fi
+    
+    # Since we can't fetch the value directly, prompt user if it's not already set
+    if [ -z "$REDIS_URL" ]; then
+      echo -ne "${YELLOW}Enter Redis URL for $ENVIRONMENT environment: ${NC}"
+      read -r UPSTASH_URL
+      
+      if [ -z "$UPSTASH_URL" ]; then
+        echo -e "${RED}Error: Redis URL cannot be empty.${NC}"
+        echo -e "${YELLOW}Using default value, but this might not work in production.${NC}"
+        UPSTASH_URL="redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379"
+      fi
+    else
+      UPSTASH_URL="$REDIS_URL"
+    fi
+  fi
+  
+  # Fetch Google Cloud Project ID
+  FETCHED_PROJECT_ID=$(gh variable list -R "$GITHUB_REPO" | grep "GCP_PROJECT_ID" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_PROJECT_ID" ]; then
+    PROJECT_ID="$FETCHED_PROJECT_ID"
+    echo -e "${GREEN}✓ Fetched Google Cloud Project ID from GitHub${NC}"
+  else
+    # Get project ID from gcloud if possible, otherwise use environment variable
+    PROJECT_ID="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo "")}"
+    echo -e "${YELLOW}Could not fetch Google Cloud Project ID from GitHub. Using local configuration.${NC}"
+  fi
+  
+  # Direct variable overrides
+  # These direct variables take precedence over environment-specific ones
+  if [ ! -z "$REACT_APP_AVAILABLE_MODELS" ]; then
+    echo -e "${YELLOW}Using explicitly provided REACT_APP_AVAILABLE_MODELS environment variable.${NC}"
+  fi
+  
+  if [ ! -z "$SECONDARY_ENDPOINT_URL" ]; then
+    echo -e "${YELLOW}Using explicitly provided SECONDARY_ENDPOINT_URL environment variable.${NC}"
+  fi
+  
+  if [ ! -z "$CONSUMER_API_URL" ]; then
+    echo -e "${YELLOW}Using explicitly provided CONSUMER_API_URL environment variable.${NC}"
+  fi
+  
+  if [ ! -z "$USE_FALLBACK_AS_PRIMARY" ]; then
+    echo -e "${YELLOW}Using explicitly provided USE_FALLBACK_AS_PRIMARY environment variable.${NC}"
+  fi
+  
+  if [ ! -z "$OPENROUTER_HTTP_REFERER" ]; then
+    echo -e "${YELLOW}Using explicitly provided OPENROUTER_HTTP_REFERER environment variable.${NC}"
+  fi
+  
+  if [ ! -z "$OPENROUTER_APP_TITLE" ]; then
+    echo -e "${YELLOW}Using explicitly provided OPENROUTER_APP_TITLE environment variable.${NC}"
+  fi
+  
+  if [ ! -z "$OPENROUTER_APP_VERSION" ]; then
+    echo -e "${YELLOW}Using explicitly provided OPENROUTER_APP_VERSION environment variable.${NC}"
+  fi
+  
+  echo -e "${GREEN}✓ Completed GitHub configuration fetch${NC}"
+  return 0
 }
 
 # Check for required tools
@@ -442,8 +603,24 @@ check_health() {
 # Main execution
 main() {
   echo -e "${GREEN}==================================================${NC}"
-  echo -e "${GREEN}   MorSaaS Deployment to Google Cloud Run (Dev)   ${NC}"
+  echo -e "${GREEN}   MorSaaS Deployment to Google Cloud Run ($ENVIRONMENT)   ${NC}"
   echo -e "${GREEN}==================================================${NC}"
+  
+  # First fetch variables from GitHub
+  fetch_github_env_vars
+  
+  # Print the final configuration
+  echo -e "\n${BLUE}Final Deployment Configuration:${NC}"
+  echo -e "${YELLOW}Environment: $ENVIRONMENT${NC}"
+  echo -e "${YELLOW}Service Name: $SERVICE_NAME${NC}"
+  echo -e "${YELLOW}Project ID: $PROJECT_ID${NC}"
+  echo -e "${YELLOW}Available Models: $REACT_APP_AVAILABLE_MODELS${NC}"
+  echo -e "${YELLOW}Secondary Endpoint URL: $SECONDARY_ENDPOINT_URL${NC}"
+  echo -e "${YELLOW}Consumer API URL: $CONSUMER_API_URL${NC}"
+  echo -e "${YELLOW}Use Fallback as Primary: $USE_FALLBACK_AS_PRIMARY${NC}"
+  echo -e "${YELLOW}OpenRouter HTTP Referer: $OPENROUTER_HTTP_REFERER${NC}"
+  echo -e "${YELLOW}OpenRouter App Title: $OPENROUTER_APP_TITLE${NC}"
+  echo -e "${YELLOW}OpenRouter App Version: $OPENROUTER_APP_VERSION${NC}"
   
   check_requirements
   initialize_gcloud

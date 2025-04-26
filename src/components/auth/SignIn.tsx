@@ -172,7 +172,14 @@ export function SignInForm() {
         throw new Error('Invalid response format from server');
       }
       
-      const user = responseData.data;
+      const user = {
+        id: responseData.data.id,
+        email: responseData.data.email,
+        name: responseData.data.name || formData.email.split('@')[0],
+        company: responseData.data.company || '',
+        avatar: responseData.data.avatar || null,
+        authToken: `user-${responseData.data.id}-${Date.now()}`
+      };
       
       console.log('[SIGNIN] Login response object structure:', JSON.stringify(responseData, null, 2));
       console.log('[SIGNIN] User data object structure:', JSON.stringify(user, null, 2));
@@ -184,8 +191,8 @@ export function SignInForm() {
         // This is a temporary fix - the server should be fixed to return proper data
         const fallbackUser = {
           id: `temp-${Date.now()}`,
-          name: formData.email.split('@')[0], // Use part of email as name
-          email: formData.email,
+          name: responseData.data.email.split('@')[0], // Use part of email as name
+          email: responseData.data.email,
           company: '', // Initialize empty company
           createdAt: new Date().toISOString()
         };

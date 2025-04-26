@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -25,6 +25,8 @@ export type Token = {
   name: string;
   token: string;
   status: 'active' | 'inactive';
+  hasValidFormat?: boolean;
+  isIncomplete?: boolean;
   createdAt: string;
   lastUsed: string | null;
 };
@@ -50,6 +52,17 @@ export function TokensTable({
   const [selectedToken, setSelectedToken] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
+
+  // Log token data for debugging
+  useEffect(() => {
+    console.log('[TOKENS_TABLE] Rendering tokens:', tokens);
+    if (tokens.some(t => t.isIncomplete)) {
+      console.log('[TOKENS_TABLE] Table contains incomplete tokens that need cleanup');
+    }
+    if (tokens.some(t => t.hasValidFormat === false)) {
+      console.log('[TOKENS_TABLE] Table contains tokens with invalid format');
+    }
+  }, [tokens]);
 
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'N/A';
@@ -121,24 +134,42 @@ export function TokensTable({
               tokens.map((token) => (
                 <TableRow 
                   key={token.id}
-                  className="group transition-colors"
+                  className={cn(
+                    "group transition-colors",
+                    token.isIncomplete && "bg-red-50 dark:bg-red-950/20"
+                  )}
                   onMouseEnter={() => setHoveredRow(token.id)}
                   onMouseLeave={() => setHoveredRow(null)}
                 >
-                  <TableCell className="font-medium">{token.name}</TableCell>
+                  <TableCell className="font-medium">{token.name || 'Unnamed Key'}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <code className="bg-muted px-1.5 py-0.5 rounded text-xs">
-                        {token.token.substring(0, 12)}...
+                      <code className={cn(
+                        "bg-muted px-1.5 py-0.5 rounded text-xs",
+                        token.isIncomplete && "text-red-600 font-bold",
+                        token.hasValidFormat === false && !token.isIncomplete && "text-red-500"
+                      )}>
+                        {token.isIncomplete
+                          ? "INVALID DATA"
+                          : token.token?.substring(0, 12) + "..." || "MISSING KEY"
+                        }
+                        {!token.isIncomplete && token.hasValidFormat === false && " (INVALID FORMAT)"}
                       </code>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={() => handleCopy(token.token)}
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
+                      {token.isIncomplete ? (
+                        <span className="text-xs text-red-500 italic">
+                          Delete and create new key
+                        </span>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={() => handleCopy(token.token)}
+                          disabled={token.isIncomplete}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -146,10 +177,12 @@ export function TokensTable({
                       variant={token.status === 'active' ? 'default' : 'outline'}
                       className={cn(
                         "capitalize",
-                        token.status === 'active' ? "bg-green-500/20 text-green-700 hover:bg-green-500/20" : "text-muted-foreground",
+                        token.isIncomplete && "bg-red-100 text-red-700 hover:bg-red-100",
+                        !token.isIncomplete && token.status === 'active' && "bg-green-500/20 text-green-700 hover:bg-green-500/20",
+                        !token.isIncomplete && token.status === 'inactive' && "text-muted-foreground"
                       )}
                     >
-                      {token.status}
+                      {token.isIncomplete ? "INVALID" : token.status}
                     </Badge>
                   </TableCell>
                   <TableCell>{formatDate(token.createdAt)}</TableCell>
@@ -161,38 +194,46 @@ export function TokensTable({
                       "flex items-center justify-end space-x-1",
                       hoveredRow === token.id ? "opacity-100" : "opacity-0 md:opacity-100"
                     )}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => onTest(token.id)}
-                      >
-                        <PlayCircle className="h-4 w-4" />
-                      </Button>
-                      {token.status === 'active' ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-amber-500 hover:text-amber-600"
-                          onClick={() => onDeactivate(token.id)}
-                        >
-                          <PowerOff className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-green-500 hover:text-green-600"
-                          onClick={() => onActivate(token.id)}
-                        >
-                          <Power className="h-4 w-4" />
-                        </Button>
+                      {!token.isIncomplete && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => onTest(token.id)}
+                            disabled={token.hasValidFormat === false}
+                          >
+                            <PlayCircle className="h-4 w-4" />
+                          </Button>
+                          
+                          {token.status === 'active' ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-amber-500 hover:text-amber-600"
+                              onClick={() => onDeactivate(token.id)}
+                            >
+                              <PowerOff className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-green-500 hover:text-green-600"
+                              onClick={() => onActivate(token.id)}
+                            >
+                              <Power className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </>
                       )}
+                      
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive/80"
                         onClick={() => handleDelete(token.id)}
+                        title={token.isIncomplete ? "Delete invalid key" : "Delete key"}
                       >
                         <Trash className="h-4 w-4" />
                       </Button>

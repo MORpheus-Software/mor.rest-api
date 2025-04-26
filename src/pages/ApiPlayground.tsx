@@ -25,6 +25,8 @@ interface ApiKey {
   value: string;
   label: string;
   isActive: boolean;
+  isValid: boolean;
+  isIncomplete?: boolean;
 }
 
 // Hardcoded models from .env REACT_APP_AVAILABLE_MODELS
@@ -66,8 +68,12 @@ const ApiPlayground = () => {
       .map(token => ({
         id: token.id,
         value: token.token,
-        label: `${token.token} (${token.name})`,
-        isActive: true
+        label: token.isIncomplete 
+          ? `${token.name} (INVALID DATA)` 
+          : `${token.token.substring(0, 8)}...${token.token.substring(token.token.length - 4)} (${token.name})`,
+        isActive: true,
+        isValid: token.hasValidFormat !== false && !token.isIncomplete,
+        isIncomplete: token.isIncomplete
       }));
   };
 
@@ -199,12 +205,32 @@ const ApiPlayground = () => {
       return;
     }
     
-    const apiKey = apiKeys.find(k => k.id === selectedApiKey)?.value;
+    const selectedKey = apiKeys.find(k => k.id === selectedApiKey);
+    const apiKey = selectedKey?.value;
     
     if (!apiKey) {
       toast({
         title: "Error",
         description: "No API key selected",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (selectedKey.isIncomplete) {
+      toast({
+        title: "Invalid API Key",
+        description: "This key has missing data. Please delete it and create a new key.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Validate API key format
+    if (!apiKey.startsWith('sk-') || apiKey.length < 35) {
+      toast({
+        title: "Invalid API Key Format",
+        description: "The selected API key has an invalid format. Please create a new API key.",
         variant: "destructive"
       });
       return;
@@ -427,8 +453,14 @@ const ApiPlayground = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {apiKeys.map(key => (
-                        <SelectItem key={key.id} value={key.id} className="break-all">
+                        <SelectItem 
+                          key={key.id} 
+                          value={key.id} 
+                          className={`break-all ${key.isIncomplete ? 'text-red-600 font-bold' : !key.isValid ? 'text-red-500' : ''}`}
+                          disabled={key.isIncomplete}
+                        >
                           {key.label}
+                          {!key.isIncomplete && !key.isValid && " (INVALID FORMAT)"}
                         </SelectItem>
                       ))}
                     </SelectContent>

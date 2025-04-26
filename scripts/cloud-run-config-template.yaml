@@ -43,3 +43,7 @@ spec:
           value: OPENROUTER_APP_TITLE_VALUE
         - name: OPENROUTER_APP_VERSION
           value: OPENROUTER_APP_VERSION_VALUE
+        - name: ETHEREUM_CHAIN_ID
+          value: "1"
+        - name: ETHEREUM_RPC_URL
+          value: ETHEREUM_RPC_URL_VALUE
