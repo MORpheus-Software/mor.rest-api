@@ -2,7 +2,10 @@ name: Deploy to Cloud Run
 
 on:
   push:
-    branches-ignore: [ staging, master, main ]
+    branches-ignore:
+      - main
+      - master
+      - staging
   workflow_dispatch:
     inputs:
       environment:
@@ -23,7 +26,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || github.ref_name == 'staging' && 'staging' || github.ref_name == 'master' && 'prod' || github.ref_name == 'main' && 'prod' || 'dev' }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || github.ref_name }}
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -35,7 +38,7 @@ jobs:
     - name: Set environment variables
       run: |
         # Set service name based on branch/environment
-        if [[ "${{ github.ref_name }}" == "master" || "${{ github.ref_name }}" == "main" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
+        if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
           echo "SERVICE_NAME=morsaas" >> $GITHUB_ENV
           echo "Deploying to production environment: morsaas"
           echo "IS_PROD=true" >> $GITHUB_ENV
@@ -56,7 +59,7 @@ jobs:
           echo "CONSUMER_API_URL=${{ vars.STAGING_CONSUMER_API_URL || 'https://consumer-node-1081887913409.us-west1.run.app' }}" >> $GITHUB_ENV
           echo "USE_FALLBACK_AS_PRIMARY=${{ vars.STAGING_USE_FALLBACK_AS_PRIMARY || 'false' }}" >> $GITHUB_ENV
         else
-          # Default to dev environment
+          # Default to dev environment for all other branches
           echo "SERVICE_NAME=morsaas-dev" >> $GITHUB_ENV
           echo "Deploying to development environment: morsaas-dev"
           echo "IS_PROD=false" >> $GITHUB_ENV
@@ -156,10 +159,6 @@ jobs:
         echo "Cleaning build cache..."
         rm -rf dist node_modules/.vite
         
-        # Ensure ESM import fix scripts are executable
-        echo "Making fix scripts executable..."
-        chmod +x scripts/fix-esm-imports.js scripts/apply-fixes-for-production.js
-        
         # Generate unique build ID (timestamp + git short hash)
         BUILD_ID="$(date +%s)-$(git rev-parse --short HEAD)"
         echo "Using BUILD_ID: $BUILD_ID for cache control"
@@ -214,7 +213,7 @@ jobs:
         sed -i "s|namespace: default|namespace: ${{ env.PROJECT_ID }}|g" cloud-run-deploy-config.yaml
         
         # Update environment labels with actual environment name
-        if [[ "${{ github.ref_name }}" == "master" || "${{ github.ref_name }}" == "main" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
+        if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
           sed -i "s|ENVIRONMENT_NAME|prod|g" cloud-run-deploy-config.yaml
         elif [[ "${{ github.ref_name }}" == "staging" || "${{ github.event.inputs.environment }}" == "staging" ]]; then
           sed -i "s|ENVIRONMENT_NAME|staging|g" cloud-run-deploy-config.yaml
@@ -296,7 +295,7 @@ jobs:
         fi
         
         # Update OpenRouter configuration
-        if [[ "${{ github.ref_name }}" == "master" || "${{ github.ref_name }}" == "main" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
+        if [[ "${{ github.ref_name }}" == "master" || "${{ github.event.inputs.environment }}" == "prod" ]]; then
           # Escape values for sed
           ESCAPED_URL=$(./scripts/escape-sed-value.sh "${{ vars.PROD_OPENROUTER_HTTP_REFERER || 'https://morsaas.com' }}")
           sed -i "s|OPENROUTER_HTTP_REFERER_VALUE|${ESCAPED_URL}|g" cloud-run-deploy-config.yaml
