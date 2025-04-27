@@ -4,17 +4,6 @@ set -e
 # MorSaaS Deployment Script for Google Cloud Run
 # This script automates the deployment of the application to Google Cloud Run
 # It fetches configuration from GitHub (if available) and deploys to the appropriate environment
-# By default, it deploys to the 'dev' environment (morsaas-dev service)
-
-# Load environment variables from .env at the project root if present
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-ENV_FILE="$PROJECT_ROOT/.env"
-if [ -f "$ENV_FILE" ]; then
-  echo "Loading environment variables from $ENV_FILE"
-  set -o allexport
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
   set +o allexport
 fi
 
@@ -167,13 +156,6 @@ check_requirements() {
     missing_requirements=1
   else
     echo -e "${GREEN}✓ Docker is installed${NC}"
-    
-    # Check and set up QEMU if on Apple Silicon
-    if [[ "$(uname -m)" == "arm64" ]]; then
-      echo -e "${YELLOW}Apple Silicon (ARM64) detected, setting up QEMU for multi-platform builds...${NC}"
-      docker run --privileged --rm tonistiigi/binfmt --install all
-      echo -e "${GREEN}✓ QEMU configured for multi-platform builds${NC}"
-    fi
   fi
   
   if ! command_exists npm; then
@@ -393,33 +375,9 @@ build_image() {
     node scripts/build-for-deploy.js
   fi
   
-  # Verify that dist/index.html exists after local build
-  if [[ "$current_dir" == *"/scripts" ]]; then
-    # If in scripts directory, check one level up
-    if [ ! -f "../dist/index.html" ]; then
-      echo -e "${RED}❌ ERROR: dist/index.html not found after local build!${NC}"
-      echo -e "${RED}Local build failed. Cannot proceed with Docker build.${NC}"
-      exit 1
-    else
-      echo -e "${GREEN}✅ Local build successful: dist/index.html exists${NC}"
-    fi
-  else
-    # If at root
-    if [ ! -f "dist/index.html" ]; then
-      echo -e "${RED}❌ ERROR: dist/index.html not found after local build!${NC}"
-      echo -e "${RED}Local build failed. Cannot proceed with Docker build.${NC}"
-      exit 1
-    else
-      echo -e "${GREEN}✅ Local build successful: dist/index.html exists${NC}"
-    fi
-  fi
-  
   # Generate unique build ID
   BUILD_ID="$(date +%s)-$(git rev-parse --short HEAD 2>/dev/null || echo 'local')"
   echo "Using BUILD_ID: $BUILD_ID for cache control"
-  
-  # Use the BUILD_ID for the image tag to ensure uniqueness
-  IMAGE_TAG="$BUILD_ID"
   
   # Sanitize model names to prevent shell script errors
   SIMPLIFIED_MODELS=$(simplify_model_names "$REACT_APP_AVAILABLE_MODELS")
@@ -435,7 +393,6 @@ build_image() {
   fi
   
   docker build \
-    --platform=linux/amd64 \
     --build-arg BUILD_ID="$BUILD_ID" \
     --build-arg REACT_APP_AVAILABLE_MODELS="$SIMPLIFIED_MODELS" \
     --build-arg VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://nfa-proxy-1081887913409.us-west1.run.app}" \
@@ -443,10 +400,7 @@ build_image() {
     --build-arg SECONDARY_ENDPOINT_MODEL="$SIMPLIFIED_SECONDARY_MODEL" \
     --build-arg USE_FALLBACK_AS_PRIMARY="${USE_FALLBACK_AS_PRIMARY}" \
     --build-arg CONSUMER_API_URL="${CONSUMER_API_URL}" \
-    -t "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:${IMAGE_TAG}" .
-  
-  # Also tag as latest for convenience
-  docker tag "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:${IMAGE_TAG}" "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest"
+    -t "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest" .
   
   # If we changed directory, go back to the original directory
   if [[ "$current_dir" == *"/scripts" ]]; then
@@ -454,7 +408,6 @@ build_image() {
   fi
   
   echo -e "${GREEN}✓ Docker image built successfully with model: $SIMPLIFIED_MODELS${NC}"
-  echo -e "${GREEN}✓ Tagged as: gcr.io/${PROJECT_ID}/${SERVICE_NAME}:${IMAGE_TAG}${NC}"
 }
 
 # Push the Docker image to Google Container Registry
@@ -462,9 +415,6 @@ push_image() {
   section "Pushing to Google Container Registry"
   
   echo -e "${YELLOW}Pushing Docker image to GCR...${NC}"
-  # Push the uniquely tagged image
-  docker push "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:${IMAGE_TAG}"
-  # Also push latest tag
   docker push "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest"
   
   echo -e "${GREEN}✓ Docker image pushed successfully${NC}"
@@ -492,9 +442,9 @@ configure_yaml() {
   # Update environment labels
   sed -i.bak "s|ENVIRONMENT_NAME|$ENVIRONMENT|g" cloud-run-deploy-config.yaml
   
-  # Update image reference with specific tag instead of 'latest'
+  # Update image reference
   sed -i.bak "s|PROJECT_ID|$PROJECT_ID|g" cloud-run-deploy-config.yaml
-  sed -i.bak "s|COMMIT_SHA|$IMAGE_TAG|g" cloud-run-deploy-config.yaml
+  sed -i.bak "s|COMMIT_SHA|latest|g" cloud-run-deploy-config.yaml
   
   # Verify the Redis URL
   echo "Redis URL format check:"

@@ -1,22 +1,8 @@
 #!/bin/bash
 set -e
 
-# MorSaaS Deployment Script for Google Cloud Run
-# This script automates the deployment of the application to Google Cloud Run
-# It fetches configuration from GitHub (if available) and deploys to the appropriate environment
-# By default, it deploys to the 'dev' environment (morsaas-dev service)
-
-# Load environment variables from .env at the project root if present
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-ENV_FILE="$PROJECT_ROOT/.env"
-if [ -f "$ENV_FILE" ]; then
-  echo "Loading environment variables from $ENV_FILE"
-  set -o allexport
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
-  set +o allexport
-fi
+# MorSaaS Development Deployment Script for Google Cloud Run
+# This is a modified version that skips loading the .env file
 
 # Colors for better readability
 RED='\033[0;31m'
@@ -36,81 +22,25 @@ MIN_INSTANCES="1"  # Changed from 0 to 1 to ensure an instance is always ready
 MAX_INSTANCES="10"
 TIMEOUT="600s"
 
-# DEFAULT ENVIRONMENT SETTINGS
-# When running locally, default to the dev environment
-ENVIRONMENT="${DEPLOY_ENVIRONMENT:-dev}"
-if [[ "$ENVIRONMENT" == "master" ]]; then
-  ENVIRONMENT="prod"
-  SERVICE_NAME="${SERVICE_NAME:-morsaas}"
-  IS_PROD="true"
-  # Production model config & endpoints from GitHub
-  REACT_APP_AVAILABLE_MODELS="${PROD_AVAILABLE_MODELS:-mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B}"
-  SECONDARY_ENDPOINT_URL="${PROD_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
-  CONSUMER_API_URL="${PROD_CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}"
-  USE_FALLBACK_AS_PRIMARY="${PROD_USE_FALLBACK_AS_PRIMARY:-false}"
-  OPENROUTER_HTTP_REFERER="${PROD_OPENROUTER_HTTP_REFERER:-https://morsaas.com}"
-  OPENROUTER_APP_TITLE="${PROD_OPENROUTER_APP_TITLE:-MorSaaS}"
-  OPENROUTER_APP_VERSION="${PROD_OPENROUTER_APP_VERSION:-1.0.0}"
-  UPSTASH_URL="${PROD_REDIS_URL:-redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379}"
-  ETHEREUM_CHAIN_ID="${PROD_ETHEREUM_CHAIN_ID:-1}"
-  ETHEREUM_RPC_URL="${PROD_ETHEREUM_RPC_URL:-https://eth-mainnet.g.alchemy.com/v2/demo}"
-elif [[ "$ENVIRONMENT" == "staging" ]]; then
-  ENVIRONMENT="staging"
-  SERVICE_NAME="${SERVICE_NAME:-morsaas-staging}"
-  IS_PROD="false"
-  # Staging model config & endpoints from GitHub
-  REACT_APP_AVAILABLE_MODELS="${STAGING_AVAILABLE_MODELS:-mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B}"
-  SECONDARY_ENDPOINT_URL="${STAGING_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
-  CONSUMER_API_URL="${STAGING_CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}"
-  USE_FALLBACK_AS_PRIMARY="${STAGING_USE_FALLBACK_AS_PRIMARY:-false}"
-  OPENROUTER_HTTP_REFERER="${STAGING_OPENROUTER_HTTP_REFERER:-https://staging.morsaas.com}"
-  OPENROUTER_APP_TITLE="${STAGING_OPENROUTER_APP_TITLE:-MorSaaS-Staging}"
-  OPENROUTER_APP_VERSION="${STAGING_OPENROUTER_APP_VERSION:-1.0.0-staging}"
-  UPSTASH_URL="${STAGING_REDIS_URL:-redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379}"
-  ETHEREUM_CHAIN_ID="${STAGING_ETHEREUM_CHAIN_ID:-5}"
-  ETHEREUM_RPC_URL="${STAGING_ETHEREUM_RPC_URL:-https://eth-goerli.g.alchemy.com/v2/demo}"
-else
-  # Default to dev environment
-  ENVIRONMENT="dev"
-  SERVICE_NAME="${SERVICE_NAME:-morsaas-dev}"
-  IS_PROD="false"
-  # Development model config & endpoints from GitHub
-  REACT_APP_AVAILABLE_MODELS="${DEV_AVAILABLE_MODELS:-mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B}"
-  SECONDARY_ENDPOINT_URL="${DEV_SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
-  CONSUMER_API_URL="${DEV_CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}"
-  USE_FALLBACK_AS_PRIMARY="${DEV_USE_FALLBACK_AS_PRIMARY:-false}"
-  OPENROUTER_HTTP_REFERER="${DEV_OPENROUTER_HTTP_REFERER:-https://dev.morsaas.com}"
-  OPENROUTER_APP_TITLE="${DEV_OPENROUTER_APP_TITLE:-MorSaaS-Dev}"
-  OPENROUTER_APP_VERSION="${DEV_OPENROUTER_APP_VERSION:-1.0.0-dev}"
-  UPSTASH_URL="${DEV_REDIS_URL:-redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379}"
-  ETHEREUM_CHAIN_ID="${DEV_ETHEREUM_CHAIN_ID:-5}"
-  ETHEREUM_RPC_URL="${DEV_ETHEREUM_RPC_URL:-https://eth-goerli.g.alchemy.com/v2/demo}"
-fi
+# Fixed to dev environment
+ENVIRONMENT="dev"
+SERVICE_NAME="${SERVICE_NAME:-morsaas-dev}"
+IS_PROD="false"
 
-# Allow override of all environment variables through explicit environment variables
-REACT_APP_AVAILABLE_MODELS="${REACT_APP_AVAILABLE_MODELS:-$REACT_APP_AVAILABLE_MODELS}"
-SECONDARY_ENDPOINT_URL="${SECONDARY_ENDPOINT_URL:-$SECONDARY_ENDPOINT_URL}"
-CONSUMER_API_URL="${CONSUMER_API_URL:-$CONSUMER_API_URL}"
-USE_FALLBACK_AS_PRIMARY="${USE_FALLBACK_AS_PRIMARY:-$USE_FALLBACK_AS_PRIMARY}"
-OPENROUTER_HTTP_REFERER="${OPENROUTER_HTTP_REFERER:-$OPENROUTER_HTTP_REFERER}"
-OPENROUTER_APP_TITLE="${OPENROUTER_APP_TITLE:-$OPENROUTER_APP_TITLE}"
-OPENROUTER_APP_VERSION="${OPENROUTER_APP_VERSION:-$OPENROUTER_APP_VERSION}"
-UPSTASH_URL="${REDIS_URL:-$UPSTASH_URL}"
-ETHEREUM_CHAIN_ID="${ETHEREUM_CHAIN_ID:-$ETHEREUM_CHAIN_ID}"
-ETHEREUM_RPC_URL="${ETHEREUM_RPC_URL:-$ETHEREUM_RPC_URL}"
+# Set model config directly to avoid env file issues
+REACT_APP_AVAILABLE_MODELS="mistralai/mistral-small-3.1-24b-instruct|Mistral Small 3.1 24B,deepseek/deepseek-r1-zero|Deepseek R1 Zero,meta-llama/llama-3.3-70b-instruct|Llama 3.3 70B"
+SECONDARY_ENDPOINT_URL="${SECONDARY_ENDPOINT_URL:-https://openrouter.ai/api/v1/chat/completions}"
+CONSUMER_API_URL="${CONSUMER_API_URL:-https://consumer-node-1081887913409.us-west1.run.app}"
+USE_FALLBACK_AS_PRIMARY="${USE_FALLBACK_AS_PRIMARY:-true}"
+OPENROUTER_HTTP_REFERER="${OPENROUTER_HTTP_REFERER:-https://dev.morsaas.com}"
+OPENROUTER_APP_TITLE="${OPENROUTER_APP_TITLE:-MorSaaS-Dev}"
+OPENROUTER_APP_VERSION="${OPENROUTER_APP_VERSION:-1.0.0-dev}"
+ETHEREUM_CHAIN_ID="${ETHEREUM_CHAIN_ID:-421614}"
+ETHEREUM_RPC_URL="${ETHEREUM_RPC_URL:-https://arb-sepolia.g.alchemy.com/v2/demo}"
+SECONDARY_ENDPOINT_MODEL="${SECONDARY_ENDPOINT_MODEL:-openrouter/auto}"
 
 # Get project ID from gcloud if possible, otherwise use environment variable
 PROJECT_ID="${PROJECT_ID:-${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo "")}}"
-
-# Print the configuration
-echo -e "${BLUE}Deployment Configuration:${NC}"
-echo -e "${YELLOW}Environment: $ENVIRONMENT${NC}"
-echo -e "${YELLOW}Service Name: $SERVICE_NAME${NC}"
-echo -e "${YELLOW}Project ID: $PROJECT_ID${NC}"
-echo -e "${YELLOW}Available Models: $REACT_APP_AVAILABLE_MODELS${NC}"
-echo -e "${YELLOW}Secondary Endpoint URL: $SECONDARY_ENDPOINT_URL${NC}"
-echo -e "${YELLOW}Ethereum Chain ID: $ETHEREUM_CHAIN_ID${NC}"
-echo -e "${YELLOW}Ethereum RPC URL: $ETHEREUM_RPC_URL${NC}"
 
 # Function to display a section header
 section() {
@@ -124,117 +54,10 @@ command_exists() {
   command -v "$1" &> /dev/null
 }
 
-# Function to sanitize model names (equivalent to simplify-model-names.sh)
-simplify_model_names() {
-  local input="$1"
-  # Remove all numbers with decimal points and special characters
-  echo "$input" | sed 's/[0-9]\+\.[0-9]\+//g' | sed 's/[0-9]\+B//g' | sed 's/ /_/g' | sed 's/,/__/g' | sed 's/|/--/g' | sed 's/[:;]/_/g'
-}
+# The rest of the script is the same as deploy-to-cloud-run-dev.sh
+# Copy the remaining functions from the original script
 
-# Function to escape special characters for sed (like escape-sed-value.sh)
-escape_sed_value() {
-  local value="$1"
-  echo "$value" | sed -e 's/[\/&]/\\&/g'
-}
-
-# Check if user is authenticated with Google Cloud
-is_authenticated() {
-  # Check if user is authenticated
-  if gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | grep -q "@"; then
-    return 0  # Authenticated
-  else
-    return 1  # Not authenticated
-  fi
-}
-
-# Check for required tools
-check_requirements() {
-  section "Checking Requirements"
-  
-  local missing_requirements=0
-  
-  if ! command_exists gcloud; then
-    echo -e "${RED}Error: Google Cloud SDK (gcloud) is not installed.${NC}"
-    echo "Please install it from: https://cloud.google.com/sdk/docs/install"
-    missing_requirements=1
-  else
-    echo -e "${GREEN}✓ Google Cloud SDK is installed${NC}"
-  fi
-  
-  if ! command_exists docker; then
-    echo -e "${RED}Error: Docker is not installed.${NC}"
-    echo "Please install it from: https://docs.docker.com/get-docker/"
-    missing_requirements=1
-  else
-    echo -e "${GREEN}✓ Docker is installed${NC}"
-    
-    # Check and set up QEMU if on Apple Silicon
-    if [[ "$(uname -m)" == "arm64" ]]; then
-      echo -e "${YELLOW}Apple Silicon (ARM64) detected, setting up QEMU for multi-platform builds...${NC}"
-      docker run --privileged --rm tonistiigi/binfmt --install all
-      echo -e "${GREEN}✓ QEMU configured for multi-platform builds${NC}"
-    fi
-  fi
-  
-  if ! command_exists npm; then
-    echo -e "${RED}Error: npm is not installed.${NC}"
-    echo "Please install Node.js and npm from: https://nodejs.org/"
-    missing_requirements=1
-  else
-    echo -e "${GREEN}✓ npm is installed${NC}"
-  fi
-  
-  if ! command_exists sed; then
-    echo -e "${RED}Error: sed is not installed.${NC}"
-    missing_requirements=1
-  else
-    echo -e "${GREEN}✓ sed is installed${NC}"
-  fi
-  
-  if [ $missing_requirements -ne 0 ]; then
-    echo -e "${RED}Please install the missing requirements and try again.${NC}"
-    exit 1
-  fi
-}
-
-# Initialize Google Cloud project
-initialize_gcloud() {
-  section "Initializing Google Cloud"
-  
-  # Only prompt for login if not already authenticated
-  if ! is_authenticated; then
-    echo -e "${YELLOW}Not authenticated with Google Cloud. Logging in...${NC}"
-    gcloud auth login
-  else
-    echo -e "${GREEN}✓ Already authenticated with Google Cloud${NC}"
-  fi
-  
-  # Check if we have a project ID, if not, prompt for it
-  if [ -z "$PROJECT_ID" ]; then
-    echo -ne "${YELLOW}Enter your Google Cloud Project ID: ${NC}"
-    read -r PROJECT_ID
-    
-    if [ -z "$PROJECT_ID" ]; then
-      echo -e "${RED}Error: Project ID cannot be empty.${NC}"
-      exit 1
-    fi
-  fi
-  
-  echo -e "${YELLOW}Setting Google Cloud project to: $PROJECT_ID${NC}"
-  gcloud config set project "$PROJECT_ID"
-  
-  # Enable required APIs
-  echo -e "${YELLOW}Enabling required Google Cloud APIs...${NC}"
-  gcloud services enable cloudbuild.googleapis.com
-  gcloud services enable run.googleapis.com
-  gcloud services enable artifactregistry.googleapis.com
-  
-  # Configure Docker to use Google Cloud credential helper
-  echo -e "${YELLOW}Configuring Docker authentication...${NC}"
-  gcloud auth configure-docker --quiet
-}
-
-# Function to fetch GitHub environment variables
+# Function to fetch GitHub environment variables (specifically for dev environment)
 fetch_github_env_vars() {
   section "Fetching GitHub Environment Variables"
   
@@ -260,17 +83,10 @@ fetch_github_env_vars() {
     fi
   fi
   
-  echo -e "${GREEN}Fetching variables for $ENVIRONMENT environment from GitHub repository: $GITHUB_REPO${NC}"
+  echo -e "${GREEN}Fetching variables for dev environment from GitHub repository: $GITHUB_REPO${NC}"
   
-  # Set environment prefix
-  ENV_PREFIX=""
-  if [[ "$ENVIRONMENT" == "prod" ]]; then
-    ENV_PREFIX="PROD_"
-  elif [[ "$ENVIRONMENT" == "staging" ]]; then
-    ENV_PREFIX="STAGING_"
-  else
-    ENV_PREFIX="DEV_"
-  fi
+  # Set environment prefix for dev
+  ENV_PREFIX="DEV_"
   
   # Fetch variables from GitHub
   echo -e "${YELLOW}Fetching environment variables from GitHub...${NC}"
@@ -324,14 +140,38 @@ fetch_github_env_vars() {
     echo -e "${GREEN}✓ Fetched OpenRouter app version from GitHub${NC}"
   fi
   
+  # Fetch Ethereum Chain ID
+  FETCHED_ETHEREUM_CHAIN_ID=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}ETHEREUM_CHAIN_ID" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_ETHEREUM_CHAIN_ID" ]; then
+    ETHEREUM_CHAIN_ID="$FETCHED_ETHEREUM_CHAIN_ID"
+    echo -e "${GREEN}✓ Fetched Ethereum Chain ID from GitHub${NC}"
+  fi
+  
+  # Fetch Ethereum RPC URL
+  FETCHED_ETHEREUM_RPC_URL=$(gh variable list -R "$GITHUB_REPO" | grep "${ENV_PREFIX}ETHEREUM_RPC_URL" | awk '{print $2}' 2>/dev/null)
+  if [ ! -z "$FETCHED_ETHEREUM_RPC_URL" ]; then
+    ETHEREUM_RPC_URL="$FETCHED_ETHEREUM_RPC_URL"
+    echo -e "${GREEN}✓ Fetched Ethereum RPC URL from GitHub${NC}"
+  fi
+  
   # Try to fetch secrets indirectly - GitHub doesn't allow direct secret access
   # Check for Redis URL secret existence
-  if [ -z "$UPSTASH_URL" ] && [ -z "$REDIS_URL" ]; then
+  if [ -z "$UPSTASH_URL" ] && [ -z "$REDIS_URL" ] || [[ "${REDIS_URL}" == *"localhost"* ]]; then
     if gh secret list -R "$GITHUB_REPO" | grep -q "${ENV_PREFIX}REDIS_URL" >/dev/null 2>&1; then
       echo -e "${YELLOW}Redis URL secret found in GitHub but cannot access value directly.${NC}"
-      echo -e "${YELLOW}Please set ${ENV_PREFIX}REDIS_URL as an environment variable.${NC}"
+      echo -e "${YELLOW}Please set ${ENV_PREFIX}REDIS_URL as an environment variable or provide it when prompted.${NC}"
     else
       echo -e "${YELLOW}Could not find Redis URL secret in GitHub.${NC}"
+    fi
+  fi
+  
+  # Check for Secondary Endpoint Token secret existence
+  if [ -z "$SECONDARY_ENDPOINT_TOKEN" ]; then
+    if gh secret list -R "$GITHUB_REPO" | grep -q "${ENV_PREFIX}SECONDARY_ENDPOINT_TOKEN" >/dev/null 2>&1; then
+      echo -e "${YELLOW}Secondary Endpoint Token secret found in GitHub but cannot access value directly.${NC}"
+      echo -e "${YELLOW}Please set ${ENV_PREFIX}SECONDARY_ENDPOINT_TOKEN as an environment variable or provide it when prompted.${NC}"
+    else
+      echo -e "${YELLOW}Could not find Secondary Endpoint Token secret in GitHub.${NC}"
     fi
   fi
   
@@ -344,6 +184,165 @@ fetch_github_env_vars() {
   
   echo -e "${GREEN}✓ Completed GitHub configuration fetch${NC}"
   return 0
+}
+
+# Function to sanitize model names (equivalent to simplify-model-names.sh)
+simplify_model_names() {
+  local input="$1"
+  # Remove all numbers with decimal points and special characters
+  echo "$input" | sed 's/[0-9]\+\.[0-9]\+//g' | sed 's/[0-9]\+B//g' | sed 's/ /_/g' | sed 's/,/__/g' | sed 's/|/--/g' | sed 's/[:;]/_/g'
+}
+
+# Function to escape special characters for sed (like escape-sed-value.sh)
+escape_sed_value() {
+  local value="$1"
+  echo "$value" | sed -e 's/[\/&]/\\&/g'
+}
+
+# Check if user is authenticated with Google Cloud
+is_authenticated() {
+  # Check if user is authenticated
+  if gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | grep -q "@"; then
+    return 0  # Authenticated
+  else
+    return 1  # Not authenticated
+  fi
+}
+
+# Check for required tools
+check_requirements() {
+  section "Checking Requirements"
+  
+  local missing_requirements=0
+  
+  if ! command_exists gcloud; then
+    echo -e "${RED}Error: Google Cloud SDK (gcloud) is not installed.${NC}"
+    echo "Please install it from: https://cloud.google.com/sdk/docs/install"
+    missing_requirements=1
+  else
+    echo -e "${GREEN}✓ Google Cloud SDK is installed${NC}"
+  fi
+  
+  if ! command_exists docker; then
+    echo -e "${RED}Error: Docker is not installed.${NC}"
+    echo "Please install it from: https://docs.docker.com/get-docker/"
+    missing_requirements=1
+  else
+    echo -e "${GREEN}✓ Docker is installed${NC}"
+  fi
+  
+  if ! command_exists npm; then
+    echo -e "${RED}Error: npm is not installed.${NC}"
+    echo "Please install Node.js and npm from: https://nodejs.org/"
+    missing_requirements=1
+  else
+    echo -e "${GREEN}✓ npm is installed${NC}"
+  fi
+  
+  if ! command_exists sed; then
+    echo -e "${RED}Error: sed is not installed.${NC}"
+    missing_requirements=1
+  else
+    echo -e "${GREEN}✓ sed is installed${NC}"
+  fi
+  
+  # Check for gh CLI as well
+  if ! command_exists gh; then
+    echo -e "${YELLOW}Warning: GitHub CLI (gh) is not installed. GitHub variable fetching will be skipped.${NC}"
+    echo "Consider installing it from: https://cli.github.com/"
+  else
+    echo -e "${GREEN}✓ GitHub CLI is installed${NC}"
+  fi
+  
+  if [ $missing_requirements -ne 0 ]; then
+    echo -e "${RED}Please install the missing requirements and try again.${NC}"
+    exit 1
+  fi
+}
+
+# Initialize Google Cloud project
+initialize_gcloud() {
+  section "Initializing Google Cloud"
+  
+  # Only prompt for login if not already authenticated
+  if ! is_authenticated; then
+    echo -e "${YELLOW}Not authenticated with Google Cloud. Logging in...${NC}"
+    gcloud auth login
+  else
+    echo -e "${GREEN}✓ Already authenticated with Google Cloud${NC}"
+  fi
+  
+  # Check if we have a project ID, if not, prompt for it
+  if [ -z "$PROJECT_ID" ]; then
+    echo -ne "${YELLOW}Enter your Google Cloud Project ID: ${NC}"
+    read -r PROJECT_ID
+    
+    if [ -z "$PROJECT_ID" ]; then
+      echo -e "${RED}Error: Project ID cannot be empty.${NC}"
+      exit 1
+    fi
+  fi
+  
+  echo -e "${YELLOW}Setting Google Cloud project to: $PROJECT_ID${NC}"
+  gcloud config set project "$PROJECT_ID"
+  
+  # Enable required APIs
+  echo -e "${YELLOW}Enabling required Google Cloud APIs...${NC}"
+  gcloud services enable cloudbuild.googleapis.com
+  gcloud services enable run.googleapis.com
+  gcloud services enable artifactregistry.googleapis.com
+  gcloud services enable secretmanager.googleapis.com
+  
+  # Configure Docker to use Google Cloud credential helper
+  echo -e "${YELLOW}Configuring Docker authentication...${NC}"
+  gcloud auth configure-docker --quiet
+}
+
+# Check for required secrets and prompt if needed
+check_and_prompt_for_secrets() {
+  section "Checking Required Secrets"
+  
+  # Use default Upstash Redis URL for dev environment without prompting
+  if [[ "${REDIS_URL}" == *"localhost"* ]] || [[ -z "${REDIS_URL}" ]]; then
+    echo -e "${YELLOW}Using default Upstash dev Redis URL...${NC}"
+    UPSTASH_URL="redis://default:AbexAAIjcDE1M2Q4MWMxZTU5N2Q0MzEzYjQ0ZmM0NjIzZGUyYjQxMXAxMA@learning-goblin-47025.upstash.io:6379"
+  else
+    UPSTASH_URL="${REDIS_URL}"
+  fi
+  
+  # Use a default OpenRouter API key for development without prompting
+  if [ -z "$SECONDARY_ENDPOINT_TOKEN" ]; then
+    echo -e "${YELLOW}Using default OpenRouter API key for development...${NC}"
+    # Using a placeholder value - this should be replaced with an actual key in a real deployment
+    SECONDARY_ENDPOINT_TOKEN="sk-or-v1-placeholder-development-key"
+  fi
+  
+  echo -e "${GREEN}✓ Using default secrets for development deployment${NC}"
+}
+
+# Create or update secrets in Secret Manager
+setup_secrets() {
+  section "Setting up Secrets"
+  
+  # Check if the OpenAI API key secret exists
+  if ! gcloud secrets describe openai-api-key >/dev/null 2>&1; then
+    echo -e "${YELLOW}Creating OpenAI API key secret...${NC}"
+    echo -n "$SECONDARY_ENDPOINT_TOKEN" | gcloud secrets create openai-api-key --data-file=-
+  else
+    echo -e "${YELLOW}Updating OpenAI API key secret...${NC}"
+    echo -n "$SECONDARY_ENDPOINT_TOKEN" | gcloud secrets versions add openai-api-key --data-file=-
+  fi
+  
+  # Grant access to the Cloud Run service account
+  echo -e "${YELLOW}Granting Secret Manager access to Cloud Run service account...${NC}"
+  PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+  SERVICE_ACCOUNT="$PROJECT_NUMBER-compute@developer.gserviceaccount.com"
+  
+  gcloud secrets add-iam-policy-binding openai-api-key \
+    --member="serviceAccount:$SERVICE_ACCOUNT" \
+    --role="roles/secretmanager.secretAccessor"
+  
+  echo -e "${GREEN}✓ Secrets configured successfully${NC}"
 }
 
 # Build and tag the Docker image
@@ -383,43 +382,9 @@ build_image() {
     rm -rf dist node_modules/.vite
   fi
   
-  # Run custom build script that bypasses TypeScript errors
-  echo "Running custom build script to bypass TypeScript errors..."
-  if [[ "$current_dir" == *"/scripts" ]]; then
-    cd ..
-    node scripts/build-for-deploy.js
-    cd scripts
-  else
-    node scripts/build-for-deploy.js
-  fi
-  
-  # Verify that dist/index.html exists after local build
-  if [[ "$current_dir" == *"/scripts" ]]; then
-    # If in scripts directory, check one level up
-    if [ ! -f "../dist/index.html" ]; then
-      echo -e "${RED}❌ ERROR: dist/index.html not found after local build!${NC}"
-      echo -e "${RED}Local build failed. Cannot proceed with Docker build.${NC}"
-      exit 1
-    else
-      echo -e "${GREEN}✅ Local build successful: dist/index.html exists${NC}"
-    fi
-  else
-    # If at root
-    if [ ! -f "dist/index.html" ]; then
-      echo -e "${RED}❌ ERROR: dist/index.html not found after local build!${NC}"
-      echo -e "${RED}Local build failed. Cannot proceed with Docker build.${NC}"
-      exit 1
-    else
-      echo -e "${GREEN}✅ Local build successful: dist/index.html exists${NC}"
-    fi
-  fi
-  
   # Generate unique build ID
   BUILD_ID="$(date +%s)-$(git rev-parse --short HEAD 2>/dev/null || echo 'local')"
   echo "Using BUILD_ID: $BUILD_ID for cache control"
-  
-  # Use the BUILD_ID for the image tag to ensure uniqueness
-  IMAGE_TAG="$BUILD_ID"
   
   # Sanitize model names to prevent shell script errors
   SIMPLIFIED_MODELS=$(simplify_model_names "$REACT_APP_AVAILABLE_MODELS")
@@ -435,7 +400,6 @@ build_image() {
   fi
   
   docker build \
-    --platform=linux/amd64 \
     --build-arg BUILD_ID="$BUILD_ID" \
     --build-arg REACT_APP_AVAILABLE_MODELS="$SIMPLIFIED_MODELS" \
     --build-arg VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://nfa-proxy-1081887913409.us-west1.run.app}" \
@@ -443,10 +407,7 @@ build_image() {
     --build-arg SECONDARY_ENDPOINT_MODEL="$SIMPLIFIED_SECONDARY_MODEL" \
     --build-arg USE_FALLBACK_AS_PRIMARY="${USE_FALLBACK_AS_PRIMARY}" \
     --build-arg CONSUMER_API_URL="${CONSUMER_API_URL}" \
-    -t "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:${IMAGE_TAG}" .
-  
-  # Also tag as latest for convenience
-  docker tag "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:${IMAGE_TAG}" "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest"
+    -t "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest" .
   
   # If we changed directory, go back to the original directory
   if [[ "$current_dir" == *"/scripts" ]]; then
@@ -454,7 +415,6 @@ build_image() {
   fi
   
   echo -e "${GREEN}✓ Docker image built successfully with model: $SIMPLIFIED_MODELS${NC}"
-  echo -e "${GREEN}✓ Tagged as: gcr.io/${PROJECT_ID}/${SERVICE_NAME}:${IMAGE_TAG}${NC}"
 }
 
 # Push the Docker image to Google Container Registry
@@ -462,9 +422,6 @@ push_image() {
   section "Pushing to Google Container Registry"
   
   echo -e "${YELLOW}Pushing Docker image to GCR...${NC}"
-  # Push the uniquely tagged image
-  docker push "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:${IMAGE_TAG}"
-  # Also push latest tag
   docker push "gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest"
   
   echo -e "${GREEN}✓ Docker image pushed successfully${NC}"
@@ -492,9 +449,9 @@ configure_yaml() {
   # Update environment labels
   sed -i.bak "s|ENVIRONMENT_NAME|$ENVIRONMENT|g" cloud-run-deploy-config.yaml
   
-  # Update image reference with specific tag instead of 'latest'
+  # Update image reference
   sed -i.bak "s|PROJECT_ID|$PROJECT_ID|g" cloud-run-deploy-config.yaml
-  sed -i.bak "s|COMMIT_SHA|$IMAGE_TAG|g" cloud-run-deploy-config.yaml
+  sed -i.bak "s|COMMIT_SHA|latest|g" cloud-run-deploy-config.yaml
   
   # Verify the Redis URL
   echo "Redis URL format check:"
@@ -678,25 +635,10 @@ check_health() {
   echo "You can visit your deployed app at: $SERVICE_URL"
 }
 
-# Main execution
-main() {
-  # Show all environment variables that would be used
-  echo -e "${GREEN}==================================================${NC}"
-  echo -e "${GREEN}   MorSaaS Deployment to Google Cloud Run (${ENVIRONMENT})   ${NC}"
-  echo -e "${GREEN}==================================================${NC}"
-  
-  echo -e "${YELLOW}Initial Environment Configuration:${NC}"
-  echo -e "${BLUE}Environment Variables:${NC}"
-  echo -e "DEPLOY_ENVIRONMENT=${DEPLOY_ENVIRONMENT:-dev}"
-  echo -e "SERVICE_NAME=${SERVICE_NAME:-morsaas-dev}"
-  echo -e "REGION=${REGION:-us-west1}"
-  echo -e "GCP_PROJECT_ID=${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo 'not-set')}"
-  
-  # First fetch variables from GitHub
-  fetch_github_env_vars
-  
-  # Print the final configuration
-  echo -e "\n${BLUE}Final Deployment Configuration:${NC}"
+# Show configured environment variables
+show_config() {
+  # Print the final configuration after GitHub fetching
+  echo -e "${BLUE}Deployment Configuration:${NC}"
   echo -e "${YELLOW}Environment: $ENVIRONMENT${NC}"
   echo -e "${YELLOW}Service Name: $SERVICE_NAME${NC}"
   echo -e "${YELLOW}Project ID: $PROJECT_ID${NC}"
@@ -709,9 +651,28 @@ main() {
   echo -e "${YELLOW}OpenRouter HTTP Referer: $OPENROUTER_HTTP_REFERER${NC}"
   echo -e "${YELLOW}OpenRouter App Title: $OPENROUTER_APP_TITLE${NC}"
   echo -e "${YELLOW}OpenRouter App Version: $OPENROUTER_APP_VERSION${NC}"
+}
+
+# Main execution
+main() {
+  # Show all environment variables that would be used
+  echo -e "${GREEN}==================================================${NC}"
+  echo -e "${GREEN}   MorSaaS Development Deployment to Google Cloud Run   ${NC}"
+  echo -e "${GREEN}==================================================${NC}"
   
   check_requirements
+  
+  # First fetch variables from GitHub
+  fetch_github_env_vars
+  
+  # Check for and prompt for any missing secrets
+  check_and_prompt_for_secrets
+  
+  # Show final configuration after fetching from GitHub and environment
+  show_config
+  
   initialize_gcloud
+  setup_secrets
   build_image
   push_image
   configure_yaml
@@ -726,7 +687,7 @@ main() {
   
   echo -e "${GREEN}==================================================${NC}"
   echo -e "${GREEN}   Deployment process completed successfully!   ${NC}"
-  echo -e "${GREEN}   The demo script deployed to: $SERVICE_NAME   ${NC}"
+  echo -e "${GREEN}   The app deployed to: $SERVICE_NAME   ${NC}"
   echo -e "${GREEN}==================================================${NC}"
 }
 

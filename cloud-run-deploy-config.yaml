@@ -1,10 +1,10 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: morsaas
-  namespace: default
+  name: morsaas-dev
+  namespace: graphical-bus-433219-g5
   labels:
-    environment: ENVIRONMENT_NAME
+    environment: dev
 spec:
   template:
     metadata:
@@ -16,30 +16,34 @@ spec:
     spec:
       containerConcurrency: 80
       containers:
-      - image: gcr.io/graphical-bus-433219-g5/morsaas:latest
+      - image: gcr.io/graphical-bus-433219-g5/morsaas-dev:1745731838-df39343
         env:
         - name: NODE_ENV
           value: production
         - name: REDIS_URL
-          value: YOUR_REDIS_URL
+          value: redis://localhost:6379
         - name: REACT_APP_AVAILABLE_MODELS
-          value: REACT_APP_AVAILABLE_MODELS_VALUE
+          value: 'mistralai/mistral-small-3.1-24b-instruct_free--Mistral'
         - name: SECONDARY_ENDPOINT_URL
-          value: SECONDARY_ENDPOINT_URL_VALUE
+          value: https://openrouter.ai/api/v1/chat/completions
         - name: SECONDARY_ENDPOINT_TOKEN
           valueFrom:
             secretKeyRef:
               name: openai-api-key
               key: latest
         - name: SECONDARY_ENDPOINT_MODEL
-          value: SECONDARY_ENDPOINT_MODEL_VALUE
+          value: 'openrouter/auto'
         - name: CONSUMER_API_URL
-          value: CONSUMER_API_URL_VALUE
+          value: https://consumer-node-1081887913409.us-west1.run.app
         - name: USE_FALLBACK_AS_PRIMARY
-          value: "USE_FALLBACK_AS_PRIMARY_VALUE"
+          value: "true"
         - name: OPENROUTER_HTTP_REFERER
-          value: OPENROUTER_HTTP_REFERER_VALUE
+          value: https://dev.morsaas.com
         - name: OPENROUTER_APP_TITLE
-          value: OPENROUTER_APP_TITLE_VALUE
+          value: MorSaaS-Dev
         - name: OPENROUTER_APP_VERSION
-          value: OPENROUTER_APP_VERSION_VALUE
+          value: 1.0.0-dev
+        - name: ETHEREUM_CHAIN_ID
+          value: "1"
+        - name: ETHEREUM_RPC_URL
+          value: https://eth-goerli.g.alchemy.com/v2/demo
