@@ -25,10 +25,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Run npm audit fix
-        run: npm audit fix --force || true
+        run: npm audit fix --force --legacy-peer-deps || true
 
       - name: Commit changes if any
         run: |
